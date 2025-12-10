@@ -48,7 +48,7 @@ function summarizeHtml(htmlContent) {
       logger.info(`Título: ${titulo}`);
       logger.info(`======================================\n`);
 
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
       const prompt = `Resuma a seguinte notícia. 
 Destaque o anúncio principal (como data, estúdio, lançamento, etc.), 
 explique brevemente o contexto para melhor entendimento 
