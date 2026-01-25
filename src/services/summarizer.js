@@ -1,9 +1,10 @@
 require("dotenv").config();
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const OpenAI = require("openai");
+const axios = require("axios");
 const cheerio = require("cheerio");
 const logger = require("../utils/logger.js");
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 function extractArticleText(htmlContent) {
   const $ = cheerio.load(htmlContent);
@@ -21,9 +22,9 @@ function extractArticleText(htmlContent) {
 let iaQueue = Promise.resolve();
 
 function summarizeHtml(htmlContent) {
-  if (!process.env.GEMINI_API_KEY) {
+  if (!process.env.OPENAI_API_KEY) {
     return Promise.reject(
-      new Error("A variável de ambiente GEMINI_API_KEY não foi definida.")
+      new Error("A variável de ambiente OPENAI_API_KEY não foi definida.")
     );
   }
 
@@ -48,16 +49,21 @@ function summarizeHtml(htmlContent) {
       logger.info(`Título: ${titulo}`);
       logger.info(`======================================\n`);
 
-      const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash-lite",
-      });
-      const prompt = `Resuma a seguinte notícia. 
+      const prompt = `Resuma a seguinte notícia. Use alguns emojis apropriados no texto do resumo, sem exagerar.
 Destaque o anúncio principal (como data, estúdio, lançamento, etc.), 
 explique brevemente o contexto para melhor entendimento 
 e acrescente um comentário curto sobre a relevância ou possível impacto do anúncio:\n\n"${articleText}"`;
 
-      const result = await model.generateContent(prompt);
-      const summary = result.response.text();
+      const response = await client.responses.create({
+        model: "gpt-5-nano-2025-08-07",
+        input: prompt,
+      });
+      const summary = (response.output_text || "").trim();
+
+      if (!summary) {
+        logger.warn("[Resumo] A IA não retornou texto para o resumo.");
+        return "Não foi possível gerar o resumo.";
+      }
 
       logger.info("\n========== RESPOSTA DA IA ============");
       logger.info(summary);
@@ -74,4 +80,21 @@ e acrescente um comentário curto sobre a relevância ou possível impacto do an
   return iaQueue;
 }
 
-module.exports = { summarizeHtml };
+async function summarizeUrl(url) {
+  if (!url) {
+    throw new Error("URL inválida para resumo.");
+  }
+
+  logger.info(`[Resumo] Buscando conteúdo para: ${url}`);
+
+  const response = await axios.get(url, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    },
+  });
+
+  return summarizeHtml(response.data);
+}
+
+module.exports = { summarizeHtml, summarizeUrl };

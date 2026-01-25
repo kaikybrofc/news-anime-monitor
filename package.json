@@ -9,12 +9,12 @@
     "pm2:logs": "pm2 logs news-anime-monitor --lines 200"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "axios": "^1.6.0",
     "chalk": "^4.1.2",
     "cheerio": "^1.1.2",
     "dotenv": "^17.2.2",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "openai": "^5.0.0"
   },
   "author": "",
   "license": "MIT",
