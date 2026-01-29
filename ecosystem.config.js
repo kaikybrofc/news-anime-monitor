@@ -10,7 +10,7 @@ module.exports = {
       max_restarts: 10,
       env: {
         NODE_ENV: "production",
-        PORT: process.env.PORT || 3000,
+        PORT: process.env.PORT || 3001,
       },
       out_file: "./logs/out.log",
       error_file: "./logs/error.log",
