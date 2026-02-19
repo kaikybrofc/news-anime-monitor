@@ -2,14 +2,14 @@
 
 ![Version](https://img.shields.io/badge/version-1.0.2-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Node](https://img.shields.io/badge/node-%3E%3D14.0.0-brightgreen.svg)
+![Node](https://img.shields.io/badge/node-%3E%3D20.18.1-brightgreen.svg)
 
-`News Anime Monitor` é um sistema de monitoramento e sumarização de notícias automatizado e inteligente. Ele rastreia uma página de notícias de anime, extrai novos artigos, utiliza a IA do Google Gemini para gerar resumos concisos e os expõe através de uma API REST local. Com persistência de dados, sistema de logs avançado e suporte a gerenciamento de processos via PM2, é uma solução completa para acompanhar notícias de anime.
+`News Anime Monitor` é um sistema de monitoramento e sumarização de notícias automatizado e inteligente. Ele rastreia uma página de notícias de anime, extrai novos artigos, utiliza a API da OpenAI para gerar resumos concisos e os expõe através de uma API REST local. Com persistência de dados, sistema de logs avançado e suporte a gerenciamento de processos via PM2, é uma solução completa para acompanhar notícias de anime.
 
 ## ✨ Funcionalidades Principais
 
 - **Monitoramento Contínuo:** Verifica periodicamente a página de notícias em busca de novos artigos (intervalo configurável, padrão: 15 minutos).
-- **Sumarização com IA:** Utiliza o Google Gemini 2.0 Flash para criar resumos inteligentes, informativos e contextualizados dos artigos.
+- **Sumarização com IA:** Utiliza modelos da OpenAI para criar resumos inteligentes, informativos e contextualizados dos artigos.
 - **API REST:** Disponibiliza os artigos processados e seus resumos através de um endpoint HTTP local para fácil integração.
 - **Persistência de Dados:** Salva as notícias em um arquivo JSON (`processed_articles.json`), garantindo que os dados não sejam perdidos ao reiniciar o servidor.
 - **Sistema de Logs Avançado:** Logs coloridos e organizados (INFO, SUCCESS, ERROR) para fácil depuração e monitoramento da aplicação.
@@ -23,8 +23,8 @@ Siga estas instruções para ter o projeto rodando em sua máquina local.
 
 ### Pré-requisitos
 
-- [Node.js](https://nodejs.org/) (versão 14 ou superior recomendada)
-- Uma chave de API do [Google Gemini](https://aistudio.google.com/app/apikey)
+- [Node.js](https://nodejs.org/) (versão 20.18.1 ou superior recomendada)
+- Uma chave de API da [OpenAI](https://platform.openai.com/api-keys)
 - (Opcional) [PM2](https://pm2.keymetrics.io/) para gerenciamento de processos em produção
 
 ### Instalação
@@ -45,9 +45,9 @@ Siga estas instruções para ter o projeto rodando em sua máquina local.
       ```bash
       cp .env.example .env
       ```
-    - Edite o arquivo `.env` e adicione sua chave da API do Gemini:
+    - Edite o arquivo `.env` e adicione sua chave da OpenAI:
       ```
-      GEMINI_API_KEY=SUA_CHAVE_DE_API_AQUI
+      OPENAI_API_KEY=SUA_CHAVE_DE_API_AQUI
       ```
 
 ### Uso
@@ -120,12 +120,10 @@ Uma vez que o servidor esteja rodando, você pode acessar as notícias processad
 
 #### Exemplo de Resposta (Sem Notícias)
 
-Se nenhuma notícia foi processada ainda, a resposta será:
+Se nenhuma notícia foi processada ainda, a resposta será um array vazio:
 
 ```json
-{
-  "message": "Nenhuma notícia foi processada ainda. Verifique novamente em alguns instantes."
-}
+[]
 ```
 
 ## 📁 Estrutura de Arquivos
@@ -136,9 +134,11 @@ news-anime-monitor/
 │   ├── api/
 │   │   └── index.js           # Servidor Express, endpoints da API e loop de monitoramento
 │   ├── services/
-│   │   └── summarizer.js      # Integração com a API do Gemini para geração de resumos
+│   │   └── summarizer.js      # Integração com a API da OpenAI para geração de resumos
 │   ├── utils/
-│   │   └── logger.js          # Sistema centralizado de logs com formatação colorida
+│   │   ├── logger.js          # Sistema centralizado de logs com formatação colorida
+│   │   ├── http.js            # HTTP com timeout/retry para coleta de páginas e feed/sitemap
+│   │   └── article-utils.js   # Regras compartilhadas de parsing e filtragem de artigos
 │   ├── scripts/
 │   │   └── monitor-log.js     # Script auxiliar para monitoramento e logging
 │   └── data/
@@ -160,27 +160,37 @@ Crie um arquivo `.env` na raiz do projeto com as seguintes variáveis:
 
 ```env
 # Obrigatório
-GEMINI_API_KEY=sua_chave_de_api_do_gemini
+OPENAI_API_KEY=sua_chave_de_api_da_openai
 
 # Opcional
 PORT=3000                      # Porta do servidor (padrão: 3000)
 NODE_ENV=production           # Ambiente de execução
+OPENAI_MODEL=gpt-5-nano-2025-08-07
+OPENAI_TIMEOUT_MS=20000
+OPENAI_MAX_ATTEMPTS=3
+OPENAI_RETRY_BASE_MS=1200
+SUMMARY_MAX_INPUT_CHARS=12000
+SUMMARY_MAX_OUTPUT_TOKENS=360
+HTTP_TIMEOUT_MS=15000
+HTTP_MAX_ATTEMPTS=3
+HTTP_RETRY_BASE_MS=600
+ARTICLE_PROCESS_CONCURRENCY=1
 ```
 
 ### Configurações do Sistema
 
 As seguintes configurações podem ser ajustadas em `src/api/index.js`:
 
-- **`URL_TO_MONITOR`**: URL da página a ser monitorada (padrão: `https://animenew.com.br/noticias/animes/`)
+- **`URL_TO_MONITOR`**: URL da página a ser monitorada (padrão: `https://animenew.com.br/`)
 - **`CHECK_INTERVAL_MS`**: Intervalo de verificação de novas notícias em milissegundos (padrão: 900000 = 15 minutos)
 - **`EXPIRATION_TIME_MS`**: Tempo de expiração das notícias em milissegundos (padrão: 86400000 = 24 horas)
 - **`CLEANUP_INTERVAL_MS`**: Intervalo de limpeza automática em milissegundos (padrão: 3600000 = 1 hora)
 
 ## 🔧 Troubleshooting
 
-### Erro: "A variável de ambiente GEMINI_API_KEY não foi definida"
+### Erro: "A variável de ambiente OPENAI_API_KEY não foi definida"
 
-**Solução:** Certifique-se de que o arquivo `.env` existe na raiz do projeto e contém sua chave de API válida do Google Gemini.
+**Solução:** Certifique-se de que o arquivo `.env` existe na raiz do projeto e contém sua chave de API válida da OpenAI.
 
 ### Nenhuma notícia está sendo processada
 
@@ -218,7 +228,7 @@ Contribuições são bem-vindas! Se você deseja contribuir com este projeto:
 - [ ] Sistema de notificações (email, Discord, Telegram)
 - [ ] Filtros personalizáveis por categoria/tag
 - [ ] API com autenticação
-- [ ] Suporte a outros modelos de IA além do Gemini
+- [ ] Suporte a múltiplos provedores de IA além da OpenAI
 
 ## 📝 Licença
 
@@ -231,7 +241,7 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 
 ## 🌟 Agradecimentos
 
-- [Google Gemini](https://ai.google.dev/) - API de IA generativa
+- [OpenAI](https://platform.openai.com/) - API de IA generativa
 - [AnimeNew](https://animenew.com.br/) - Fonte de notícias
 - Comunidade open source
 
