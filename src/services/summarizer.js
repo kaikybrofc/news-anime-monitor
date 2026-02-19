@@ -3,6 +3,7 @@ const OpenAI = require("openai");
 const cheerio = require("cheerio");
 const logger = require("../utils/logger.js");
 const { getWithRetry, toPositiveInt } = require("../utils/http.js");
+const { extractTitleFromHtml } = require("../utils/article-utils.js");
 
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5-nano-2025-08-07";
 const OPENAI_TIMEOUT_MS = toPositiveInt(process.env.OPENAI_TIMEOUT_MS, 20000);
@@ -19,9 +20,23 @@ const SUMMARY_MAX_OUTPUT_TOKENS = toPositiveInt(
   process.env.SUMMARY_MAX_OUTPUT_TOKENS,
   360
 );
+const SUMMARY_RETRY_MAX_OUTPUT_TOKENS = toPositiveInt(
+  process.env.SUMMARY_RETRY_MAX_OUTPUT_TOKENS,
+  1200
+);
 const SUMMARY_LOG_TITLE_MAX_CHARS = toPositiveInt(
   process.env.SUMMARY_LOG_TITLE_MAX_CHARS,
   120
+);
+
+function normalizeReasoningEffort(value) {
+  const allowed = new Set(["minimal", "low", "medium", "high"]);
+  const normalized = String(value || "minimal").toLowerCase().trim();
+  return allowed.has(normalized) ? normalized : "minimal";
+}
+
+const OPENAI_REASONING_EFFORT = normalizeReasoningEffort(
+  process.env.OPENAI_REASONING_EFFORT
 );
 
 let openaiClient = null;
@@ -46,14 +61,24 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function shouldApplyReasoningConfig(modelName) {
+  return /^(gpt-5|o[1-9]|o3|o4)/i.test(String(modelName || ""));
+}
+
 function isRetryableOpenAIError(error) {
-  if (error?.message === "EMPTY_SUMMARY_RESPONSE") return false;
+  if (error?.code === "EMPTY_SUMMARY_RESPONSE") return true;
 
   const status = error?.status || error?.response?.status;
   const code = error?.code;
 
   if (typeof status === "number") {
-    return status === 408 || status === 409 || status === 425 || status === 429 || status >= 500;
+    return (
+      status === 408 ||
+      status === 409 ||
+      status === 425 ||
+      status === 429 ||
+      status >= 500
+    );
   }
 
   return [
@@ -78,19 +103,36 @@ function extractArticleText(htmlContent) {
   const $ = cheerio.load(htmlContent);
 
   const candidates = [
+    $(".inner-post-entry.entry-content").text(),
+    $(".inner-post-entry").text(),
     $(".entry-content").text(),
     $("article").text(),
     $("main").text(),
     $("body").text(),
   ];
 
-  const articleText = candidates.find((value) => value && value.trim().length > 0);
+  const articleText = candidates.find(
+    (value) => value && value.trim().length > 0
+  );
   return articleText ? normalizeArticleText(articleText) : "";
 }
 
 function truncateText(text, maxChars) {
   if (text.length <= maxChars) return text;
   return `${text.slice(0, maxChars)}\n\n[Conteúdo truncado para controle de custo.]`;
+}
+
+function buildFallbackSummary(articleText) {
+  const sentences = articleText
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length > 25);
+
+  const fallbackBody =
+    sentences.slice(0, 3).join(" ") || truncateText(articleText, 480);
+
+  const clipped = truncateText(fallbackBody, 650);
+  return `Resumo automático (fallback): ${clipped}`;
 }
 
 function buildPrompt(articleText) {
@@ -110,21 +152,76 @@ ${articleText}
 </article>`;
 }
 
+function extractTextFromResponse(response) {
+  const direct = String(response?.output_text || "").trim();
+  if (direct) {
+    return direct;
+  }
+
+  const chunks = [];
+  const outputItems = Array.isArray(response?.output) ? response.output : [];
+
+  outputItems.forEach((item) => {
+    if (typeof item?.output_text === "string") {
+      const value = item.output_text.trim();
+      if (value) chunks.push(value);
+    }
+
+    const contentList = Array.isArray(item?.content) ? item.content : [];
+    contentList.forEach((content) => {
+      if (!content) return;
+      if (!["output_text", "text"].includes(content.type)) return;
+
+      if (typeof content.text === "string") {
+        const value = content.text.trim();
+        if (value) chunks.push(value);
+        return;
+      }
+
+      if (typeof content?.text?.value === "string") {
+        const value = content.text.value.trim();
+        if (value) chunks.push(value);
+      }
+    });
+  });
+
+  return chunks.join("\n").trim();
+}
+
+function createEmptySummaryError(response) {
+  const error = new Error("EMPTY_SUMMARY_RESPONSE");
+  error.code = "EMPTY_SUMMARY_RESPONSE";
+  error.incompleteReason = response?.incomplete_details?.reason || null;
+  error.responseStatus = response?.status || null;
+  error.outputItemTypes = Array.isArray(response?.output)
+    ? response.output.map((item) => item?.type).filter(Boolean)
+    : [];
+  return error;
+}
+
 async function generateSummary(prompt) {
   const client = getOpenAIClient();
 
   let lastError;
+  let maxOutputTokens = SUMMARY_MAX_OUTPUT_TOKENS;
+
   for (let attempt = 1; attempt <= OPENAI_MAX_ATTEMPTS; attempt += 1) {
     try {
-      const response = await client.responses.create({
+      const requestPayload = {
         model: OPENAI_MODEL,
         input: prompt,
-        max_output_tokens: SUMMARY_MAX_OUTPUT_TOKENS,
-      });
+        max_output_tokens: maxOutputTokens,
+      };
 
-      const summary = (response.output_text || "").trim();
+      if (shouldApplyReasoningConfig(OPENAI_MODEL)) {
+        requestPayload.reasoning = { effort: OPENAI_REASONING_EFFORT };
+      }
+
+      const response = await client.responses.create(requestPayload);
+      const summary = extractTextFromResponse(response);
+
       if (!summary) {
-        throw new Error("EMPTY_SUMMARY_RESPONSE");
+        throw createEmptySummaryError(response);
       }
 
       return summary;
@@ -135,12 +232,29 @@ async function generateSummary(prompt) {
 
       if (!willRetry) break;
 
-      const delayMs = OPENAI_RETRY_BASE_MS * 2 ** (attempt - 1);
-      const status = error?.status || error?.response?.status || error?.code || "UNKNOWN";
-      logger.warn(
-        `[Resumo] Falha na IA (${status}) tentativa ${attempt}/${OPENAI_MAX_ATTEMPTS}. Retentando em ${delayMs}ms...`
-      );
+      if (error?.code === "EMPTY_SUMMARY_RESPONSE") {
+        if (
+          error?.incompleteReason === "max_output_tokens" ||
+          error?.responseStatus === "incomplete"
+        ) {
+          maxOutputTokens = Math.min(
+            Math.max(maxOutputTokens * 2, SUMMARY_MAX_OUTPUT_TOKENS + 120),
+            SUMMARY_RETRY_MAX_OUTPUT_TOKENS
+          );
+        }
 
+        logger.warn(
+          `[Resumo] IA retornou vazio (status=${error?.responseStatus || "unknown"}, reason=${error?.incompleteReason || "n/a"}, output=${(error?.outputItemTypes || []).join(",") || "none"}). Tentando novamente...`
+        );
+      } else {
+        const status =
+          error?.status || error?.response?.status || error?.code || "UNKNOWN";
+        logger.warn(
+          `[Resumo] Falha na IA (${status}) tentativa ${attempt}/${OPENAI_MAX_ATTEMPTS}. Retentando...`
+        );
+      }
+
+      const delayMs = OPENAI_RETRY_BASE_MS * 2 ** (attempt - 1);
       await sleep(delayMs);
     }
   }
@@ -152,6 +266,8 @@ async function generateSummary(prompt) {
 let iaQueue = Promise.resolve();
 
 async function summarizeHtmlInternal(htmlContent) {
+  let limitedText = "";
+
   try {
     const articleText = extractArticleText(htmlContent);
 
@@ -160,11 +276,14 @@ async function summarizeHtmlInternal(htmlContent) {
       return "Não foi possível extrair o conteúdo para resumo.";
     }
 
-    const limitedText = truncateText(articleText, SUMMARY_MAX_INPUT_CHARS);
+    limitedText = truncateText(articleText, SUMMARY_MAX_INPUT_CHARS);
 
+    const extractedTitle = extractTitleFromHtml(htmlContent);
     let title =
+      extractedTitle ||
       articleText.split("\n").find((line) => line.trim().length > 0) ||
       "[Sem título detectado]";
+
     if (title.length > SUMMARY_LOG_TITLE_MAX_CHARS) {
       title = `${title.slice(0, SUMMARY_LOG_TITLE_MAX_CHARS)}...`;
     }
@@ -182,6 +301,12 @@ async function summarizeHtmlInternal(htmlContent) {
 
     return summary;
   } catch (error) {
+    if (error?.code === "EMPTY_SUMMARY_RESPONSE") {
+      const fallback = buildFallbackSummary(limitedText);
+      logger.warn("[Resumo] IA retornou vazio após tentativas. Usando fallback local.");
+      return fallback;
+    }
+
     logger.error("[Resumo] Erro ao gerar resumo:", error.message || error);
     return "Ocorreu um erro durante o resumo.";
   }

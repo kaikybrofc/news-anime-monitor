@@ -7,7 +7,6 @@ const { summarizeHtml } = require("../services/summarizer.js");
 const logger = require("../utils/logger.js");
 const { getWithRetry, toPositiveInt } = require("../utils/http.js");
 const {
-  isArticleUrl,
   isLikelyUrl,
   extractArticlesFromHomeHtml,
   extractArticlesFromFeed,
@@ -17,14 +16,23 @@ const {
   inferTitleFromUrl,
   extractTitleFromHtml,
 } = require("../utils/article-utils.js");
+const { getNewsSources } = require("../config/news-sources.js");
 
 // --- CONFIGURAÇÃO ---
-const URL_TO_MONITOR = "https://animenew.com.br/";
-const FEED_URL = "https://animenew.com.br/feed/";
-const SITEMAP_INDEX_URL = "https://animenew.com.br/sitemap_index.xml";
+const NEWS_SOURCES = getNewsSources();
 const DAYS_BACK = toPositiveInt(process.env.DAYS_BACK, 3);
-const MAX_ITEMS = toPositiveInt(process.env.MAX_ITEMS, 50);
-const MAX_SITEMAPS = toPositiveInt(process.env.MAX_SITEMAPS, 5);
+const MAX_ITEMS_PER_SOURCE = toPositiveInt(
+  process.env.MAX_ITEMS_PER_SOURCE || process.env.MAX_ITEMS,
+  50
+);
+const MAX_SITEMAPS_PER_SOURCE = toPositiveInt(
+  process.env.MAX_SITEMAPS_PER_SOURCE || process.env.MAX_SITEMAPS,
+  5
+);
+const MAX_NEW_ARTICLES_PER_CYCLE = toPositiveInt(
+  process.env.MAX_NEW_ARTICLES_PER_CYCLE,
+  MAX_ITEMS_PER_SOURCE * Math.max(1, NEWS_SOURCES.length)
+);
 const CHECK_INTERVAL_MS = toPositiveInt(process.env.CHECK_INTERVAL_MS, 900000);
 const EXPIRATION_TIME_MS = toPositiveInt(
   process.env.EXPIRATION_TIME_MS,
@@ -98,12 +106,178 @@ function resolveArticleName(articleInfo, html) {
     return providedName;
   }
 
-  const extractedTitle = extractTitleFromHtml(html);
+  const extractedTitle = extractTitleFromHtml(html, articleInfo.sourceConfig);
   if (extractedTitle) {
     return extractedTitle;
   }
 
   return providedName || inferredName;
+}
+
+function getItemTimestamp(item) {
+  const dateValue = item.pubDate || item.lastmod;
+  if (!dateValue) return 0;
+
+  const parsed = Date.parse(dateValue);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function dedupeByUrl(items) {
+  const seen = new Set();
+  const deduped = [];
+
+  items.forEach((item) => {
+    if (!item?.url || seen.has(item.url)) return;
+    seen.add(item.url);
+    deduped.push(item);
+  });
+
+  return deduped;
+}
+
+function enrichSitemapNames(sitemapItems, feedItems) {
+  if (!sitemapItems.length || !feedItems.length) return sitemapItems;
+
+  const feedTitlesByUrl = new Map(
+    feedItems
+      .filter((item) => item.url && item.name)
+      .map((item) => [item.url, item.name])
+  );
+
+  return sitemapItems.map((item) => {
+    const feedTitle = feedTitlesByUrl.get(item.url);
+    if (!feedTitle) return item;
+
+    return {
+      ...item,
+      name: feedTitle,
+    };
+  });
+}
+
+function attachSourceInfo(items, source) {
+  return items.map((item) => ({
+    ...item,
+    sourceId: source.id,
+    sourceName: source.name,
+    sourceConfig: source,
+  }));
+}
+
+async function collectItemsFromSource(source) {
+  const sourceTag = `[Fonte:${source.name}]`;
+
+  // 1) Sitemap
+  let sitemapItems = [];
+  if (source.enableSitemap && source.sitemapIndexUrl) {
+    try {
+      const indexResponse = await getWithRetry(source.sitemapIndexUrl, {
+        context: `${source.name}/SitemapIndex`,
+      });
+
+      const maxSitemaps = toPositiveInt(
+        source.maxSitemaps,
+        MAX_SITEMAPS_PER_SOURCE
+      );
+      const sitemaps = extractSitemapsFromIndex(indexResponse.data).slice(
+        0,
+        maxSitemaps
+      );
+
+      const seenSitemapUrls = new Set();
+      for (const sitemapUrl of sitemaps) {
+        const smResponse = await getWithRetry(sitemapUrl, {
+          context: `${source.name}/SitemapFile`,
+        });
+
+        const urls = extractUrlsFromSitemap(smResponse.data, source);
+        urls.forEach((entry) => {
+          if (seenSitemapUrls.has(entry.url)) return;
+          seenSitemapUrls.add(entry.url);
+          sitemapItems.push({
+            name: inferTitleFromUrl(entry.url),
+            url: entry.url,
+            lastmod: entry.lastmod,
+          });
+        });
+
+        if (sitemapItems.length >= MAX_ITEMS_PER_SOURCE) break;
+      }
+
+      sitemapItems = filterByDays(sitemapItems, DAYS_BACK);
+    } catch (_error) {
+      logger.warn(`${sourceTag} Não foi possível acessar o sitemap.`);
+    }
+  }
+
+  // 2) Feed
+  let feedItems = [];
+  if (source.feedUrl) {
+    try {
+      const feedResponse = await getWithRetry(source.feedUrl, {
+        context: `${source.name}/Feed`,
+      });
+
+      feedItems = extractArticlesFromFeed(feedResponse.data, source);
+      feedItems = filterByDays(feedItems, DAYS_BACK);
+    } catch (_error) {
+      logger.warn(`${sourceTag} Não foi possível acessar o feed.`);
+    }
+  }
+
+  sitemapItems = enrichSitemapNames(sitemapItems, feedItems);
+
+  // 3) Home / categoria
+  let homeItems = [];
+  const hasPrimaryItems = sitemapItems.length || feedItems.length;
+  if (!hasPrimaryItems && source.monitorUrl) {
+    try {
+      const homeResponse = await getWithRetry(source.monitorUrl, {
+        context: `${source.name}/Home`,
+      });
+
+      homeItems = extractArticlesFromHomeHtml(homeResponse.data, source);
+    } catch (_error) {
+      logger.warn(`${sourceTag} Não foi possível acessar a página principal da fonte.`);
+    }
+  }
+
+  const buckets = {
+    sitemap: sitemapItems,
+    feed: feedItems,
+    home: homeItems,
+  };
+
+  const priority = Array.isArray(source.collectionPriority)
+    ? source.collectionPriority
+    : ["sitemap", "feed", "home"];
+
+  let selectedBucketName = "none";
+  let selectedItems = [];
+
+  for (const bucketName of priority) {
+    const bucketItems = buckets[bucketName] || [];
+    if (!bucketItems.length) continue;
+
+    selectedBucketName = bucketName;
+    selectedItems = bucketItems;
+    break;
+  }
+
+  if (!selectedItems.length) {
+    logger.warn(`${sourceTag} Nenhum item coletado nesta fonte.`);
+    return [];
+  }
+
+  if (selectedItems.length > MAX_ITEMS_PER_SOURCE) {
+    selectedItems = selectedItems.slice(0, MAX_ITEMS_PER_SOURCE);
+  }
+
+  logger.info(
+    `${sourceTag} ${selectedItems.length} item(ns) coletados via ${selectedBucketName}.`
+  );
+
+  return attachSourceInfo(selectedItems, source);
 }
 
 // Garante que o diretório de dados exista
@@ -165,10 +339,15 @@ app.get("/", (_req, res) => {
 
 async function processArticle(articleInfo) {
   try {
-    logger.info(`Processando: ${articleInfo.name || articleInfo.url}`);
+    const sourceTag = articleInfo.sourceName
+      ? `[${articleInfo.sourceName}] `
+      : "";
+    logger.info(
+      `${sourceTag}Processando: ${articleInfo.name || articleInfo.url}`
+    );
 
     const articlePageResponse = await getWithRetry(articleInfo.url, {
-      context: "Artigo/Fetch",
+      context: `${articleInfo.sourceName || "Artigo"}/Fetch`,
     });
 
     const html = articlePageResponse.data;
@@ -226,28 +405,11 @@ async function processWithConcurrency(items, worker, concurrency) {
   return results.filter(Boolean);
 }
 
-function enrichSitemapNames(sitemapItems, feedItems) {
-  if (!sitemapItems.length || !feedItems.length) return sitemapItems;
-
-  const feedTitlesByUrl = new Map(
-    feedItems
-      .filter((item) => item.url && item.name)
-      .map((item) => [item.url, item.name])
-  );
-
-  return sitemapItems.map((item) => {
-    const feedTitle = feedTitlesByUrl.get(item.url);
-    if (!feedTitle) return item;
-    return {
-      ...item,
-      name: feedTitle,
-    };
-  });
-}
-
 async function checkPageForNews() {
   if (isCheckingNews) {
-    logger.warn("[Monitor] Verificação anterior ainda está em andamento. Pulando ciclo.");
+    logger.warn(
+      "[Monitor] Verificação anterior ainda está em andamento. Pulando ciclo."
+    );
     return;
   }
 
@@ -259,88 +421,27 @@ async function checkPageForNews() {
   isCheckingNews = true;
 
   try {
-    logger.info("Verificando a página de notícias...");
+    logger.info("Verificando as fontes de notícias...");
 
-    // 1) Tenta usar o sitemap (varredura ampla)
-    let sitemapItems = [];
-    try {
-      const indexResponse = await getWithRetry(SITEMAP_INDEX_URL, {
-        context: "Sitemap/Index",
-      });
+    const collectedItems = [];
 
-      const sitemaps = extractSitemapsFromIndex(indexResponse.data).slice(
-        0,
-        MAX_SITEMAPS
-      );
-
-      const seen = new Set();
-      for (const sitemapUrl of sitemaps) {
-        const smResponse = await getWithRetry(sitemapUrl, {
-          context: "Sitemap/File",
-        });
-
-        const urls = extractUrlsFromSitemap(smResponse.data);
-        for (const entry of urls) {
-          if (!isArticleUrl(entry.url)) continue;
-          if (seen.has(entry.url)) continue;
-
-          seen.add(entry.url);
-          sitemapItems.push({
-            name: inferTitleFromUrl(entry.url),
-            url: entry.url,
-            lastmod: entry.lastmod,
-          });
-        }
-
-        if (sitemapItems.length >= MAX_ITEMS) break;
-      }
-
-      sitemapItems = filterByDays(sitemapItems, DAYS_BACK);
-    } catch (_error) {
-      logger.warn("Não foi possível acessar o sitemap. Usando feed/home.");
+    for (const source of NEWS_SOURCES) {
+      const sourceItems = await collectItemsFromSource(source);
+      collectedItems.push(...sourceItems);
     }
 
-    // 2) Tenta usar o feed
-    let feedItems = [];
-    try {
-      const feedResponse = await getWithRetry(FEED_URL, {
-        context: "Feed/Fetch",
-      });
-
-      feedItems = extractArticlesFromFeed(feedResponse.data);
-      feedItems = filterByDays(feedItems, DAYS_BACK);
-    } catch (_error) {
-      logger.warn("Não foi possível acessar o feed. Usando home.");
-    }
-
-    sitemapItems = enrichSitemapNames(sitemapItems, feedItems);
-
-    // 3) Fallback para a home
-    let homeItems = [];
-    if (!sitemapItems.length && !feedItems.length) {
-      const response = await getWithRetry(URL_TO_MONITOR, {
-        context: "Home/Fetch",
-      });
-
-      homeItems = extractArticlesFromHomeHtml(response.data);
-    }
-
-    let itemList = sitemapItems.length
-      ? sitemapItems
-      : feedItems.length
-      ? feedItems
-      : homeItems;
-
-    if (!itemList.length) {
-      logger.warn("Nenhuma notícia encontrada.");
+    if (!collectedItems.length) {
+      logger.warn("Nenhuma notícia encontrada em nenhuma fonte.");
       return;
     }
 
-    if (itemList.length > MAX_ITEMS) {
-      itemList = itemList.slice(0, MAX_ITEMS);
-    }
+    const candidates = dedupeByUrl(
+      collectedItems
+        .slice()
+        .sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a))
+    );
 
-    const newArticles = itemList.filter(
+    const newArticles = candidates.filter(
       (article) => article?.url && !knownArticleUrls.has(article.url)
     );
 
@@ -349,15 +450,23 @@ async function checkPageForNews() {
       return;
     }
 
+    const articlesToProcess = newArticles.slice(0, MAX_NEW_ARTICLES_PER_CYCLE);
+
+    if (newArticles.length > articlesToProcess.length) {
+      logger.warn(
+        `[Monitor] ${newArticles.length} notícia(s) nova(s) encontradas. Processando ${articlesToProcess.length} neste ciclo para controlar custo.`
+      );
+    }
+
     const initialRun = knownArticleUrls.size === 0;
     logger.info(
       `${initialRun ? "Inicialização:" : "Novas notícias detectadas:"} ${
-        newArticles.length
+        articlesToProcess.length
       } artigo(s) para processar.`
     );
 
     const newlyProcessed = await processWithConcurrency(
-      newArticles,
+      articlesToProcess,
       processArticle,
       ARTICLE_PROCESS_CONCURRENCY
     );
@@ -407,6 +516,11 @@ function startServer() {
   const server = app.listen(PORT, () => {
     logger.success(`Servidor rodando na porta ${PORT}.`);
     loadArticlesFromFile();
+
+    const sourcesSummary = NEWS_SOURCES.map(
+      (source) => `${source.name} (${source.monitorUrl})`
+    ).join(", ");
+    logger.info(`Fontes ativas: ${sourcesSummary}`);
     logger.info("Iniciando o monitoramento de notícias...");
 
     checkPageForNews();

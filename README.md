@@ -4,11 +4,12 @@
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D20.18.1-brightgreen.svg)
 
-`News Anime Monitor` é um sistema de monitoramento e sumarização de notícias automatizado e inteligente. Ele rastreia uma página de notícias de anime, extrai novos artigos, utiliza a API da OpenAI para gerar resumos concisos e os expõe através de uma API REST local. Com persistência de dados, sistema de logs avançado e suporte a gerenciamento de processos via PM2, é uma solução completa para acompanhar notícias de anime.
+`News Anime Monitor` é um sistema de monitoramento e sumarização de notícias automatizado e inteligente. Ele rastreia múltiplas fontes de notícias de anime, extrai novos artigos, utiliza a API da OpenAI para gerar resumos concisos e os expõe através de uma API REST local. Com persistência de dados, sistema de logs avançado e suporte a gerenciamento de processos via PM2, é uma solução completa para acompanhar notícias de anime.
 
 ## ✨ Funcionalidades Principais
 
 - **Monitoramento Contínuo:** Verifica periodicamente a página de notícias em busca de novos artigos (intervalo configurável, padrão: 15 minutos).
+- **Múltiplas Fontes:** Suporte nativo a AnimeNew e Anime Corner, com filtros específicos por domínio/fonte.
 - **Sumarização com IA:** Utiliza modelos da OpenAI para criar resumos inteligentes, informativos e contextualizados dos artigos.
 - **API REST:** Disponibiliza os artigos processados e seus resumos através de um endpoint HTTP local para fácil integração.
 - **Persistência de Dados:** Salva as notícias em um arquivo JSON (`processed_articles.json`), garantindo que os dados não sejam perdidos ao reiniciar o servidor.
@@ -133,6 +134,8 @@ news-anime-monitor/
 ├── src/
 │   ├── api/
 │   │   └── index.js           # Servidor Express, endpoints da API e loop de monitoramento
+│   ├── config/
+│   │   └── news-sources.js    # Definição das fontes monitoradas e filtros por fonte
 │   ├── services/
 │   │   └── summarizer.js      # Integração com a API da OpenAI para geração de resumos
 │   ├── utils/
@@ -169,20 +172,29 @@ OPENAI_MODEL=gpt-5-nano-2025-08-07
 OPENAI_TIMEOUT_MS=20000
 OPENAI_MAX_ATTEMPTS=3
 OPENAI_RETRY_BASE_MS=1200
+OPENAI_REASONING_EFFORT=minimal
 SUMMARY_MAX_INPUT_CHARS=12000
 SUMMARY_MAX_OUTPUT_TOKENS=360
+SUMMARY_RETRY_MAX_OUTPUT_TOKENS=1200
 HTTP_TIMEOUT_MS=15000
 HTTP_MAX_ATTEMPTS=3
 HTTP_RETRY_BASE_MS=600
 ARTICLE_PROCESS_CONCURRENCY=1
+NEWS_SOURCE_IDS=animenew,animecorner
+MAX_ITEMS_PER_SOURCE=50
+MAX_SITEMAPS_PER_SOURCE=5
+MAX_NEW_ARTICLES_PER_CYCLE=100
+MAX_MONITOR_LOG_ITEMS=100
 ```
 
 ### Configurações do Sistema
 
-As seguintes configurações podem ser ajustadas em `src/api/index.js`:
+As seguintes configurações podem ser ajustadas por variáveis de ambiente:
 
-- **`URL_TO_MONITOR`**: URL da página a ser monitorada (padrão: `https://animenew.com.br/`)
+- **`NEWS_SOURCE_IDS`**: Fontes ativas (padrão: `animenew,animecorner`)
 - **`CHECK_INTERVAL_MS`**: Intervalo de verificação de novas notícias em milissegundos (padrão: 900000 = 15 minutos)
+- **`MAX_ITEMS_PER_SOURCE`**: Limite de itens coletados por fonte em cada ciclo
+- **`MAX_NEW_ARTICLES_PER_CYCLE`**: Limite global de artigos novos processados por ciclo (controle de custo)
 - **`EXPIRATION_TIME_MS`**: Tempo de expiração das notícias em milissegundos (padrão: 86400000 = 24 horas)
 - **`CLEANUP_INTERVAL_MS`**: Intervalo de limpeza automática em milissegundos (padrão: 3600000 = 1 hora)
 
@@ -196,7 +208,7 @@ As seguintes configurações podem ser ajustadas em `src/api/index.js`:
 
 **Soluções:**
 1. Verifique sua conexão com a internet
-2. Confirme que a URL monitorada (`URL_TO_MONITOR`) está acessível
+2. Confirme se as fontes ativas em `NEWS_SOURCE_IDS` estão acessíveis
 3. Verifique os logs para identificar possíveis erros
 4. Aguarde pelo menos um ciclo de verificação (15 minutos por padrão)
 
@@ -223,7 +235,7 @@ Contribuições são bem-vindas! Se você deseja contribuir com este projeto:
 
 ## 📋 Roadmap
 
-- [ ] Suporte a múltiplas fontes de notícias
+- [x] Suporte a múltiplas fontes de notícias
 - [ ] Interface web para visualização das notícias
 - [ ] Sistema de notificações (email, Discord, Telegram)
 - [ ] Filtros personalizáveis por categoria/tag
@@ -243,6 +255,7 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 
 - [OpenAI](https://platform.openai.com/) - API de IA generativa
 - [AnimeNew](https://animenew.com.br/) - Fonte de notícias
+- [Anime Corner](https://animecorner.me/category/news/anime-news/) - Fonte de notícias
 - Comunidade open source
 
 ---
