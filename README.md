@@ -230,6 +230,8 @@ npm install -g pm2
 
 Contribuições são bem-vindas! Se você deseja contribuir com este projeto:
 
+Antes de contribuir, leia nosso [Código de Conduta](CODE_OF_CONDUCT.md).
+
 1. Faça um fork do repositório
 2. Crie uma branch para sua feature (`git checkout -b feature/MinhaNovaFeature`)
 3. Commit suas mudanças (`git commit -m 'Adiciona nova feature'`)
