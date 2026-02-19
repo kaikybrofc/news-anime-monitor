@@ -3,6 +3,7 @@ const path = require("path");
 const { summarizeUrl } = require("../services/summarizer.js");
 const logger = require("../utils/logger.js");
 const { getWithRetry, toPositiveInt } = require("../utils/http.js");
+const { checkRobotsForUrl } = require("../utils/robots.js");
 const {
   extractArticlesFromHomeHtml,
   extractArticlesFromFeed,
@@ -85,6 +86,43 @@ function attachSourceInfo(items, source) {
   }));
 }
 
+async function isSourceUrlAllowedByRobots(url, source, context) {
+  const result = await checkRobotsForUrl(url, {
+    headers: source?.requestHeaders,
+    context,
+  });
+
+  if (result.allowed) return true;
+
+  const matchedRule = result?.matchedRule;
+  const ruleInfo = matchedRule
+    ? ` (${matchedRule.type}: ${matchedRule.path})`
+    : "";
+
+  logger.warn(`[${context}] URL bloqueada por robots.txt: ${url}${ruleInfo}`);
+  return false;
+}
+
+async function filterItemsByRobots(items, source, context) {
+  const allowedItems = [];
+
+  for (const item of items) {
+    if (!item?.url) continue;
+
+    const allowed = await isSourceUrlAllowedByRobots(
+      item.url,
+      source,
+      `${context}/Article`
+    );
+
+    if (allowed) {
+      allowedItems.push(item);
+    }
+  }
+
+  return allowedItems;
+}
+
 async function collectItemsFromSource(source) {
   const sourceTag = `[Fonte:${source.name}]`;
   const sourceHeaders = source.requestHeaders;
@@ -92,61 +130,84 @@ async function collectItemsFromSource(source) {
   // 1) Sitemap
   let sitemapItems = [];
   if (source.enableSitemap && source.sitemapIndexUrl) {
-    try {
-      const indexResponse = await getWithRetry(source.sitemapIndexUrl, {
-        context: `${source.name}/SitemapIndex`,
-        headers: sourceHeaders,
-      });
+    const sitemapIndexAllowed = await isSourceUrlAllowedByRobots(
+      source.sitemapIndexUrl,
+      source,
+      `${source.name}/SitemapIndex`
+    );
 
-      const maxSitemaps = toPositiveInt(
-        source.maxSitemaps,
-        MAX_SITEMAPS_PER_SOURCE
-      );
-      const sitemaps = extractSitemapsFromIndex(indexResponse.data).slice(
-        0,
-        maxSitemaps
-      );
-
-      const seenSitemapUrls = new Set();
-      for (const sitemapUrl of sitemaps) {
-        const smResponse = await getWithRetry(sitemapUrl, {
-          context: `${source.name}/SitemapFile`,
+    if (sitemapIndexAllowed) {
+      try {
+        const indexResponse = await getWithRetry(source.sitemapIndexUrl, {
+          context: `${source.name}/SitemapIndex`,
           headers: sourceHeaders,
         });
 
-        const urls = extractUrlsFromSitemap(smResponse.data, source);
-        urls.forEach((entry) => {
-          if (seenSitemapUrls.has(entry.url)) return;
-          seenSitemapUrls.add(entry.url);
-          sitemapItems.push({
-            name: inferTitleFromUrl(entry.url),
-            url: entry.url,
-            lastmod: entry.lastmod,
+        const maxSitemaps = toPositiveInt(
+          source.maxSitemaps,
+          MAX_SITEMAPS_PER_SOURCE
+        );
+        const sitemaps = extractSitemapsFromIndex(indexResponse.data).slice(
+          0,
+          maxSitemaps
+        );
+
+        const seenSitemapUrls = new Set();
+        for (const sitemapUrl of sitemaps) {
+          const sitemapAllowed = await isSourceUrlAllowedByRobots(
+            sitemapUrl,
+            source,
+            `${source.name}/SitemapFile`
+          );
+          if (!sitemapAllowed) continue;
+
+          const smResponse = await getWithRetry(sitemapUrl, {
+            context: `${source.name}/SitemapFile`,
+            headers: sourceHeaders,
           });
-        });
 
-        if (sitemapItems.length >= MAX_ITEMS_PER_SOURCE) break;
+          const urls = extractUrlsFromSitemap(smResponse.data, source);
+          urls.forEach((entry) => {
+            if (seenSitemapUrls.has(entry.url)) return;
+            seenSitemapUrls.add(entry.url);
+            sitemapItems.push({
+              name: inferTitleFromUrl(entry.url),
+              url: entry.url,
+              lastmod: entry.lastmod,
+            });
+          });
+
+          if (sitemapItems.length >= MAX_ITEMS_PER_SOURCE) break;
+        }
+
+        sitemapItems = filterByDays(sitemapItems, DAYS_BACK);
+      } catch (_error) {
+        logger.warn(`${sourceTag} Não foi possível acessar o sitemap.`);
       }
-
-      sitemapItems = filterByDays(sitemapItems, DAYS_BACK);
-    } catch (_error) {
-      logger.warn(`${sourceTag} Não foi possível acessar o sitemap.`);
     }
   }
 
   // 2) Feed
   let feedItems = [];
   if (source.feedUrl) {
-    try {
-      const feedResponse = await getWithRetry(source.feedUrl, {
-        context: `${source.name}/Feed`,
-        headers: sourceHeaders,
-      });
+    const feedAllowed = await isSourceUrlAllowedByRobots(
+      source.feedUrl,
+      source,
+      `${source.name}/Feed`
+    );
 
-      feedItems = extractArticlesFromFeed(feedResponse.data, source);
-      feedItems = filterByDays(feedItems, DAYS_BACK);
-    } catch (_error) {
-      logger.warn(`${sourceTag} Não foi possível acessar o feed.`);
+    if (feedAllowed) {
+      try {
+        const feedResponse = await getWithRetry(source.feedUrl, {
+          context: `${source.name}/Feed`,
+          headers: sourceHeaders,
+        });
+
+        feedItems = extractArticlesFromFeed(feedResponse.data, source);
+        feedItems = filterByDays(feedItems, DAYS_BACK);
+      } catch (_error) {
+        logger.warn(`${sourceTag} Não foi possível acessar o feed.`);
+      }
     }
   }
 
@@ -156,15 +217,25 @@ async function collectItemsFromSource(source) {
   let homeItems = [];
   const hasPrimaryItems = sitemapItems.length || feedItems.length;
   if (!hasPrimaryItems && source.monitorUrl) {
-    try {
-      const homeResponse = await getWithRetry(source.monitorUrl, {
-        context: `${source.name}/Home`,
-        headers: sourceHeaders,
-      });
+    const homeAllowed = await isSourceUrlAllowedByRobots(
+      source.monitorUrl,
+      source,
+      `${source.name}/Home`
+    );
 
-      homeItems = extractArticlesFromHomeHtml(homeResponse.data, source);
-    } catch (_error) {
-      logger.warn(`${sourceTag} Não foi possível acessar a página principal da fonte.`);
+    if (homeAllowed) {
+      try {
+        const homeResponse = await getWithRetry(source.monitorUrl, {
+          context: `${source.name}/Home`,
+          headers: sourceHeaders,
+        });
+
+        homeItems = extractArticlesFromHomeHtml(homeResponse.data, source);
+      } catch (_error) {
+        logger.warn(
+          `${sourceTag} Não foi possível acessar a página principal da fonte.`
+        );
+      }
     }
   }
 
@@ -192,6 +263,19 @@ async function collectItemsFromSource(source) {
 
   if (!selectedItems.length) {
     logger.warn(`${sourceTag} Nenhum item coletado nesta fonte.`);
+    return [];
+  }
+
+  selectedItems = await filterItemsByRobots(
+    selectedItems,
+    source,
+    `${source.name}/Candidates`
+  );
+
+  if (!selectedItems.length) {
+    logger.warn(
+      `${sourceTag} Nenhum item elegível após aplicar regras de robots.txt.`
+    );
     return [];
   }
 
@@ -246,6 +330,16 @@ const checkPageForNews = async () => {
     for (const article of articles) {
       const sourceTag = article.sourceName ? `[${article.sourceName}] ` : "";
       logger.info(`${sourceTag}Processando: ${article.name}`);
+
+      const articleAllowed = await isSourceUrlAllowedByRobots(
+        article.url,
+        article.sourceConfig,
+        `${article.sourceName || "Resumo"}/FetchURL`
+      );
+
+      if (!articleAllowed) {
+        continue;
+      }
 
       let summary = "";
       try {

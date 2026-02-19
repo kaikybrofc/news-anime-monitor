@@ -15,6 +15,7 @@
 ## ✨ Funcionalidades Principais
 
 - **Monitoramento Contínuo:** Verifica periodicamente a página de notícias em busca de novos artigos (intervalo configurável, padrão: 15 minutos).
+- **Respeito a robots.txt:** Aplica automaticamente regras de rastreamento permitidas por cada domínio monitorado.
 - **Múltiplas Fontes:** Suporte nativo a AnimeNew, Anime Corner e Anime News Network, com filtros específicos por domínio/fonte.
 - **Sumarização com IA:** Utiliza modelos da OpenAI para criar resumos inteligentes, informativos e contextualizados dos artigos.
 - **API REST:** Disponibiliza os artigos processados e seus resumos através de um endpoint HTTP local para fácil integração.
@@ -185,6 +186,12 @@ SUMMARY_RETRY_MAX_OUTPUT_TOKENS=1200
 HTTP_TIMEOUT_MS=15000
 HTTP_MAX_ATTEMPTS=3
 HTTP_RETRY_BASE_MS=600
+ROBOTS_RESPECT=true
+ROBOTS_USER_AGENT=news-anime-monitor
+ROBOTS_STRICT=false
+ROBOTS_CACHE_TTL_MS=21600000
+ROBOTS_FAILURE_TTL_MS=900000
+ROBOTS_FETCH_ATTEMPTS=2
 ANIMENEWSNETWORK_COOKIE=
 ANN_COOKIE=
 ARTICLE_PROCESS_CONCURRENCY=1
@@ -200,6 +207,9 @@ MAX_MONITOR_LOG_ITEMS=100
 As seguintes configurações podem ser ajustadas por variáveis de ambiente:
 
 - **`NEWS_SOURCE_IDS`**: Fontes ativas (padrão: `animenew,animecorner,animenewsnetwork`)
+- **`ROBOTS_RESPECT`**: Habilita respeito automático ao `robots.txt` (padrão: `true`)
+- **`ROBOTS_USER_AGENT`**: User-agent usado na leitura/interpretação de `robots.txt`
+- **`ROBOTS_STRICT`**: Se `true`, bloqueia rastreamento quando `robots.txt` não puder ser lido
 - **`ANIMENEWSNETWORK_COOKIE`**: Cookie opcional enviado apenas para requests do Anime News Network
 - **`CHECK_INTERVAL_MS`**: Intervalo de verificação de novas notícias em milissegundos (padrão: 900000 = 15 minutos)
 - **`MAX_ITEMS_PER_SOURCE`**: Limite de itens coletados por fonte em cada ciclo
