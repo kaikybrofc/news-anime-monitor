@@ -29,6 +29,41 @@ const DEFAULT_ANIMECORNER_EXCLUDED_PREFIXES = [
   "/feed/",
 ];
 
+const DEFAULT_ANN_EXCLUDED_PREFIXES = [
+  "/news/archive",
+  "/news/rss",
+  "/news/atom",
+  "/news/encyclopedia",
+  "/news/network",
+  "/news/topic",
+  "/news/tag",
+  "/news/interest",
+  "/news/feature",
+  "/news/review",
+  "/news/preview",
+  "/news/interview",
+];
+
+function getFirstEnvValue(keys = []) {
+  for (const key of keys) {
+    const value = String(process.env[key] || "").trim();
+    if (value) return value;
+  }
+
+  return "";
+}
+
+function buildRequestHeaders(baseHeaders = {}, cookieEnvKeys = []) {
+  const headers = { ...baseHeaders };
+  const cookie = getFirstEnvValue(cookieEnvKeys);
+
+  if (cookie) {
+    headers.Cookie = cookie;
+  }
+
+  return Object.keys(headers).length ? headers : undefined;
+}
+
 const SOURCE_DEFINITIONS = {
   animenew: {
     id: "animenew",
@@ -59,6 +94,30 @@ const SOURCE_DEFINITIONS = {
     ],
     requiredFeedCategories: ["Anime News"],
     titleSuffixes: ["Anime Corner"],
+  },
+  animenewsnetwork: {
+    id: "animenewsnetwork",
+    name: "Anime News Network",
+    monitorUrl: "https://www.animenewsnetwork.com/news",
+    feedUrl: "https://www.animenewsnetwork.com/news/rss.xml?ann-edition=w",
+    collectionPriority: ["feed", "home"],
+    enableSitemap: false,
+    domains: ["animenewsnetwork.com"],
+    allowedPathPrefixes: ["/news/"],
+    excludedPathPrefixes: DEFAULT_ANN_EXCLUDED_PREFIXES,
+    homeLinkSelectors: [
+      ".mainfeed-section .herald.box.news h3 a",
+      ".herald.box.news h3 a",
+      "a[href^='/news/']",
+    ],
+    requestHeaders: buildRequestHeaders(
+      {
+        Referer: "https://www.animenewsnetwork.com/news",
+        Origin: "https://www.animenewsnetwork.com",
+      },
+      ["ANIMENEWSNETWORK_COOKIE", "ANN_COOKIE"]
+    ),
+    titleSuffixes: ["Anime News Network"],
   },
 };
 

@@ -166,6 +166,7 @@ function attachSourceInfo(items, source) {
 
 async function collectItemsFromSource(source) {
   const sourceTag = `[Fonte:${source.name}]`;
+  const sourceHeaders = source.requestHeaders;
 
   // 1) Sitemap
   let sitemapItems = [];
@@ -173,6 +174,7 @@ async function collectItemsFromSource(source) {
     try {
       const indexResponse = await getWithRetry(source.sitemapIndexUrl, {
         context: `${source.name}/SitemapIndex`,
+        headers: sourceHeaders,
       });
 
       const maxSitemaps = toPositiveInt(
@@ -188,6 +190,7 @@ async function collectItemsFromSource(source) {
       for (const sitemapUrl of sitemaps) {
         const smResponse = await getWithRetry(sitemapUrl, {
           context: `${source.name}/SitemapFile`,
+          headers: sourceHeaders,
         });
 
         const urls = extractUrlsFromSitemap(smResponse.data, source);
@@ -216,6 +219,7 @@ async function collectItemsFromSource(source) {
     try {
       const feedResponse = await getWithRetry(source.feedUrl, {
         context: `${source.name}/Feed`,
+        headers: sourceHeaders,
       });
 
       feedItems = extractArticlesFromFeed(feedResponse.data, source);
@@ -234,6 +238,7 @@ async function collectItemsFromSource(source) {
     try {
       const homeResponse = await getWithRetry(source.monitorUrl, {
         context: `${source.name}/Home`,
+        headers: sourceHeaders,
       });
 
       homeItems = extractArticlesFromHomeHtml(homeResponse.data, source);
@@ -348,6 +353,7 @@ async function processArticle(articleInfo) {
 
     const articlePageResponse = await getWithRetry(articleInfo.url, {
       context: `${articleInfo.sourceName || "Artigo"}/Fetch`,
+      headers: articleInfo.sourceConfig?.requestHeaders,
     });
 
     const html = articlePageResponse.data;

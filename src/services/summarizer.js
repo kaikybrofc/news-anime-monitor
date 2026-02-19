@@ -332,15 +332,18 @@ function summarizeHtml(htmlContent) {
   return iaQueue;
 }
 
-async function summarizeUrl(url) {
+async function summarizeUrl(url, options = {}) {
   if (!url) {
     throw new Error("URL inválida para resumo.");
   }
 
+  const { context = "Resumo/FetchURL", headers } = options;
+
   logger.info(`[Resumo] Buscando conteúdo para: ${url}`);
 
   const response = await getWithRetry(url, {
-    context: "Resumo/FetchURL",
+    context,
+    headers,
   });
 
   return summarizeHtml(response.data);

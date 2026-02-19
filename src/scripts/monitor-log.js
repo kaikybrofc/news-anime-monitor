@@ -81,11 +81,13 @@ function attachSourceInfo(items, source) {
     ...item,
     sourceId: source.id,
     sourceName: source.name,
+    sourceConfig: source,
   }));
 }
 
 async function collectItemsFromSource(source) {
   const sourceTag = `[Fonte:${source.name}]`;
+  const sourceHeaders = source.requestHeaders;
 
   // 1) Sitemap
   let sitemapItems = [];
@@ -93,6 +95,7 @@ async function collectItemsFromSource(source) {
     try {
       const indexResponse = await getWithRetry(source.sitemapIndexUrl, {
         context: `${source.name}/SitemapIndex`,
+        headers: sourceHeaders,
       });
 
       const maxSitemaps = toPositiveInt(
@@ -108,6 +111,7 @@ async function collectItemsFromSource(source) {
       for (const sitemapUrl of sitemaps) {
         const smResponse = await getWithRetry(sitemapUrl, {
           context: `${source.name}/SitemapFile`,
+          headers: sourceHeaders,
         });
 
         const urls = extractUrlsFromSitemap(smResponse.data, source);
@@ -136,6 +140,7 @@ async function collectItemsFromSource(source) {
     try {
       const feedResponse = await getWithRetry(source.feedUrl, {
         context: `${source.name}/Feed`,
+        headers: sourceHeaders,
       });
 
       feedItems = extractArticlesFromFeed(feedResponse.data, source);
@@ -154,6 +159,7 @@ async function collectItemsFromSource(source) {
     try {
       const homeResponse = await getWithRetry(source.monitorUrl, {
         context: `${source.name}/Home`,
+        headers: sourceHeaders,
       });
 
       homeItems = extractArticlesFromHomeHtml(homeResponse.data, source);
@@ -243,7 +249,10 @@ const checkPageForNews = async () => {
 
       let summary = "";
       try {
-        summary = await summarizeUrl(article.url);
+        summary = await summarizeUrl(article.url, {
+          context: `${article.sourceName || "Resumo"}/FetchURL`,
+          headers: article.sourceConfig?.requestHeaders,
+        });
       } catch (error) {
         logger.error(`Erro ao resumir notícia (${article.url}):`, error);
         summary = "[ERRO AO RESUMIR]";

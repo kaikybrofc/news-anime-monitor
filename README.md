@@ -9,7 +9,7 @@
 ## ✨ Funcionalidades Principais
 
 - **Monitoramento Contínuo:** Verifica periodicamente a página de notícias em busca de novos artigos (intervalo configurável, padrão: 15 minutos).
-- **Múltiplas Fontes:** Suporte nativo a AnimeNew e Anime Corner, com filtros específicos por domínio/fonte.
+- **Múltiplas Fontes:** Suporte nativo a AnimeNew, Anime Corner e Anime News Network, com filtros específicos por domínio/fonte.
 - **Sumarização com IA:** Utiliza modelos da OpenAI para criar resumos inteligentes, informativos e contextualizados dos artigos.
 - **API REST:** Disponibiliza os artigos processados e seus resumos através de um endpoint HTTP local para fácil integração.
 - **Persistência de Dados:** Salva as notícias em um arquivo JSON (`processed_articles.json`), garantindo que os dados não sejam perdidos ao reiniciar o servidor.
@@ -179,8 +179,10 @@ SUMMARY_RETRY_MAX_OUTPUT_TOKENS=1200
 HTTP_TIMEOUT_MS=15000
 HTTP_MAX_ATTEMPTS=3
 HTTP_RETRY_BASE_MS=600
+ANIMENEWSNETWORK_COOKIE=
+ANN_COOKIE=
 ARTICLE_PROCESS_CONCURRENCY=1
-NEWS_SOURCE_IDS=animenew,animecorner
+NEWS_SOURCE_IDS=animenew,animecorner,animenewsnetwork
 MAX_ITEMS_PER_SOURCE=50
 MAX_SITEMAPS_PER_SOURCE=5
 MAX_NEW_ARTICLES_PER_CYCLE=100
@@ -191,7 +193,8 @@ MAX_MONITOR_LOG_ITEMS=100
 
 As seguintes configurações podem ser ajustadas por variáveis de ambiente:
 
-- **`NEWS_SOURCE_IDS`**: Fontes ativas (padrão: `animenew,animecorner`)
+- **`NEWS_SOURCE_IDS`**: Fontes ativas (padrão: `animenew,animecorner,animenewsnetwork`)
+- **`ANIMENEWSNETWORK_COOKIE`**: Cookie opcional enviado apenas para requests do Anime News Network
 - **`CHECK_INTERVAL_MS`**: Intervalo de verificação de novas notícias em milissegundos (padrão: 900000 = 15 minutos)
 - **`MAX_ITEMS_PER_SOURCE`**: Limite de itens coletados por fonte em cada ciclo
 - **`MAX_NEW_ARTICLES_PER_CYCLE`**: Limite global de artigos novos processados por ciclo (controle de custo)
@@ -256,6 +259,7 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 - [OpenAI](https://platform.openai.com/) - API de IA generativa
 - [AnimeNew](https://animenew.com.br/) - Fonte de notícias
 - [Anime Corner](https://animecorner.me/category/news/anime-news/) - Fonte de notícias
+- [Anime News Network](https://www.animenewsnetwork.com/news) - Fonte de notícias
 - Comunidade open source
 
 ---
