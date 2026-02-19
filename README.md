@@ -4,6 +4,12 @@
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D20.18.1-brightgreen.svg)
 
+> [!WARNING]
+> Este projeto nao tem intencao de atacar, sobrecarregar ou prejudicar qualquer site.
+> As requisicoes sao feitas de forma nao agressiva, com limites e boas praticas.
+> Nao promovemos uso para ataques, abuso ou qualquer atividade maliciosa.
+> O uso deste projeto e destinado a estudo, aprendizado e testes de scraping.
+
 `News Anime Monitor` é um sistema de monitoramento e sumarização de notícias automatizado e inteligente. Ele rastreia múltiplas fontes de notícias de anime, extrai novos artigos, utiliza a API da OpenAI para gerar resumos concisos e os expõe através de uma API REST local. Com persistência de dados, sistema de logs avançado e suporte a gerenciamento de processos via PM2, é uma solução completa para acompanhar notícias de anime.
 
 ## ✨ Funcionalidades Principais
