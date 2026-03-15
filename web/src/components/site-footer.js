@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export function SiteFooter() {
   const currentYear = new Date().getFullYear();
 
@@ -13,9 +15,9 @@ export function SiteFooter() {
         <div className="flex flex-col justify-end gap-2 md:text-right">
           <p>© {currentYear} OmniZap</p>
           <div className="flex gap-4 md:justify-end">
-            <a href="#" className="hover:text-[#e11d48]">Privacidade</a>
-            <a href="#" className="hover:text-[#e11d48]">Termos</a>
-            <a href="#" className="hover:text-[#e11d48]">Contato</a>
+            <Link href="/privacidade" className="hover:text-[#e11d48]">Privacidade</Link>
+            <Link href="/termos" className="hover:text-[#e11d48]">Termos</Link>
+            <Link href="/contato" className="hover:text-[#e11d48]">Contato</Link>
           </div>
         </div>
       </div>

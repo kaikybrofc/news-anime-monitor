@@ -101,6 +101,9 @@ export default async function sitemap() {
     { path: "/tag", lastModified: nowIso },
     { path: "/api", lastModified: nowIso },
     { path: "/sobre", lastModified: nowIso },
+    { path: "/privacidade", lastModified: nowIso },
+    { path: "/termos", lastModified: nowIso },
+    { path: "/contato", lastModified: nowIso },
   ];
 
   try {
