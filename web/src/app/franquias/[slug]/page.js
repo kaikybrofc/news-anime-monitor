@@ -2,13 +2,43 @@ import { ArticleCard } from "@/components/article-card";
 import { Pagination } from "@/components/pagination";
 import { clampInt, fetchMonitor, readQueryInt } from "@/lib/api";
 import { formatNumber, titleFromSlug } from "@/lib/formatters";
+import { notFound as renderNotFound } from "next/navigation";
 
 export async function generateMetadata(props) {
   const resolvedProps = await props;
   const resolvedParams = await resolvedProps?.params;
-  const name = titleFromSlug(resolvedParams?.slug || "");
+  const slug = String(resolvedParams?.slug || "").trim().toLowerCase();
+  const fallbackName = titleFromSlug(slug) || "Franquia";
+  const canonicalPath = slug ? `/franquias/${encodeURIComponent(slug)}` : "/franquias";
+  let entityName = fallbackName;
+  let shouldNoIndex = !slug;
+
+  if (slug) {
+    try {
+      const payload = await fetchMonitor(`/franchises/${encodeURIComponent(slug)}`, {
+        limit: 1,
+        offset: 0,
+      });
+      entityName = String(payload?.name || fallbackName).trim() || fallbackName;
+      shouldNoIndex = Number(payload?.total || 0) <= 0;
+    } catch (error) {
+      shouldNoIndex = error?.status === 404;
+    }
+  }
+
   return {
-    title: `${name} | Franquia | OmniZap Anime Radar`,
+    title: `${entityName} | Franquia | OmniZap Anime Radar`,
+    description:
+      "Página de franquia com notícias relacionadas, distribuição por fonte e leitura de cobertura recente.",
+    alternates: {
+      canonical: canonicalPath,
+    },
+    robots: shouldNoIndex
+      ? {
+          index: false,
+          follow: true,
+        }
+      : undefined,
   };
 }
 
@@ -38,6 +68,7 @@ export default async function FranquiaDetailPage(props) {
     items: [],
   };
   let errorMessage = "";
+  let notFound = false;
 
   if (!slug) {
     errorMessage = "Slug de franquia ausente.";
@@ -48,8 +79,16 @@ export default async function FranquiaDetailPage(props) {
         offset,
       });
     } catch (error) {
-      errorMessage = error.message;
+      if (error?.status === 404) {
+        notFound = true;
+      } else {
+        errorMessage = error.message;
+      }
     }
+  }
+
+  if (notFound) {
+    renderNotFound();
   }
 
   const sourceDistribution = payload?.stats?.sourceDistribution || [];

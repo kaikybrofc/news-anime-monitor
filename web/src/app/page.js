@@ -2,6 +2,15 @@ import Link from "next/link";
 import { ArticleCard } from "@/components/article-card";
 import { fetchMonitor } from "@/lib/api";
 
+export const metadata = {
+  title: "OmniZap Anime Radar",
+  description:
+    "Radar de notícias de anime com cobertura em tempo real, tendências por franquia e inteligência editorial por fonte.",
+  alternates: {
+    canonical: "/",
+  },
+};
+
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {

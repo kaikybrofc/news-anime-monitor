@@ -4,6 +4,11 @@ import { formatDateTime, formatNumber } from "@/lib/formatters";
 
 export const metadata = {
   title: "Franquias | OmniZap Anime Radar",
+  description:
+    "Página de franquias com menções, score médio e recorte recente de cobertura das notícias de anime.",
+  alternates: {
+    canonical: "/franquias",
+  },
 };
 
 export const dynamic = "force-dynamic";

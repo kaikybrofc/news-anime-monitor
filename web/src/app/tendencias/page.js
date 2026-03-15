@@ -4,6 +4,11 @@ import { formatDateTime, formatNumber } from "@/lib/formatters";
 
 export const metadata = {
   title: "Tendências | OmniZap Anime Radar",
+  description:
+    "Painel de tendências com franquias em alta, tópicos recentes e fontes mais ativas no monitor de anime.",
+  alternates: {
+    canonical: "/tendencias",
+  },
 };
 
 export const dynamic = "force-dynamic";

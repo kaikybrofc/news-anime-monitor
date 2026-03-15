@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound as renderNotFound } from "next/navigation";
 import { ArticleCard } from "@/components/article-card";
 import { Pagination } from "@/components/pagination";
 import { clampInt, fetchMonitor, readQueryInt } from "@/lib/api";
@@ -129,17 +130,7 @@ export async function SeoEntityDetailView({ routeKey, params, searchParams }) {
   }
 
   if (notFound) {
-    return (
-      <section className="stack">
-        <h1>{config.singular} não encontrado</h1>
-        <article className="info-card warning-card">
-          <p>Não encontramos dados para `{slug}` nesta entidade.</p>
-          <Link href={config.routeBase} className="btn btn-secondary">
-            Voltar para {config.plural.toLowerCase()}
-          </Link>
-        </article>
-      </section>
-    );
+    renderNotFound();
   }
 
   const sourceDistribution = payload?.stats?.sourceDistribution || [];

@@ -1,20 +1,40 @@
-import Link from "next/link";
+import { notFound as renderNotFound } from "next/navigation";
 import { ArticleCard } from "@/components/article-card";
 import { Pagination } from "@/components/pagination";
 import { clampInt, fetchMonitor, readQueryInt, readQueryString } from "@/lib/api";
 import { formatNumber } from "@/lib/formatters";
 
-export function generateMetadata({ params }) {
-  const sourceId = String(params.sourceId || "");
+const VALID_SOURCE_IDS = new Set(["animenew", "animecorner", "animenewsnetwork"]);
+
+export async function generateMetadata(props) {
+  const resolvedProps = await props;
+  const resolvedParams = await resolvedProps?.params;
+  const sourceId = String(resolvedParams?.sourceId || "").trim().toLowerCase();
+  const canonicalPath = sourceId ? `/fontes/${encodeURIComponent(sourceId)}` : "/fontes";
+
   return {
     title: `${sourceId} | Fonte | OmniZap Anime Radar`,
+    description:
+      "Detalhes de cobertura por fonte, com distribuição de conteúdo, ciclo de vida e histórico de artigos processados.",
+    alternates: {
+      canonical: canonicalPath,
+    },
+    robots: !sourceId || !VALID_SOURCE_IDS.has(sourceId)
+      ? {
+          index: false,
+          follow: true,
+        }
+      : undefined,
   };
 }
 
 export const dynamic = "force-dynamic";
 
-export default async function FonteDetailPage({ params, searchParams }) {
-  const sourceId = String(params.sourceId || "").toLowerCase();
+export default async function FonteDetailPage(props) {
+  const resolvedProps = await props;
+  const resolvedParams = await resolvedProps?.params;
+  const searchParams = resolvedProps?.searchParams;
+  const sourceId = String(resolvedParams?.sourceId || "").toLowerCase();
   const limit = clampInt(readQueryInt(searchParams, "limit", 20), 1, 50, 20);
   const offset = clampInt(readQueryInt(searchParams, "offset", 0), 0, 100000, 0);
   const bucket = readQueryString(searchParams, "bucket", "").toLowerCase();
@@ -59,17 +79,7 @@ export default async function FonteDetailPage({ params, searchParams }) {
   }
 
   if (notFound) {
-    return (
-      <section className="stack">
-        <h1>Fonte não encontrada</h1>
-        <article className="info-card">
-          <p>A fonte `{sourceId}` não existe no monitor atual.</p>
-          <Link href="/fontes" className="btn btn-secondary">
-            Voltar para fontes
-          </Link>
-        </article>
-      </section>
-    );
+    renderNotFound();
   }
 
   const lifecycle = payload?.stats?.lifecycle || {};

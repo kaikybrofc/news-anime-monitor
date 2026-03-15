@@ -10,6 +10,11 @@ const SOURCE_DEFINITIONS = [
 
 export const metadata = {
   title: "Fontes | OmniZap Anime Radar",
+  description:
+    "Visão por fonte monitorada com volume de artigos, qualidade de ingestão e score médio de cobertura.",
+  alternates: {
+    canonical: "/fontes",
+  },
 };
 
 export const dynamic = "force-dynamic";

@@ -3,6 +3,11 @@ import { formatDateTime, formatNumber } from "@/lib/formatters";
 
 export const metadata = {
   title: "API | OmniZap Anime Radar",
+  description:
+    "Documentação técnica e status operacional da API pública do monitor OmniZap Anime Radar.",
+  alternates: {
+    canonical: "/api",
+  },
 };
 
 export const dynamic = "force-dynamic";

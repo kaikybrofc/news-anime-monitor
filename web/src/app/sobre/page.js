@@ -1,5 +1,10 @@
 export const metadata = {
   title: "Sobre | OmniZap Anime Radar",
+  description:
+    "Conheça o projeto OmniZap Anime Radar, focado em monitoramento, deduplicação e enriquecimento de notícias de anime.",
+  alternates: {
+    canonical: "/sobre",
+  },
 };
 
 export default function SobrePage() {

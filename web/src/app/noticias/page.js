@@ -4,6 +4,11 @@ import { clampInt, fetchMonitor, readQueryInt, readQueryString } from "@/lib/api
 
 export const metadata = {
   title: "Notícias | OmniZap Anime Radar",
+  description:
+    "Lista editorial com notícias de anime processadas pelo monitor, com atualização contínua, filtros e paginação.",
+  alternates: {
+    canonical: "/noticias",
+  },
 };
 
 export const dynamic = "force-dynamic";
