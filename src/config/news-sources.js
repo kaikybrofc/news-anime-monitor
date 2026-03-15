@@ -88,6 +88,7 @@ const SOURCE_DEFINITIONS = {
       "article.item.hentry h2.entry-title a",
     ],
     requiredFeedCategories: ["Anime News"],
+    enforceCategoryScopeAcrossBuckets: true,
     titleSuffixes: ["Anime Corner"],
   },
   animenewsnetwork: {

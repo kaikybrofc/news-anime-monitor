@@ -1,23 +1,43 @@
 const express = require("express");
-const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
-const cheerio = require("cheerio");
-const { summarizeHtml } = require("../services/summarizer.js");
 const logger = require("../utils/logger.js");
-const { getWithRetry, toPositiveInt } = require("../utils/http.js");
-const { checkRobotsForUrl } = require("../utils/robots.js");
-const {
-  isLikelyUrl,
-  extractArticlesFromHomeHtml,
-  extractArticlesFromFeed,
-  extractSitemapsFromIndex,
-  extractUrlsFromSitemap,
-  filterByDays,
-  inferTitleFromUrl,
-  extractTitleFromHtml,
-} = require("../utils/article-utils.js");
+const { toPositiveInt } = require("../utils/http.js");
 const { getNewsSources } = require("../config/news-sources.js");
+const {
+  processArticleCandidate,
+  processWithConcurrency,
+} = require("../services/article-processor.js");
+const {
+  createSourceMetricsTracker,
+  buildInventoryMetrics,
+} = require("../services/monitor-analytics.js");
+
+const { collectItemsFromSource } = require("../pipeline/ingestion.js");
+const { normalizeCollectedItems } = require("../pipeline/normalization.js");
+const { filterItemsBySource } = require("../pipeline/filtering.js");
+const {
+  dedupeCandidates,
+  buildExistingArticleIndex,
+  matchCandidateToExisting,
+  indexArticle,
+} = require("../pipeline/dedupe.js");
+const {
+  applyArticleDefaults,
+  bumpArticleSeen,
+} = require("../pipeline/enrichment.js");
+const {
+  createSourceMetrics,
+  finishSourceMetrics,
+  createCycleMetrics,
+  finishCycleMetrics,
+} = require("../pipeline/metrics.js");
+const {
+  ensureDatabaseAndTable,
+  loadAllArticles,
+  saveAllArticlesSnapshot,
+} = require("../db/articles-repository.js");
+const { hasDbConfig } = require("../db/mysql.js");
 
 // --- CONFIGURAÇÃO ---
 const NEWS_SOURCES = getNewsSources();
@@ -49,6 +69,7 @@ const ARTICLE_PROCESS_CONCURRENCY = toPositiveInt(
 );
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || "127.0.0.1";
+const USE_MYSQL = hasDbConfig();
 const DATA_FILE = path.resolve(
   __dirname,
   "..",
@@ -62,348 +83,68 @@ const knownArticleUrls = new Set();
 let processedArticles = [];
 let isCheckingNews = false;
 let isShuttingDown = false;
-
-function extractImageFromHtml(html) {
-  const $ = cheerio.load(html);
-  const ogImage =
-    $('meta[property="og:image"]').attr("content") ||
-    $('meta[name="twitter:image"]').attr("content");
-  if (ogImage) return ogImage.trim();
-
-  const featured =
-    $(".featured-img").first().attr("data-lazy-src") ||
-    $(".featured-img").first().attr("src");
-  if (featured) return featured.trim();
-
-  const contentImage =
-    $(".entry-content img").first().attr("data-lazy-src") ||
-    $(".entry-content img").first().attr("src");
-  if (contentImage) return contentImage.trim();
-
-  return "";
-}
+let lastCycleMetrics = null;
+let lastSourceMetrics = [];
 
 function rebuildKnownArticleUrls() {
   knownArticleUrls.clear();
   processedArticles.forEach((article) => {
-    const url = article?.refined?.url;
+    const url = article?.refined?.canonicalUrl || article?.refined?.url;
     if (url) knownArticleUrls.add(url);
   });
 }
 
-function normalizeNameKey(value) {
-  return String(value || "").trim().toLowerCase();
-}
-
-function normalizeCategories(categories) {
-  return Array.from(
-    new Set(
-      (Array.isArray(categories) ? categories : [])
-        .map((category) => String(category || "").trim())
-        .filter(Boolean)
-    )
-  );
-}
-
-function resolveArticleName(articleInfo, html) {
-  const providedName = String(articleInfo?.name || "").trim();
-  const inferredName = inferTitleFromUrl(articleInfo.url);
-
-  const hasStrongProvidedName =
-    providedName &&
-    !isLikelyUrl(providedName) &&
-    normalizeNameKey(providedName) !== normalizeNameKey(inferredName);
-
-  if (hasStrongProvidedName) {
-    return providedName;
-  }
-
-  const extractedTitle = extractTitleFromHtml(html, articleInfo.sourceConfig);
-  if (extractedTitle) {
-    return extractedTitle;
-  }
-
-  return providedName || inferredName;
-}
-
 function getItemTimestamp(item) {
-  const dateValue = item.pubDate || item.lastmod;
+  const dateValue = item.publishedAt || item.pubDate || item.lastmod;
   if (!dateValue) return 0;
 
   const parsed = Date.parse(dateValue);
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
-function dedupeByUrl(items) {
-  const seen = new Set();
-  const deduped = [];
-
-  items.forEach((item) => {
-    if (!item?.url || seen.has(item.url)) return;
-    seen.add(item.url);
-    deduped.push(item);
-  });
-
-  return deduped;
-}
-
-function enrichSitemapNames(sitemapItems, feedItems) {
-  if (!sitemapItems.length || !feedItems.length) return sitemapItems;
-
-  const feedTitlesByUrl = new Map(
-    feedItems
-      .filter((item) => item.url && item.name)
-      .map((item) => [item.url, item.name])
+function replaceArticle(oldArticle, updatedArticle) {
+  const index = processedArticles.findIndex(
+    (article) => article === oldArticle || article.id === oldArticle.id
   );
 
-  return sitemapItems.map((item) => {
-    const feedTitle = feedTitlesByUrl.get(item.url);
-    if (!feedTitle) return item;
-
-    return {
-      ...item,
-      name: feedTitle,
-    };
-  });
-}
-
-function attachSourceInfo(items, source) {
-  return items.map((item) => ({
-    ...item,
-    sourceId: source.id,
-    sourceName: source.name,
-    sourceConfig: source,
-  }));
-}
-
-async function isSourceUrlAllowedByRobots(url, source, context) {
-  const result = await checkRobotsForUrl(url, {
-    headers: source?.requestHeaders,
-    context,
-  });
-
-  if (result.allowed) return true;
-
-  const matchedRule = result?.matchedRule;
-  const ruleInfo = matchedRule
-    ? ` (${matchedRule.type}: ${matchedRule.path})`
-    : "";
-
-  logger.warn(`[${context}] URL bloqueada por robots.txt: ${url}${ruleInfo}`);
-  return false;
-}
-
-async function filterItemsByRobots(items, source, context) {
-  const allowedItems = [];
-
-  for (const item of items) {
-    if (!item?.url) continue;
-
-    const allowed = await isSourceUrlAllowedByRobots(
-      item.url,
-      source,
-      `${context}/Article`
-    );
-
-    if (allowed) {
-      allowedItems.push(item);
-    }
+  if (index >= 0) {
+    processedArticles[index] = updatedArticle;
+    return;
   }
 
-  return allowedItems;
+  processedArticles.unshift(updatedArticle);
 }
 
-async function collectItemsFromSource(source) {
-  const sourceTag = `[Fonte:${source.name}]`;
-  const sourceHeaders = source.requestHeaders;
-  const maxItemsForSource = toPositiveInt(source.maxItems, MAX_ITEMS_PER_SOURCE);
+function markExistingArticleSeen(existingArticle, candidate, reason, seenAt, indexes) {
+  const updated = bumpArticleSeen(existingArticle, candidate, reason, seenAt);
+  replaceArticle(existingArticle, updated);
+  indexArticle(indexes, updated);
 
-  // 1) Sitemap
-  let sitemapItems = [];
-  if (source.enableSitemap && source.sitemapIndexUrl) {
-    const sitemapIndexAllowed = await isSourceUrlAllowedByRobots(
-      source.sitemapIndexUrl,
-      source,
-      `${source.name}/SitemapIndex`
-    );
+  const canonical = updated?.refined?.canonicalUrl || updated?.refined?.url;
+  if (canonical) knownArticleUrls.add(canonical);
 
-    if (sitemapIndexAllowed) {
-      try {
-        const indexResponse = await getWithRetry(source.sitemapIndexUrl, {
-          context: `${source.name}/SitemapIndex`,
-          headers: sourceHeaders,
-        });
-
-        const maxSitemaps = toPositiveInt(
-          source.maxSitemaps,
-          MAX_SITEMAPS_PER_SOURCE
-        );
-        const sitemaps = extractSitemapsFromIndex(indexResponse.data).slice(
-          0,
-          maxSitemaps
-        );
-
-        const seenSitemapUrls = new Set();
-        for (const sitemapUrl of sitemaps) {
-          const sitemapAllowed = await isSourceUrlAllowedByRobots(
-            sitemapUrl,
-            source,
-            `${source.name}/SitemapFile`
-          );
-          if (!sitemapAllowed) continue;
-
-          const smResponse = await getWithRetry(sitemapUrl, {
-            context: `${source.name}/SitemapFile`,
-            headers: sourceHeaders,
-          });
-
-          const urls = extractUrlsFromSitemap(smResponse.data, source);
-          urls.forEach((entry) => {
-            if (seenSitemapUrls.has(entry.url)) return;
-            seenSitemapUrls.add(entry.url);
-            sitemapItems.push({
-              name: inferTitleFromUrl(entry.url),
-              url: entry.url,
-              lastmod: entry.lastmod,
-            });
-          });
-
-          if (sitemapItems.length >= maxItemsForSource) break;
-        }
-
-        sitemapItems = filterByDays(sitemapItems, DAYS_BACK);
-      } catch (_error) {
-        logger.warn(`${sourceTag} Não foi possível acessar o sitemap.`);
-      }
-    }
-  }
-
-  // 2) Feed
-  let feedItems = [];
-  if (source.feedUrl) {
-    const feedAllowed = await isSourceUrlAllowedByRobots(
-      source.feedUrl,
-      source,
-      `${source.name}/Feed`
-    );
-
-    if (feedAllowed) {
-      try {
-        const feedResponse = await getWithRetry(source.feedUrl, {
-          context: `${source.name}/Feed`,
-          headers: sourceHeaders,
-        });
-
-        feedItems = extractArticlesFromFeed(feedResponse.data, source);
-        feedItems = filterByDays(feedItems, DAYS_BACK);
-      } catch (_error) {
-        logger.warn(`${sourceTag} Não foi possível acessar o feed.`);
-      }
-    }
-  }
-
-  sitemapItems = enrichSitemapNames(sitemapItems, feedItems);
-
-  // 3) Home / categoria
-  let homeItems = [];
-  const hasPrimaryItems = sitemapItems.length || feedItems.length;
-  const shouldMergeBuckets = Boolean(source.mergeBuckets);
-  const shouldCollectFromHome =
-    source.monitorUrl && (!hasPrimaryItems || shouldMergeBuckets);
-
-  if (shouldCollectFromHome) {
-    const homeAllowed = await isSourceUrlAllowedByRobots(
-      source.monitorUrl,
-      source,
-      `${source.name}/Home`
-    );
-
-    if (homeAllowed) {
-      try {
-        const homeResponse = await getWithRetry(source.monitorUrl, {
-          context: `${source.name}/Home`,
-          headers: sourceHeaders,
-        });
-
-        homeItems = extractArticlesFromHomeHtml(homeResponse.data, source);
-      } catch (_error) {
-        logger.warn(
-          `${sourceTag} Não foi possível acessar a página principal da fonte.`
-        );
-      }
-    }
-  }
-
-  const buckets = {
-    sitemap: sitemapItems,
-    feed: feedItems,
-    home: homeItems,
+  return {
+    article: updated,
+    eventType: String(updated?.refined?.lastSeenEvent || "revisited"),
   };
+}
 
-  const priority = Array.isArray(source.collectionPriority)
-    ? source.collectionPriority
-    : ["sitemap", "feed", "home"];
-
-  let selectedBucketName = "none";
-  let selectedItems = [];
-
-  if (shouldMergeBuckets) {
-    const seenUrls = new Set();
-    const mergedItems = [];
-    const usedBuckets = [];
-
-    for (const bucketName of priority) {
-      const bucketItems = buckets[bucketName] || [];
-      if (!bucketItems.length) continue;
-
-      usedBuckets.push(bucketName);
-      bucketItems.forEach((item) => {
-        if (!item?.url || seenUrls.has(item.url)) return;
-        seenUrls.add(item.url);
-        mergedItems.push(item);
-      });
-    }
-
-    selectedBucketName = usedBuckets.length ? usedBuckets.join("+") : "none";
-    selectedItems = mergedItems;
-  } else {
-    for (const bucketName of priority) {
-      const bucketItems = buckets[bucketName] || [];
-      if (!bucketItems.length) continue;
-
-      selectedBucketName = bucketName;
-      selectedItems = bucketItems;
-      break;
-    }
-  }
-
-  if (!selectedItems.length) {
-    logger.warn(`${sourceTag} Nenhum item coletado nesta fonte.`);
+function loadArticlesFromJsonFile() {
+  if (!fs.existsSync(DATA_FILE)) {
     return [];
   }
 
-  selectedItems = await filterItemsByRobots(
-    selectedItems,
-    source,
-    `${source.name}/Candidates`
-  );
-
-  if (!selectedItems.length) {
-    logger.warn(
-      `${sourceTag} Nenhum item elegível após aplicar regras de robots.txt.`
-    );
-    return [];
+  const data = fs.readFileSync(DATA_FILE, "utf8");
+  const parsed = JSON.parse(data);
+  if (!Array.isArray(parsed)) {
+    throw new Error("Formato inválido de cache JSON: esperado um array.");
   }
 
-  if (selectedItems.length > maxItemsForSource) {
-    selectedItems = selectedItems.slice(0, maxItemsForSource);
-  }
+  return parsed.filter((article) => article?.refined?.url);
+}
 
-  logger.info(
-    `${sourceTag} ${selectedItems.length} item(ns) coletados via ${selectedBucketName}.`
-  );
-
-  return attachSourceInfo(selectedItems, source);
+function saveArticlesToJsonFile(articles) {
+  fs.writeFileSync(DATA_FILE, JSON.stringify(articles, null, 2), "utf8");
 }
 
 // Garante que o diretório de dados exista
@@ -418,52 +159,80 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
-function loadArticlesFromFile() {
+async function loadArticlesFromStorage() {
   try {
-    if (fs.existsSync(DATA_FILE)) {
-      const data = fs.readFileSync(DATA_FILE, "utf8");
-      const parsed = JSON.parse(data);
+    const nowIso = new Date().toISOString();
 
-      if (!Array.isArray(parsed)) {
-        throw new Error("Formato inválido de cache: esperado um array.");
+    if (USE_MYSQL) {
+      await ensureDatabaseAndTable();
+      const dbArticles = await loadAllArticles();
+
+      if (dbArticles.length) {
+        processedArticles = dbArticles.map((article) =>
+          applyArticleDefaults(article, nowIso)
+        );
+        rebuildKnownArticleUrls();
+        logger.success(
+          `Carregados ${processedArticles.length} artigos do MySQL.`
+        );
+        return;
       }
 
-      processedArticles = parsed
-        .filter((article) => article?.refined?.url)
-        .map((article) => ({
-          ...article,
-          refined: {
-            ...article.refined,
-            categories: normalizeCategories(article?.refined?.categories),
-          },
-        }));
-      rebuildKnownArticleUrls();
+      if (fs.existsSync(DATA_FILE)) {
+        const jsonArticles = loadArticlesFromJsonFile();
+        processedArticles = jsonArticles.map((article) =>
+          applyArticleDefaults(article, nowIso)
+        );
+        await saveAllArticlesSnapshot(processedArticles);
+        rebuildKnownArticleUrls();
 
-      logger.success(
-        `Carregados ${processedArticles.length} artigos do cache local.`
-      );
-    } else {
+        logger.success(
+          `Carregados ${processedArticles.length} artigos do JSON e migrados para MySQL.`
+        );
+        return;
+      }
+
+      processedArticles = [];
+      rebuildKnownArticleUrls();
       logger.info(
-        "Nenhum arquivo de cache local encontrado. Começando do zero."
+        "Tabela MySQL vazia e sem cache JSON local. Começando do zero."
       );
+      return;
     }
+
+    if (!fs.existsSync(DATA_FILE)) {
+      logger.info("Nenhum arquivo de cache local encontrado. Começando do zero.");
+      processedArticles = [];
+      rebuildKnownArticleUrls();
+      return;
+    }
+
+    const parsed = loadArticlesFromJsonFile();
+    processedArticles = parsed.map((article) => applyArticleDefaults(article, nowIso));
+    rebuildKnownArticleUrls();
+
+    logger.success(
+      `Carregados ${processedArticles.length} artigos do cache JSON local.`
+    );
   } catch (error) {
-    logger.error("Erro ao carregar ou analisar o arquivo de cache local:", error);
+    logger.error("Erro ao carregar artigos do armazenamento:", error);
     processedArticles = [];
     rebuildKnownArticleUrls();
   }
 }
 
-function saveArticlesToFile() {
+async function saveArticlesToStorage() {
   try {
-    fs.writeFileSync(
-      DATA_FILE,
-      JSON.stringify(processedArticles, null, 2),
-      "utf8"
-    );
+    if (USE_MYSQL) {
+      await saveAllArticlesSnapshot(processedArticles);
+      logger.info("Notícias salvas com sucesso no MySQL.");
+      return;
+    }
+
+    saveArticlesToJsonFile(processedArticles);
     logger.info(`Notícias salvas com sucesso em ${DATA_FILE}`);
   } catch (error) {
-    logger.error("Erro ao salvar notícias no arquivo:", error);
+    logger.error("Erro ao salvar notícias no armazenamento:", error);
   }
 }
 
@@ -471,86 +240,16 @@ app.get("/", (_req, res) => {
   res.json(processedArticles);
 });
 
-async function processArticle(articleInfo) {
-  try {
-    const sourceTag = articleInfo.sourceName
-      ? `[${articleInfo.sourceName}] `
-      : "";
-    logger.info(
-      `${sourceTag}Processando: ${articleInfo.name || articleInfo.url}`
-    );
-
-    const articleAllowed = await isSourceUrlAllowedByRobots(
-      articleInfo.url,
-      articleInfo.sourceConfig,
-      `${articleInfo.sourceName || "Artigo"}/Fetch`
-    );
-
-    if (!articleAllowed) {
-      return null;
-    }
-
-    const articlePageResponse = await getWithRetry(articleInfo.url, {
-      context: `${articleInfo.sourceName || "Artigo"}/Fetch`,
-      headers: articleInfo.sourceConfig?.requestHeaders,
-    });
-
-    const html = articlePageResponse.data;
-    const summary = await summarizeHtml(html);
-    const extractedImage = extractImageFromHtml(html);
-    const image = articleInfo.image || extractedImage || "";
-    const name = resolveArticleName(articleInfo, html);
-    const categories = normalizeCategories(articleInfo.categories);
-
-    if (!image) {
-      logger.warn(`[Imagem] Nenhuma imagem encontrada: ${articleInfo.url}`);
-    }
-
-    const id = crypto.createHash("sha1").update(articleInfo.url).digest("hex");
-
-    return {
-      id,
-      timestamp: new Date().toISOString(),
-      refined: {
-        name,
-        url: articleInfo.url,
-        image,
-        summary,
-        categories,
-      },
-    };
-  } catch (error) {
-    logger.error(
-      `Erro ao processar o artigo "${articleInfo.name || articleInfo.url}":`,
-      error.message || error
-    );
-    return null;
-  }
-}
-
-async function processWithConcurrency(items, worker, concurrency) {
-  if (!items.length) return [];
-
-  const results = new Array(items.length);
-  const limit = Math.max(1, Math.min(concurrency, items.length));
-  let nextIndex = 0;
-
-  async function runWorker() {
-    while (true) {
-      const index = nextIndex;
-      nextIndex += 1;
-
-      if (index >= items.length) {
-        return;
-      }
-
-      results[index] = await worker(items[index]);
-    }
-  }
-
-  await Promise.all(Array.from({ length: limit }, () => runWorker()));
-  return results.filter(Boolean);
-}
+app.get("/debug/sources", (_req, res) => {
+  res.json({
+    isCheckingNews,
+    isShuttingDown,
+    sourcesActive: NEWS_SOURCES.map((source) => source.id),
+    inventory: buildInventoryMetrics(processedArticles),
+    lastCycle: lastCycleMetrics,
+    sourceRuns: lastSourceMetrics,
+  });
+});
 
 async function checkPageForNews() {
   if (isCheckingNews) {
@@ -566,93 +265,228 @@ async function checkPageForNews() {
   }
 
   isCheckingNews = true;
+  const cycleMetrics = createCycleMetrics();
 
   try {
     logger.info("Verificando as fontes de notícias...");
 
-    const collectedItems = [];
+    const collectedCandidates = [];
 
     for (const source of NEWS_SOURCES) {
-      const sourceItems = await collectItemsFromSource(source);
-      collectedItems.push(...sourceItems);
+      const sourceMetrics = createSourceMetrics(source);
+      cycleMetrics.sourceRuns.push(sourceMetrics);
+
+      try {
+        const rawItems = await collectItemsFromSource(source, {
+          daysBack: DAYS_BACK,
+          maxItemsPerSource: MAX_ITEMS_PER_SOURCE,
+          maxSitemapsPerSource: MAX_SITEMAPS_PER_SOURCE,
+          metrics: sourceMetrics,
+        });
+
+        const normalizedItems = normalizeCollectedItems(rawItems, source);
+        const { accepted } = filterItemsBySource(
+          normalizedItems,
+          source,
+          sourceMetrics
+        );
+
+        collectedCandidates.push(...accepted);
+      } catch (error) {
+        sourceMetrics.parseErrorCount += 1;
+        logger.error(
+          `[Fonte:${source.name}] Falha no pipeline da fonte:`,
+          error.message || error
+        );
+      } finally {
+        finishSourceMetrics(sourceMetrics);
+      }
     }
 
-    if (!collectedItems.length) {
+    const sourceMetricsTracker = createSourceMetricsTracker(cycleMetrics.sourceRuns);
+
+    if (!collectedCandidates.length) {
       logger.warn("Nenhuma notícia encontrada em nenhuma fonte.");
       return;
     }
 
-    const candidates = dedupeByUrl(
-      collectedItems
-        .slice()
-        .sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a))
-    );
+    const sortedCandidates = collectedCandidates
+      .slice()
+      .sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
 
-    const newArticles = candidates.filter(
-      (article) => article?.url && !knownArticleUrls.has(article.url)
-    );
+    const {
+      accepted: dedupedCandidates,
+      duplicates: cycleDuplicates,
+    } = dedupeCandidates(sortedCandidates);
 
-    if (!newArticles.length) {
+    cycleDuplicates.forEach((duplicate) => {
+      sourceMetricsTracker.incrementDuplicate(duplicate.sourceId, 1);
+    });
+
+    const existingIndexes = buildExistingArticleIndex(processedArticles);
+    const seenAt = new Date().toISOString();
+
+    const newCandidates = [];
+    let touchedExisting = false;
+
+    for (const candidate of dedupedCandidates) {
+      const existingMatch = matchCandidateToExisting(candidate, existingIndexes, {
+        allowContentHash: false,
+      });
+
+      if (existingMatch) {
+        const seenResult = markExistingArticleSeen(
+          existingMatch.article,
+          candidate,
+          `pre_process_${existingMatch.reason}`,
+          seenAt,
+          existingIndexes
+        );
+        sourceMetricsTracker.incrementDuplicate(candidate.sourceId, 1);
+        if (seenResult.eventType === "updated") {
+          sourceMetricsTracker.incrementUpdated(candidate.sourceId, 1);
+        } else {
+          sourceMetricsTracker.incrementRevisited(candidate.sourceId, 1);
+        }
+        touchedExisting = true;
+        continue;
+      }
+
+      const urlKey = candidate.canonicalUrl || candidate.url;
+      if (urlKey && knownArticleUrls.has(urlKey)) {
+        sourceMetricsTracker.incrementDuplicate(candidate.sourceId, 1);
+        sourceMetricsTracker.incrementRevisited(candidate.sourceId, 1);
+        continue;
+      }
+
+      newCandidates.push(candidate);
+    }
+
+    if (!newCandidates.length) {
+      if (touchedExisting) {
+        rebuildKnownArticleUrls();
+        await saveArticlesToStorage();
+      }
+
       logger.info("Nenhuma notícia nova encontrada.");
       return;
     }
 
-    const articlesToProcess = newArticles.slice(0, MAX_NEW_ARTICLES_PER_CYCLE);
+    const candidatesToProcess = newCandidates.slice(0, MAX_NEW_ARTICLES_PER_CYCLE);
 
-    if (newArticles.length > articlesToProcess.length) {
+    if (newCandidates.length > candidatesToProcess.length) {
       logger.warn(
-        `[Monitor] ${newArticles.length} notícia(s) nova(s) encontradas. Processando ${articlesToProcess.length} neste ciclo para controlar custo.`
+        `[Monitor] ${newCandidates.length} notícia(s) nova(s) encontradas. Processando ${candidatesToProcess.length} neste ciclo para controlar custo.`
       );
     }
 
     const initialRun = knownArticleUrls.size === 0;
     logger.info(
       `${initialRun ? "Inicialização:" : "Novas notícias detectadas:"} ${
-        articlesToProcess.length
+        candidatesToProcess.length
       } artigo(s) para processar.`
     );
 
     const newlyProcessed = await processWithConcurrency(
-      articlesToProcess,
-      processArticle,
+      candidatesToProcess,
+      (candidate) => processArticleCandidate(candidate, new Date().toISOString()),
       ARTICLE_PROCESS_CONCURRENCY
     );
 
     if (!newlyProcessed.length) {
+      if (touchedExisting) {
+        rebuildKnownArticleUrls();
+        await saveArticlesToStorage();
+      }
+
       logger.warn("Nenhum artigo foi processado com sucesso nesta rodada.");
       return;
     }
 
-    processedArticles = [...newlyProcessed, ...processedArticles];
+    const additions = [];
+
+    for (const article of newlyProcessed) {
+      if (article?.refined?.fetchRestricted) {
+        sourceMetricsTracker.incrementFetchRestricted(article.refined.sourceId, 1);
+      }
+
+      const existingMatch = matchCandidateToExisting(article.refined, existingIndexes, {
+        allowContentHash: true,
+      });
+
+      if (existingMatch) {
+        const seenResult = markExistingArticleSeen(
+          existingMatch.article,
+          article.refined,
+          `post_process_${existingMatch.reason}`,
+          article.timestamp,
+          existingIndexes
+        );
+        sourceMetricsTracker.incrementDuplicate(article.refined.sourceId, 1);
+        if (seenResult.eventType === "updated") {
+          sourceMetricsTracker.incrementUpdated(article.refined.sourceId, 1);
+        } else {
+          sourceMetricsTracker.incrementRevisited(article.refined.sourceId, 1);
+        }
+        touchedExisting = true;
+        continue;
+      }
+
+      additions.push(article);
+      sourceMetricsTracker.incrementNew(article?.refined?.sourceId, 1);
+      indexArticle(existingIndexes, article);
+    }
+
+    if (!additions.length && touchedExisting) {
+      rebuildKnownArticleUrls();
+      await saveArticlesToStorage();
+      logger.info("Nenhum artigo novo adicionado; cache atualizado por recorrência.");
+      return;
+    }
+
+    if (!additions.length) {
+      logger.info("Nenhum artigo novo elegível após deduplicação final.");
+      return;
+    }
+
+    processedArticles = [...additions, ...processedArticles].map((article) =>
+      applyArticleDefaults(article)
+    );
+
     rebuildKnownArticleUrls();
 
-    logger.success(`${newlyProcessed.length} artigo(s) adicionado(s) à API.`);
-    saveArticlesToFile();
+    logger.success(`${additions.length} artigo(s) adicionado(s) à API.`);
+    await saveArticlesToStorage();
   } catch (error) {
     logger.error("Ocorreu um erro no loop de verificação:", error.message || error);
   } finally {
+    lastCycleMetrics = finishCycleMetrics(cycleMetrics);
+    lastSourceMetrics = cycleMetrics.sourceRuns;
     isCheckingNews = false;
   }
 }
 
-function cleanupExpiredArticles() {
+async function cleanupExpiredArticles() {
   const now = Date.now();
-  const originalCount = processedArticles.length;
+  let expiredCount = 0;
 
-  processedArticles = processedArticles.filter((article) => {
+  processedArticles.forEach((article) => {
     const timestamp = new Date(article.timestamp).getTime();
-    if (Number.isNaN(timestamp)) return false;
+    if (Number.isNaN(timestamp)) {
+      expiredCount += 1;
+      return;
+    }
 
     const articleAge = now - timestamp;
-    return articleAge < EXPIRATION_TIME_MS;
+    if (articleAge >= EXPIRATION_TIME_MS) {
+      expiredCount += 1;
+    }
   });
 
-  rebuildKnownArticleUrls();
-
-  const removedCount = originalCount - processedArticles.length;
-  if (removedCount > 0) {
-    logger.info(`[Manutenção] Removidos ${removedCount} artigo(s) expirado(s).`);
-    saveArticlesToFile();
+  if (expiredCount > 0) {
+    logger.info(
+      `[Manutenção] ${expiredCount} artigo(s) estão fora da janela de expiração, mas foram preservados no histórico.`
+    );
   }
 }
 
@@ -660,9 +494,14 @@ let checkIntervalId = null;
 let cleanupIntervalId = null;
 
 function startServer() {
-  const server = app.listen(PORT, HOST, () => {
+  const server = app.listen(PORT, HOST, async () => {
     logger.success(`Servidor rodando em ${HOST}:${PORT}.`);
-    loadArticlesFromFile();
+    if (USE_MYSQL) {
+      logger.info("Persistência ativa: MySQL.");
+    } else {
+      logger.warn("Persistência ativa: JSON local (DB_* não configurado).");
+    }
+    await loadArticlesFromStorage();
 
     const sourcesSummary = NEWS_SOURCES.map(
       (source) => `${source.name} (${source.monitorUrl})`
@@ -670,12 +509,13 @@ function startServer() {
     logger.info(`Fontes ativas: ${sourcesSummary}`);
     logger.info("Iniciando o monitoramento de notícias...");
 
-    checkPageForNews();
+    await checkPageForNews();
     checkIntervalId = setInterval(checkPageForNews, CHECK_INTERVAL_MS);
-    cleanupIntervalId = setInterval(
-      cleanupExpiredArticles,
-      CLEANUP_INTERVAL_MS
-    );
+    cleanupIntervalId = setInterval(() => {
+      cleanupExpiredArticles().catch((error) => {
+        logger.error("[Manutenção] Falha ao limpar artigos expirados:", error);
+      });
+    }, CLEANUP_INTERVAL_MS);
   });
 
   async function gracefulShutdown(signal) {
@@ -690,7 +530,7 @@ function startServer() {
       if (checkIntervalId) clearInterval(checkIntervalId);
       if (cleanupIntervalId) clearInterval(cleanupIntervalId);
 
-      saveArticlesToFile();
+      await saveArticlesToStorage();
 
       server.close((err) => {
         if (err) {
@@ -718,13 +558,13 @@ function startServer() {
 
   process.on("uncaughtException", (err) => {
     logger.error("[uncaughtException]", err);
-    saveArticlesToFile();
+    saveArticlesToStorage();
     setTimeout(() => process.exit(1), 1000);
   });
 
   process.on("unhandledRejection", (reason) => {
     logger.error("[unhandledRejection]", reason);
-    saveArticlesToFile();
+    saveArticlesToStorage();
     setTimeout(() => process.exit(1), 1000);
   });
 }
