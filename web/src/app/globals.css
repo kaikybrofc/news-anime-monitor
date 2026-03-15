@@ -1,8 +1,22 @@
 @import "tailwindcss";
 
 @layer base {
+  :root {
+    --primary: #f43f5e;
+    --primary-foreground: #ffffff;
+    --background: #0f172a;
+    --foreground: #f1f5f9;
+    --muted: #475569;
+    --muted-foreground: #94a3b8;
+    --accent: #1e293b;
+    --border: #334155;
+    --card: #1e293b;
+    --card-foreground: #f1f5f9;
+    --radius: 0.75rem;
+  }
+
   * {
-    @apply box-border;
+    @apply box-border border-[#334155];
   }
 
   html,
@@ -11,235 +25,186 @@
   }
 
   body {
-    @apply relative min-h-screen text-[#1f1b16] antialiased;
-    font-family: var(--font-body), Georgia, serif;
-    background:
-      radial-gradient(circle at 5% 0%, #ffd9a8 0%, transparent 45%),
-      radial-gradient(circle at 90% 20%, #c8eff1 0%, transparent 38%),
-      linear-gradient(155deg, #f6f4ef 0%, #f9f7f1 45%, #ece4d5 100%);
+    @apply min-h-screen bg-[#0f172a] text-[#f1f5f9] antialiased;
+    font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
   }
 
   a {
-    @apply text-inherit no-underline;
+    @apply text-inherit no-underline transition-colors;
   }
 
   h1,
   h2,
-  h3 {
-    @apply m-0;
-    font-family: var(--font-heading), "Trebuchet MS", sans-serif;
-    letter-spacing: -0.015em;
+  h3,
+  h4 {
+    @apply font-bold tracking-tight text-[#f1f5f9];
+    font-family: var(--font-heading), ui-sans-serif, system-ui, sans-serif;
   }
 
   h1 {
-    font-size: clamp(1.8rem, 3.4vw, 2.7rem);
+    font-size: clamp(2rem, 5vw, 3rem);
+    line-height: 1.1;
   }
 
   h2 {
-    font-size: clamp(1.15rem, 2.2vw, 1.45rem);
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    line-height: 1.2;
   }
 
   p {
-    @apply m-0 leading-relaxed;
-  }
-
-  code {
-    @apply rounded-lg border border-black/10 bg-black/5 px-1.5 py-0.5 font-mono text-[0.85em];
+    @apply m-0 leading-relaxed text-[#94a3b8];
   }
 }
 
 @layer components {
   .site-container {
-    @apply mx-auto w-[min(1100px,92vw)];
-  }
-
-  .page-glow {
-    @apply pointer-events-none fixed inset-0 -z-10;
-    background-image:
-      linear-gradient(0deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.4)),
-      repeating-linear-gradient(
-        45deg,
-        rgba(31, 27, 22, 0.01) 0,
-        rgba(31, 27, 22, 0.01) 8px,
-        transparent 8px,
-        transparent 16px
-      );
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
   }
 
   .site-header {
-    @apply sticky top-0 z-50 border-b border-black/10 bg-[#f6f4ef]/85 backdrop-blur;
+    @apply sticky top-0 z-50 border-b border-[#334155] bg-[#0f172a]/80 backdrop-blur-md;
   }
 
   .header-inner {
-    @apply flex items-start justify-between gap-4 py-3 max-[760px]:flex-col;
+    @apply flex h-16 items-center justify-between gap-4;
   }
 
   .brand {
-    @apply inline-flex items-center gap-2 tracking-[0.02em];
-    font-family: var(--font-heading), "Trebuchet MS", sans-serif;
-    font-size: 1.02rem;
+    @apply flex items-center gap-2 text-xl font-bold tracking-tighter text-[#f43f5e];
+    font-family: var(--font-heading), ui-sans-serif, system-ui, sans-serif;
   }
 
   .brand-dot {
-    @apply h-2.5 w-2.5 rounded-full;
-    background: linear-gradient(140deg, #cb4c2a, #0f6c74);
-    box-shadow: 0 0 0 6px rgba(203, 76, 42, 0.1);
+    @apply h-3 w-3 rounded-full bg-[#f43f5e];
+    box-shadow: 0 0 10px rgba(244, 63, 94, 0.4);
   }
 
   .main-nav {
-    @apply flex w-full flex-wrap justify-start gap-1.5 md:w-auto md:justify-end;
+    @apply hidden items-center gap-1 md:flex;
   }
 
   .nav-link {
-    @apply rounded-full border border-transparent px-3 py-1.5 text-sm text-[#6f675e] transition;
-  }
-
-  .nav-link:hover {
-    @apply -translate-y-px border-[#0f6c74]/35 text-[#1f1b16];
+    @apply rounded-md px-3 py-2 text-sm font-medium text-[#94a3b8] transition-colors hover:bg-[#1e293b] hover:text-[#f1f5f9];
   }
 
   .nav-link.active {
-    @apply border-[#8f2f17] text-white;
-    background: linear-gradient(120deg, #cb4c2a, #8f2f17);
+    @apply bg-[#1e293b] text-[#f43f5e];
+  }
+
+  /* Mobile Nav (Simplified for now) */
+  @media (max-width: 768px) {
+    .main-nav {
+      @apply flex w-full overflow-x-auto pb-2;
+    }
+    .header-inner {
+      @apply h-auto flex-col items-start py-4;
+    }
   }
 
   .main-content {
-    @apply py-10;
+    @apply py-8 md:py-12;
   }
 
   .stack {
-    @apply grid gap-4;
+    @apply flex flex-col gap-6 md:gap-10;
   }
 
   .lead {
-    @apply text-[#6f675e];
+    @apply text-lg text-[#94a3b8] md:text-xl;
   }
 
   .eyebrow {
-    @apply text-[0.84rem] font-bold uppercase tracking-[0.13em] text-[#8f2f17];
+    @apply text-xs font-bold uppercase tracking-widest text-[#f43f5e];
   }
 
-  .hero-card,
-  .info-card {
-    @apply grid gap-1.5 rounded-2xl border border-black/15 p-5 shadow-[0_8px_30px_rgba(31,27,22,0.06)];
-    background: linear-gradient(160deg, #fffaf1 0%, #fff6e7 100%);
-  }
-
+  /* Cards */
   .hero-card {
-    @apply gap-3.5 p-6;
+    @apply relative overflow-hidden rounded-3xl bg-[#1e293b] p-8 shadow-xl border border-[#334155] md:p-12;
   }
 
-  .hero-actions {
-    @apply flex flex-wrap gap-2.5;
+  .hero-card::before {
+    content: "";
+    @apply absolute -top-24 -right-24 h-64 w-64 rounded-full bg-rose-500/10 blur-3xl;
   }
 
-  .btn {
-    @apply inline-block rounded-full border border-transparent px-4 py-2 text-sm font-semibold transition;
-  }
-
-  .btn:hover {
-    @apply -translate-y-px;
-  }
-
-  .btn-primary {
-    @apply text-white;
-    background: linear-gradient(130deg, #cb4c2a, #8f2f17);
-  }
-
-  .btn-secondary {
-    @apply border-black/20 bg-white text-[#1f1b16];
-  }
-
-  .btn-disabled {
-    @apply pointer-events-none border-black/12 bg-white/60 text-[#6f675e];
-  }
-
-  .grid-cards {
-    @apply grid gap-4;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  }
-
-  .three-cols {
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  }
-
-  .kpi-grid {
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  }
-
-  .split-card {
-    @apply flex flex-wrap items-end justify-between gap-4 max-[760px]:items-start;
-  }
-
-  .kpi-number {
-    font-family: var(--font-heading), "Trebuchet MS", sans-serif;
-    font-size: clamp(1.45rem, 3vw, 2.3rem);
-    letter-spacing: -0.03em;
-  }
-
-  .meta-stack {
-    @apply grid gap-0.5 text-[0.92rem] text-[#6f675e];
+  .info-card {
+    @apply rounded-2xl border border-[#334155] bg-[#1e293b] p-6 shadow-sm transition-all hover:border-slate-500 hover:bg-[#232f46];
   }
 
   .warning-card {
-    @apply border-[#8f2f17]/30;
-    background: linear-gradient(160deg, #fff7f1 0%, #ffede4 100%);
+    @apply border-rose-900/50 bg-rose-950/20;
   }
 
-  .article-card {
-    @apply gap-3;
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-full px-6 py-2.5 text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:pointer-events-none disabled:opacity-50;
   }
 
+  .btn-primary {
+    @apply bg-[#f43f5e] text-white shadow-sm hover:bg-rose-600 active:scale-95;
+  }
+
+  .btn-secondary {
+    @apply border border-[#334155] bg-slate-800 text-[#f1f5f9] hover:bg-slate-700;
+  }
+
+  .btn-disabled {
+    @apply border-[#334155] bg-[#0f172a] text-[#475569];
+  }
+
+  /* Grids */
   .article-grid {
-    @apply grid gap-4;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    @apply grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
   }
 
-  @media (min-width: 768px) {
-    .article-grid {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
+  .grid-cards {
+    @apply grid grid-cols-1 gap-4 md:grid-cols-3;
   }
 
-  @media (min-width: 1024px) {
-    .article-grid {
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-    }
+  .kpi-grid {
+    @apply grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4;
   }
 
-  @media (min-width: 1280px) {
-    .article-grid {
-      grid-template-columns: repeat(6, minmax(0, 1fr));
-    }
+  .split-card {
+    @apply flex flex-col justify-between gap-6 sm:flex-row sm:items-center;
+  }
+
+  .meta-stack {
+    @apply flex flex-col gap-1 text-sm text-[#94a3b8];
+  }
+
+  .kpi-number {
+    @apply text-4xl font-bold tracking-tight text-[#f1f5f9] md:text-5xl;
+    font-family: var(--font-heading), ui-sans-serif, system-ui, sans-serif;
+  }
+
+  /* Article Card specific */
+  .article-card {
+    @apply flex flex-col gap-4 p-0 overflow-hidden;
   }
 
   .article-cover {
-    @apply block overflow-hidden rounded-xl border border-black/10;
-    aspect-ratio: 16 / 9;
+    @apply relative aspect-video overflow-hidden bg-slate-800;
   }
 
   .article-cover img {
-    @apply h-full w-full object-cover transition;
+    @apply h-full w-full object-cover opacity-80 transition-all duration-500;
   }
 
-  .article-cover:hover img {
-    @apply scale-[1.02];
+  .article-card:hover .article-cover img {
+    @apply scale-105 opacity-100;
   }
 
   .article-title-link h2 {
-    @apply transition;
-  }
-
-  .article-title-link:hover h2 {
-    @apply text-[#8f2f17];
+    @apply line-clamp-2 text-lg font-bold leading-tight transition-colors text-slate-100 hover:text-[#f43f5e];
   }
 
   .article-summary {
-    @apply text-[#6f675e];
+    @apply line-clamp-3 text-sm text-[#94a3b8] leading-relaxed;
   }
 
   .meta-line {
-    @apply flex flex-wrap gap-3 text-[0.9rem] text-[#6f675e];
+    @apply flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400;
   }
 
   .badge-row {
@@ -247,98 +212,39 @@
   }
 
   .status-badge {
-    @apply rounded-full border px-2.5 py-0.5 text-[0.72rem] font-semibold uppercase tracking-[0.08em];
+    @apply rounded-md px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wider;
   }
 
   .status-new {
-    @apply border-emerald-700/35 bg-emerald-600/10 text-emerald-900;
+    @apply bg-emerald-950/50 text-emerald-400 border border-emerald-900/50;
   }
 
   .status-updated {
-    @apply border-amber-700/35 bg-amber-600/10 text-amber-900;
+    @apply bg-sky-950/50 text-sky-400 border border-sky-900/50;
   }
 
   .status-restricted {
-    @apply border-rose-700/35 bg-rose-600/10 text-rose-900;
-  }
-
-  .article-actions {
-    @apply flex flex-wrap gap-3;
-  }
-
-  .inline-tags {
-    @apply flex flex-wrap gap-2;
+    @apply bg-rose-950/50 text-rose-400 border border-rose-900/50;
   }
 
   .tag {
-    @apply rounded-full border border-[#0f6c74]/35 bg-[#0f6c74]/8 px-2.5 py-0.5 text-[0.78rem] text-[#0d4f55];
-  }
-
-  .list-stack {
-    @apply grid gap-2;
-  }
-
-  .line-link,
-  .line-item {
-    @apply grid gap-0.5 py-1.5;
-  }
-
-  .line-link {
-    @apply border-b border-dashed border-black/12;
-  }
-
-  .line-link:last-child {
-    @apply border-b-0;
-  }
-
-  .line-link span,
-  .line-item span,
-  .muted {
-    @apply text-[0.9rem] text-[#6f675e];
+    @apply rounded-md bg-slate-800 px-2 py-0.5 text-[0.7rem] font-medium text-slate-400 border border-slate-700;
   }
 
   .inline-link {
-    @apply text-sm font-semibold text-[#8f2f17] underline decoration-dotted underline-offset-4 transition;
+    @apply text-sm font-semibold text-[#f43f5e] hover:underline;
   }
 
-  .inline-link:hover {
-    @apply text-[#cb4c2a];
-  }
-
-  .detail-hero {
-    @apply gap-4;
-  }
-
-  .detail-cover {
-    @apply overflow-hidden rounded-xl border border-black/10;
-    aspect-ratio: 16 / 9;
-  }
-
-  .detail-cover img {
-    @apply h-full w-full object-cover;
-  }
-
-  .detail-grid {
-    @apply grid gap-1.5 text-[0.95rem] text-[#423b33] sm:grid-cols-2;
-  }
-
+  /* Utils */
   .pagination-row {
-    @apply flex flex-wrap justify-between gap-2.5;
-  }
-
-  .link-card {
-    @apply transition;
-  }
-
-  .link-card:hover {
-    @apply -translate-y-0.5 border-[#cb4c2a]/50;
+    @apply mt-8 flex items-center justify-between gap-4;
   }
 
   .site-footer {
-    @apply mt-auto border-t border-black/10 bg-[#ece4d5]/80;
+    @apply mt-auto border-t border-[#334155] bg-[#0f172a];
   }
 
   .footer-inner {
-    @apply flex flex-col justify-between gap-4 py-4 text-[0.92rem] text-[#6f675e] md:flex-row;
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col justify-between gap-8 py-12 md:flex-row;
   }
 }

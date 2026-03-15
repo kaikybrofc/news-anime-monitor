@@ -26,68 +26,79 @@ export function ArticleCard({ article }) {
   const title = getArticleTitle(article);
   const url = getArticleUrl(article);
   const imageUrl = getArticleImageUrl(article);
-  const summary = summarizeText(refined.summary || "", 120);
+  const summary = summarizeText(refined.summary || "", 100);
   const tags = buildTagList(article);
   const lifecycleBadges = getArticleLifecycleBadges(article);
   const sourceName = String(refined.sourceName || refined.sourceId || "fonte desconhecida");
   const publishedAt = refined.publishedAt || article.publishedAt || article.timestamp;
-  const lastSeenAt = refined.lastSeenAt || article.timestamp;
   const score = formatNumber(refined.score || 0);
   const detailHref = articleId ? `/noticias/${articleId}` : "/noticias";
 
   return (
-    <article className="info-card article-card">
+    <article className="info-card article-card group">
       {imageUrl ? (
         <Link href={detailHref} className="article-cover" title="Abrir detalhe da noticia">
           <img src={imageUrl} alt={title} loading="lazy" />
         </Link>
-      ) : null}
-
-      <div className="article-header">
-        <Link href={detailHref} className="article-title-link" title="Abrir detalhe da noticia">
-          <h2>{title}</h2>
-        </Link>
-      </div>
-
-      <p className="meta-line">
-        <span>Fonte: {sourceName}</span>
-        <span>Score: {score}</span>
-        <span>Publicado: {formatDateTime(publishedAt)}</span>
-        <span>Ultimo seen: {formatDateTime(lastSeenAt)}</span>
-      </p>
-
-      {lifecycleBadges.length ? (
-        <div className="badge-row">
-          {lifecycleBadges.map((badge) => (
-            <span key={badge.key} className={`status-badge ${badge.toneClass}`}>
-              {badge.label}
-            </span>
-          ))}
+      ) : (
+        <div className="article-cover flex items-center justify-center bg-slate-100 text-slate-400">
+          <span className="text-xs">Sem imagem</span>
         </div>
-      ) : null}
+      )}
 
-      {summary ? <p className="article-summary">{summary}</p> : null}
+      <div className="flex flex-1 flex-col p-4 pt-0 gap-4">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-4 border-b border-slate-50 pb-2">
+            <span className="text-[10px] font-black uppercase tracking-widest text-rose-600 truncate">
+              {sourceName}
+            </span>
+            <div className="flex items-center gap-1.5 shrink-0 bg-slate-800/50 px-2 py-1 rounded-md border border-slate-700">
+              <span className="text-[9px] font-bold text-slate-500 uppercase">Score</span>
+              <span className="text-xs font-black text-rose-400">{score}</span>
+            </div>
+          </div>
+          
+          <Link href={detailHref} className="article-title-link block">
+            <h2 title={title} className="text-base font-bold leading-tight line-clamp-2">
+              {title}
+            </h2>
+          </Link>
+        </div>
 
-      <div className="article-actions">
-        <Link href={detailHref} className="inline-link">
-          Ler detalhe
-        </Link>
-        {url ? (
-          <a href={url} target="_blank" rel="noreferrer" className="inline-link">
-            Fonte original
-          </a>
+        {summary ? (
+          <p className="article-summary text-sm text-slate-500 line-clamp-3 leading-relaxed">
+            {summary}
+          </p>
         ) : null}
-      </div>
 
-      {tags.length ? (
-        <div className="inline-tags">
-          {tags.map((tag) => (
-            <span key={tag} className="tag">
-              {tag}
-            </span>
-          ))}
+        <div className="mt-auto space-y-4">
+          <div className="flex items-center justify-between gap-2 text-[10px] text-slate-400 font-medium">
+            <span>{formatDateTime(publishedAt)}</span>
+            {lifecycleBadges.length > 0 && (
+              <span className={`status-badge !text-[9px] ${lifecycleBadges[0].toneClass}`}>
+                {lifecycleBadges[0].label}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 border-t border-slate-50 pt-3">
+            <Link href={detailHref} className="btn btn-primary !py-1.5 !px-4 !text-[11px] flex-1">
+              Detalhes
+            </Link>
+            {url && (
+              <a 
+                href={url} 
+                target="_blank" 
+                rel="noreferrer" 
+                className="btn btn-secondary !py-1.5 !px-3 !text-[11px]"
+                title="Link Externo"
+              >
+                🔗
+              </a>
+            )}
+          </div>
         </div>
-      ) : null}
+      </div>
     </article>
   );
 }

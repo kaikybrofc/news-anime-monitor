@@ -33,7 +33,7 @@ export default async function HomePage() {
           Este frontend e a base do portal: navegacao pronta, layout responsivo e
           estrutura para evoluir paginas editoriais e tecnicas.
         </p>
-        <div className="hero-actions">
+        <div className="mt-8 flex flex-wrap gap-3">
           <Link href="/noticias" className="btn btn-primary">
             Ver noticias
           </Link>

@@ -1,4 +1,4 @@
-import { Space_Grotesk, Fraunces } from "next/font/google";
+import { Space_Grotesk, Inter } from "next/font/google";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import "./globals.css";
@@ -9,7 +9,7 @@ const headingFont = Space_Grotesk({
   weight: ["500", "700"],
 });
 
-const bodyFont = Fraunces({
+const bodyFont = Inter({
   subsets: ["latin"],
   variable: "--font-body",
   weight: ["400", "500", "600"],
@@ -25,7 +25,6 @@ export default function RootLayout({ children }) {
   return (
     <html lang="pt-BR">
       <body className={`${headingFont.variable} ${bodyFont.variable}`}>
-        <div className="page-glow" aria-hidden="true" />
         <SiteHeader />
         <main className="site-container main-content">{children}</main>
         <SiteFooter />
