@@ -48,6 +48,7 @@ const ARTICLE_PROCESS_CONCURRENCY = toPositiveInt(
   1
 );
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || "127.0.0.1";
 const DATA_FILE = path.resolve(
   __dirname,
   "..",
@@ -92,6 +93,16 @@ function rebuildKnownArticleUrls() {
 
 function normalizeNameKey(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function normalizeCategories(categories) {
+  return Array.from(
+    new Set(
+      (Array.isArray(categories) ? categories : [])
+        .map((category) => String(category || "").trim())
+        .filter(Boolean)
+    )
+  );
 }
 
 function resolveArticleName(articleInfo, html) {
@@ -205,6 +216,7 @@ async function filterItemsByRobots(items, source, context) {
 async function collectItemsFromSource(source) {
   const sourceTag = `[Fonte:${source.name}]`;
   const sourceHeaders = source.requestHeaders;
+  const maxItemsForSource = toPositiveInt(source.maxItems, MAX_ITEMS_PER_SOURCE);
 
   // 1) Sitemap
   let sitemapItems = [];
@@ -256,7 +268,7 @@ async function collectItemsFromSource(source) {
             });
           });
 
-          if (sitemapItems.length >= MAX_ITEMS_PER_SOURCE) break;
+          if (sitemapItems.length >= maxItemsForSource) break;
         }
 
         sitemapItems = filterByDays(sitemapItems, DAYS_BACK);
@@ -295,7 +307,11 @@ async function collectItemsFromSource(source) {
   // 3) Home / categoria
   let homeItems = [];
   const hasPrimaryItems = sitemapItems.length || feedItems.length;
-  if (!hasPrimaryItems && source.monitorUrl) {
+  const shouldMergeBuckets = Boolean(source.mergeBuckets);
+  const shouldCollectFromHome =
+    source.monitorUrl && (!hasPrimaryItems || shouldMergeBuckets);
+
+  if (shouldCollectFromHome) {
     const homeAllowed = await isSourceUrlAllowedByRobots(
       source.monitorUrl,
       source,
@@ -331,13 +347,34 @@ async function collectItemsFromSource(source) {
   let selectedBucketName = "none";
   let selectedItems = [];
 
-  for (const bucketName of priority) {
-    const bucketItems = buckets[bucketName] || [];
-    if (!bucketItems.length) continue;
+  if (shouldMergeBuckets) {
+    const seenUrls = new Set();
+    const mergedItems = [];
+    const usedBuckets = [];
 
-    selectedBucketName = bucketName;
-    selectedItems = bucketItems;
-    break;
+    for (const bucketName of priority) {
+      const bucketItems = buckets[bucketName] || [];
+      if (!bucketItems.length) continue;
+
+      usedBuckets.push(bucketName);
+      bucketItems.forEach((item) => {
+        if (!item?.url || seenUrls.has(item.url)) return;
+        seenUrls.add(item.url);
+        mergedItems.push(item);
+      });
+    }
+
+    selectedBucketName = usedBuckets.length ? usedBuckets.join("+") : "none";
+    selectedItems = mergedItems;
+  } else {
+    for (const bucketName of priority) {
+      const bucketItems = buckets[bucketName] || [];
+      if (!bucketItems.length) continue;
+
+      selectedBucketName = bucketName;
+      selectedItems = bucketItems;
+      break;
+    }
   }
 
   if (!selectedItems.length) {
@@ -358,8 +395,8 @@ async function collectItemsFromSource(source) {
     return [];
   }
 
-  if (selectedItems.length > MAX_ITEMS_PER_SOURCE) {
-    selectedItems = selectedItems.slice(0, MAX_ITEMS_PER_SOURCE);
+  if (selectedItems.length > maxItemsForSource) {
+    selectedItems = selectedItems.slice(0, maxItemsForSource);
   }
 
   logger.info(
@@ -391,7 +428,15 @@ function loadArticlesFromFile() {
         throw new Error("Formato inválido de cache: esperado um array.");
       }
 
-      processedArticles = parsed.filter((article) => article?.refined?.url);
+      processedArticles = parsed
+        .filter((article) => article?.refined?.url)
+        .map((article) => ({
+          ...article,
+          refined: {
+            ...article.refined,
+            categories: normalizeCategories(article?.refined?.categories),
+          },
+        }));
       rebuildKnownArticleUrls();
 
       logger.success(
@@ -455,6 +500,7 @@ async function processArticle(articleInfo) {
     const extractedImage = extractImageFromHtml(html);
     const image = articleInfo.image || extractedImage || "";
     const name = resolveArticleName(articleInfo, html);
+    const categories = normalizeCategories(articleInfo.categories);
 
     if (!image) {
       logger.warn(`[Imagem] Nenhuma imagem encontrada: ${articleInfo.url}`);
@@ -470,6 +516,7 @@ async function processArticle(articleInfo) {
         url: articleInfo.url,
         image,
         summary,
+        categories,
       },
     };
   } catch (error) {
@@ -613,8 +660,8 @@ let checkIntervalId = null;
 let cleanupIntervalId = null;
 
 function startServer() {
-  const server = app.listen(PORT, () => {
-    logger.success(`Servidor rodando na porta ${PORT}.`);
+  const server = app.listen(PORT, HOST, () => {
+    logger.success(`Servidor rodando em ${HOST}:${PORT}.`);
     loadArticlesFromFile();
 
     const sourcesSummary = NEWS_SOURCES.map(

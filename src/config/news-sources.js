@@ -37,11 +37,6 @@ const DEFAULT_ANN_EXCLUDED_PREFIXES = [
   "/news/network",
   "/news/topic",
   "/news/tag",
-  "/news/interest",
-  "/news/feature",
-  "/news/review",
-  "/news/preview",
-  "/news/interview",
 ];
 
 function getFirstEnvValue(keys = []) {
@@ -101,14 +96,17 @@ const SOURCE_DEFINITIONS = {
     monitorUrl: "https://www.animenewsnetwork.com/news",
     feedUrl: "https://www.animenewsnetwork.com/news/rss.xml?ann-edition=w",
     collectionPriority: ["feed", "home"],
+    mergeBuckets: true,
+    maxItems: 200,
     enableSitemap: false,
     domains: ["animenewsnetwork.com"],
-    allowedPathPrefixes: ["/news/"],
+    allowedPathPrefixes: ["/news/", "/daily-briefs/"],
     excludedPathPrefixes: DEFAULT_ANN_EXCLUDED_PREFIXES,
     homeLinkSelectors: [
       ".mainfeed-section .herald.box.news h3 a",
       ".herald.box.news h3 a",
       "a[href^='/news/']",
+      "a[href^='/daily-briefs/']",
     ],
     requestHeaders: buildRequestHeaders(
       {
