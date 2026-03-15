@@ -386,13 +386,16 @@ function enforceInMemoryWindow() {
 }
 
 function getItemTimestamp(item) {
+  const refined = item?.refined || {};
   const dateValue =
+    refined.publishedAt ||
     item?.publishedAt ||
     item?.pubDate ||
     item?.lastmod ||
+    refined.firstSeenAt ||
+    item?.firstSeenAt ||
     item?.timestamp ||
-    item?.refined?.publishedAt ||
-    item?.refined?.lastSeenAt;
+    refined.lastSeenAt;
   if (!dateValue) return 0;
 
   const parsed = Date.parse(dateValue);

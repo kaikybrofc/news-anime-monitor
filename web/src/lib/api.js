@@ -1,17 +1,30 @@
-const DEFAULT_MONITOR_API_BASE_URL = "http://127.0.0.1:3001";
+const DEFAULT_MONITOR_API_BASE_URLS = [
+  "http://127.0.0.1:3001",
+  "http://127.0.0.1:3000",
+];
 const REQUEST_TIMEOUT_MS = 10000;
 
 function stripTrailingSlash(value) {
   return String(value || "").replace(/\/+$/, "");
 }
 
-export function getMonitorApiBaseUrl() {
+function getConfiguredMonitorApiBaseUrl() {
   const envBase =
     process.env.NEWS_MONITOR_API_URL ||
     process.env.MONITOR_API_URL ||
     process.env.API_BASE_URL;
 
-  return stripTrailingSlash(envBase || DEFAULT_MONITOR_API_BASE_URL);
+  return stripTrailingSlash(envBase || "");
+}
+
+export function getMonitorApiBaseUrls() {
+  const configured = getConfiguredMonitorApiBaseUrl();
+  if (configured) return [configured];
+  return DEFAULT_MONITOR_API_BASE_URLS.slice();
+}
+
+export function getMonitorApiBaseUrl() {
+  return getMonitorApiBaseUrls()[0];
 }
 
 function appendQueryParams(url, query = {}) {
@@ -27,39 +40,63 @@ function appendQueryParams(url, query = {}) {
 }
 
 export async function fetchMonitor(pathname, query = {}) {
-  const baseUrl = getMonitorApiBaseUrl();
   const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`;
-  const url = new URL(normalizedPath, `${baseUrl}/`);
-  appendQueryParams(url, query);
+  const configuredBaseUrl = getConfiguredMonitorApiBaseUrl();
+  const baseUrls = getMonitorApiBaseUrls();
+  const allowFallback = !configuredBaseUrl;
+  const attemptErrors = [];
 
-  let response;
-  try {
-    response = await fetch(url.toString(), {
-      cache: "no-store",
-      next: { revalidate: 0 },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-  } catch (error) {
-    throw new Error(`Falha de rede ao acessar ${url.pathname}: ${error.message}`);
-  }
+  for (let index = 0; index < baseUrls.length; index += 1) {
+    const baseUrl = baseUrls[index];
+    const url = new URL(normalizedPath, `${baseUrl}/`);
+    appendQueryParams(url, query);
 
-  if (!response.ok) {
-    let details = "";
+    let response;
     try {
-      const json = await response.json();
-      details = json?.error ? ` ${json.error}` : "";
-    } catch {
-      details = "";
+      response = await fetch(url.toString(), {
+        cache: "no-store",
+        next: { revalidate: 0 },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+    } catch (error) {
+      attemptErrors.push(
+        `Falha de rede em ${baseUrl}${normalizedPath}: ${error.message}`
+      );
+
+      if (allowFallback && index < baseUrls.length - 1) {
+        continue;
+      }
+
+      throw new Error(attemptErrors.join(" | "));
     }
 
-    const error = new Error(
-      `Erro ${response.status} em ${url.pathname}.${details}`.trim()
-    );
-    error.status = response.status;
-    throw error;
+    if (!response.ok) {
+      let details = "";
+      try {
+        const json = await response.json();
+        details = json?.error ? ` ${json.error}` : "";
+      } catch {
+        details = "";
+      }
+
+      const statusMessage = `Erro ${response.status} em ${baseUrl}${normalizedPath}.${details}`.trim();
+      attemptErrors.push(statusMessage);
+
+      if (allowFallback && index < baseUrls.length - 1) {
+        continue;
+      }
+
+      const error = new Error(attemptErrors.join(" | "));
+      error.status = response.status;
+      throw error;
+    }
+
+    return response.json();
   }
 
-  return response.json();
+  throw new Error(
+    `Falha ao acessar ${normalizedPath}. Tentativas: ${attemptErrors.join(" | ")}`
+  );
 }
 
 export function readQueryString(searchParams, key, fallback = "") {

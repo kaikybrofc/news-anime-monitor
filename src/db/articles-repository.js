@@ -5,6 +5,15 @@ const {
 } = require("./mysql.js");
 
 const TABLE_NAME = "articles";
+const ARTICLE_RECENCY_SQL = `
+COALESCE(
+  NULLIF(JSON_UNQUOTE(JSON_EXTRACT(refined_json, '$.publishedAt')), ''),
+  NULLIF(JSON_UNQUOTE(JSON_EXTRACT(refined_json, '$.firstSeenAt')), ''),
+  DATE_FORMAT(COALESCE(first_seen_at, timestamp), '%Y-%m-%dT%H:%i:%s.%fZ'),
+  NULLIF(JSON_UNQUOTE(JSON_EXTRACT(refined_json, '$.lastSeenAt')), ''),
+  DATE_FORMAT(COALESCE(last_seen_at, timestamp), '%Y-%m-%dT%H:%i:%s.%fZ')
+)
+`;
 const FRANCHISE_SLUG_SQL = `
 COALESCE(
   NULLIF(LOWER(JSON_UNQUOTE(JSON_EXTRACT(refined_json, '$.franchiseSlug'))), ''),
@@ -359,8 +368,8 @@ async function queryArticles(params = {}) {
 
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
   const orderSql = q
-    ? "ORDER BY score DESC, COALESCE(last_seen_at, timestamp) DESC, timestamp DESC"
-    : "ORDER BY timestamp DESC";
+    ? `ORDER BY score DESC, ${ARTICLE_RECENCY_SQL} DESC, timestamp DESC`
+    : `ORDER BY ${ARTICLE_RECENCY_SQL} DESC, timestamp DESC`;
 
   const [countRows] = await db.query(
     `SELECT COUNT(*) AS total FROM ${quoteIdentifier(TABLE_NAME)} ${whereSql}`,

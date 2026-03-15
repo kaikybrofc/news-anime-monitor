@@ -1,5 +1,6 @@
+import { fetchMonitor as fetchMonitorApi } from "@/lib/api";
+
 const DEFAULT_SITE_URL = "https://omnizap.xyz";
-const DEFAULT_MONITOR_API_BASE_URL = "http://127.0.0.1:3001";
 const PAGE_LIMIT = 200;
 
 function stripTrailingSlash(value = "") {
@@ -10,43 +11,13 @@ function getSiteUrl() {
   return stripTrailingSlash(process.env.NEXT_PUBLIC_SITE_URL || DEFAULT_SITE_URL);
 }
 
-function getMonitorApiBaseUrl() {
-  return stripTrailingSlash(
-    process.env.NEWS_MONITOR_API_URL ||
-      process.env.MONITOR_API_URL ||
-      process.env.API_BASE_URL ||
-      DEFAULT_MONITOR_API_BASE_URL
-  );
-}
-
-async function fetchMonitor(pathname, query = {}) {
-  const baseUrl = getMonitorApiBaseUrl();
-  const url = new URL(pathname.startsWith("/") ? pathname : `/${pathname}`, `${baseUrl}/`);
-
-  Object.entries(query).forEach(([key, value]) => {
-    if (value === undefined || value === null || value === "") return;
-    url.searchParams.set(key, String(value));
-  });
-
-  const response = await fetch(url.toString(), {
-    cache: "no-store",
-    next: { revalidate: 0 },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Falha ao carregar ${url.pathname}: ${response.status}`);
-  }
-
-  return response.json();
-}
-
 async function fetchAllArticlePaths() {
   const paths = [];
   let offset = 0;
   let hasMore = true;
 
   while (hasMore) {
-    const payload = await fetchMonitor("/articles", {
+    const payload = await fetchMonitorApi("/articles", {
       limit: PAGE_LIMIT,
       offset,
     });
@@ -72,7 +43,7 @@ async function fetchAllArticlePaths() {
 }
 
 async function fetchEntityPaths(type, routeBase) {
-  const payload = await fetchMonitor("/seo/entities", {
+  const payload = await fetchMonitorApi("/seo/entities", {
     type,
     top: 1000,
   });

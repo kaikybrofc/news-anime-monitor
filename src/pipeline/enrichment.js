@@ -513,7 +513,9 @@ function bumpArticleSeen(existingArticle, candidate, reason, seenAt) {
   base.refined.qualityScore = scores.qualityScore;
   base.refined.importanceScore = scores.importanceScore;
   base.refined.trendScore = scores.trendScore;
-  base.timestamp = nowIso;
+  if (!base.timestamp || Number.isNaN(Date.parse(String(base.timestamp)))) {
+    base.timestamp = base.refined.firstSeenAt || nowIso;
+  }
 
   return base;
 }
