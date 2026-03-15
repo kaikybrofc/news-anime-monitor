@@ -72,6 +72,7 @@ export function readQueryString(searchParams, key, fallback = "") {
 
 export function readQueryInt(searchParams, key, fallback) {
   const raw = readQueryString(searchParams, key, "");
+  if (!String(raw).trim()) return fallback;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.floor(parsed);
@@ -82,4 +83,3 @@ export function clampInt(value, minimum, maximum, fallback) {
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(minimum, Math.min(maximum, Math.floor(parsed)));
 }
-

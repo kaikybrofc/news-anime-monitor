@@ -27,7 +27,7 @@ export default function RootLayout({ children }) {
       <body className={`${headingFont.variable} ${bodyFont.variable}`}>
         <div className="page-glow" aria-hidden="true" />
         <SiteHeader />
-        <main className="container main-content">{children}</main>
+        <main className="site-container main-content">{children}</main>
         <SiteFooter />
       </body>
     </html>
