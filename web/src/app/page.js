@@ -51,23 +51,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Search Bar - Glassmorphism */}
-      <section className="animate-fade-in-up delay-500">
-        <div className="info-card glass !p-1 md:!p-2 shadow-2xl overflow-hidden rounded-[2rem]">
-          <form action="/noticias" method="get" className="flex flex-col sm:flex-row gap-2">
-            <input
-              type="text"
-              name="q"
-              placeholder="O que você está procurando hoje? Ex: MAPPA, Bleach, Trailer..."
-              className="flex-1 bg-transparent border-none px-6 py-4 text-slate-100 text-lg outline-none placeholder:text-slate-500"
-            />
-            <button type="submit" className="btn btn-primary !rounded-[1.5rem] !px-10 text-lg mx-1 my-1">
-              Buscar Agora
-            </button>
-          </form>
-        </div>
-      </section>
-
       {/* Latest News Section */}
       <section className="flex flex-col gap-10">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 animate-fade-in">
