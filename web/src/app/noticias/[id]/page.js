@@ -13,6 +13,7 @@ import {
   isLikelyArticleId,
   summarizeText,
 } from "@/lib/formatters";
+import { toAbsoluteSiteUrl } from "@/lib/site-url";
 import {
   getArticleEntitiesByType,
   getSeoEntityConfigByType,
@@ -141,19 +142,13 @@ export default async function NoticiaDetailPage(props) {
   const badges = getArticleLifecycleBadges(article);
   const score = formatNumber(refined.score || 0);
   const canonicalPath = getArticleDetailPath(article);
-  const siteBaseUrl = String(process.env.NEXT_PUBLIC_SITE_URL || "https://omnizap.xyz").replace(
-    /\/+$/,
-    ""
-  );
-  const canonicalUrl = canonicalPath.startsWith("/")
-    ? `${siteBaseUrl}${canonicalPath}`
-    : siteBaseUrl;
+  const canonicalUrl = toAbsoluteSiteUrl(canonicalPath);
   const articleSchema = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
     headline: title,
-    datePublished: publishedAt || null,
-    dateModified: lastSeenAt || publishedAt || null,
+    datePublished: publishedAt || undefined,
+    dateModified: lastSeenAt || publishedAt || undefined,
     image: imageUrl ? [imageUrl] : undefined,
     mainEntityOfPage: canonicalUrl,
     url: canonicalUrl,
@@ -166,6 +161,9 @@ export default async function NoticiaDetailPage(props) {
       name: "Anime Radar",
     },
     description: summary || undefined,
+    articleSection: refined.contentType || "news",
+    isAccessibleForFree: true,
+    inLanguage: "pt-BR",
   };
   const entitySections = [
     { type: "anime", label: "Anime" },

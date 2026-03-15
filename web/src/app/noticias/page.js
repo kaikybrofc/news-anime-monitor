@@ -1,11 +1,17 @@
 import Link from "next/link";
 import { ArticleCard } from "@/components/article-card";
 import { Pagination } from "@/components/pagination";
+import { UnifiedSearch } from "@/components/unified-search";
 import { clampInt, fetchMonitor, readQueryInt, readQueryString } from "@/lib/api";
+import { getArticleDetailPath, getArticleTitle } from "@/lib/formatters";
+import { toAbsoluteSiteUrl } from "@/lib/site-url";
 
 export const metadata = {
   title: "Notícias | Anime Radar",
   description: "Acompanhe as notícias de anime monitoradas em tempo real.",
+  alternates: {
+    canonical: "/noticias",
+  },
 };
 
 export const dynamic = "force-dynamic";
@@ -52,24 +58,44 @@ export default async function NoticiasPage(props) {
     errorMessage = error.message;
   }
 
+  const canonicalPath = "/noticias";
+  const collectionSchema = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "Notícias de Anime",
+    url: toAbsoluteSiteUrl(canonicalPath),
+    isPartOf: {
+      "@type": "WebSite",
+      name: "OmniZap Anime Radar",
+      url: toAbsoluteSiteUrl("/"),
+    },
+    mainEntity: {
+      "@type": "ItemList",
+      itemListOrder: "https://schema.org/ItemListOrderDescending",
+      numberOfItems: Number(payload?.total || 0),
+      itemListElement: (payload.items || []).slice(0, 20).map((article, index) => ({
+        "@type": "ListItem",
+        position: Number(offset) + index + 1,
+        url: toAbsoluteSiteUrl(getArticleDetailPath(article)),
+        name: getArticleTitle(article),
+      })),
+    },
+  };
+
   return (
     <div className="flex flex-col gap-10">
+      <script type="application/ld+json" suppressHydrationWarning>
+        {JSON.stringify(collectionSchema)}
+      </script>
+
       {/* Search */}
       <section className="animate-fade-in-up delay-50">
-        <div className="info-card glass !p-1 md:!p-2 shadow-2xl overflow-hidden rounded-[2rem]">
-          <form action="/noticias" method="get" className="flex flex-col sm:flex-row gap-2">
-            <input type="hidden" name="offset" value="0" />
-            <input
-              type="text"
-              name="q"
-              defaultValue={filters.q}
-              placeholder="Busque por anime, estúdio, trailer, fonte..."
-              className="flex-1 bg-transparent border-none px-6 py-4 text-slate-100 text-lg outline-none placeholder:text-slate-500"
-            />
-            <button type="submit" className="btn btn-primary !rounded-[1.5rem] !px-10 text-lg mx-1 my-1">
-              Buscar
-            </button>
-          </form>
+        <div className="info-card glass !p-1 md:!p-2 shadow-2xl overflow-visible rounded-[2rem]">
+          <UnifiedSearch
+            initialQuery={filters.q}
+            className="w-full"
+            placeholder="Buscar notícia, franquia ou fonte..."
+          />
         </div>
       </section>
 

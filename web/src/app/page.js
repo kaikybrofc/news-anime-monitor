@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { ArticleCard } from "@/components/article-card";
+import { UnifiedSearch } from "@/components/unified-search";
 import { fetchMonitor } from "@/lib/api";
+import { getArticleDetailPath, getArticleTitle } from "@/lib/formatters";
+import { toAbsoluteSiteUrl } from "@/lib/site-url";
 
 export const metadata = {
   title: "Anime Radar | Inteligência em Notícias",
@@ -23,8 +26,45 @@ export default async function HomePage() {
     errorMessage = error.message;
   }
 
+  const websiteSchema = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "OmniZap Anime Radar",
+    url: toAbsoluteSiteUrl("/"),
+    potentialAction: {
+      "@type": "SearchAction",
+      target: `${toAbsoluteSiteUrl("/noticias")}?q={search_term_string}`,
+      "query-input": "required name=search_term_string",
+    },
+  };
+
+  const collectionSchema = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "Últimas Notícias de Anime",
+    url: toAbsoluteSiteUrl("/"),
+    isPartOf: {
+      "@type": "WebSite",
+      name: "OmniZap Anime Radar",
+      url: toAbsoluteSiteUrl("/"),
+    },
+    mainEntity: {
+      "@type": "ItemList",
+      itemListElement: (latestPayload.items || []).slice(0, 8).map((article, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        url: toAbsoluteSiteUrl(getArticleDetailPath(article)),
+        name: getArticleTitle(article),
+      })),
+    },
+  };
+
   return (
     <div className="flex flex-col gap-16 md:gap-24">
+      <script type="application/ld+json" suppressHydrationWarning>
+        {JSON.stringify([websiteSchema, collectionSchema])}
+      </script>
+
       {/* Hero Section */}
       <section className="relative py-12 md:py-24 animate-fade-in">
         <div className="absolute top-0 right-0 -z-10 h-96 w-96 rounded-full bg-rose-500/10 blur-[120px]" />
@@ -49,6 +89,10 @@ export default async function HomePage() {
             </Link>
           </div>
         </div>
+      </section>
+
+      <section className="animate-fade-in-up">
+        <UnifiedSearch className="mx-auto w-full max-w-3xl" />
       </section>
 
       {/* Latest News Section */}
