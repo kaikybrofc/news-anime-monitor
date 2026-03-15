@@ -213,6 +213,7 @@ export async function SeoEntityDetailView({ routeKey, params, searchParams }) {
         offset={payload.offset || offset}
         limit={payload.limit || limit}
         hasMore={Boolean(payload.hasMore)}
+        total={payload.total || 0}
       />
     </section>
   );

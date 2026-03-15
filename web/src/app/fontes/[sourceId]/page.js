@@ -158,6 +158,7 @@ export default async function FonteDetailPage(props) {
         offset={payload.offset || offset}
         limit={payload.limit || limit}
         hasMore={Boolean(payload.hasMore)}
+        total={payload.total || 0}
       />
     </section>
   );
