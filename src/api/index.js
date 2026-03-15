@@ -220,6 +220,59 @@ function normalizeQueryText(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function normalizeToAscii(value = "") {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function slugifyNewsText(value = "", maxLength = 84) {
+  const cleaned = normalizeToAscii(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-+/g, "-")
+    .trim();
+
+  if (!cleaned) return "noticia";
+  if (cleaned.length <= maxLength) return cleaned;
+
+  return cleaned.slice(0, maxLength).replace(/-+$/g, "");
+}
+
+function formatNewsDateSlug(value) {
+  const parsed = Date.parse(String(value || ""));
+  if (Number.isNaN(parsed)) return "sem-data";
+
+  const date = new Date(parsed);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getArticleTitleForSlug(article = {}) {
+  const refined = article?.refined || {};
+  const explicitTitle = String(refined.name || article.name || "").trim();
+  if (explicitTitle) return explicitTitle;
+
+  const normalizedTitle = String(refined.titleNormalized || "").trim();
+  if (normalizedTitle) return normalizedTitle;
+
+  return String(refined.canonicalUrl || refined.url || article.id || "noticia");
+}
+
+function getArticlePublishedAtForSlug(article = {}) {
+  const refined = article?.refined || {};
+  return refined.publishedAt || article.publishedAt || article.timestamp || "";
+}
+
+function buildArticleNewsSlug(article = {}) {
+  const titleSlug = slugifyNewsText(getArticleTitleForSlug(article), 84);
+  const dateSlug = formatNewsDateSlug(getArticlePublishedAtForSlug(article));
+  return `${titleSlug}-${dateSlug}`;
+}
+
 function normalizeLimit(value, fallback = API_DEFAULT_LIMIT) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
@@ -394,6 +447,7 @@ function deriveFranchiseFromRefined(refined = {}) {
 function toArticleContract(article) {
   const hydrated = applyArticleDefaults(article);
   const franchise = deriveFranchiseFromRefined(hydrated.refined);
+  const newsSlug = buildArticleNewsSlug(hydrated);
 
   return {
     ...hydrated,
@@ -401,6 +455,7 @@ function toArticleContract(article) {
       ...hydrated.refined,
       franchiseSlug: franchise.slug || "",
       franchiseName: franchise.name || "",
+      newsSlug,
     },
   };
 }
@@ -716,6 +771,57 @@ app.get("/articles", async (req, res) => {
     logger.error("[API:/articles] Falha ao listar artigos:", error);
     res.status(500).json({
       error: "Falha ao listar artigos.",
+    });
+  }
+});
+
+app.get("/articles/slug/:slug", async (req, res) => {
+  try {
+    const newsSlug = normalizeQueryText(req.params.slug);
+    if (!newsSlug) {
+      return res.status(400).json({
+        error: "Parâmetro slug inválido.",
+      });
+    }
+
+    const allArticles = await loadAllArticlesForContract();
+    const matches = allArticles
+      .filter((article) => {
+        const refined = article?.refined || {};
+        const candidateSlug = normalizeQueryText(
+          refined.newsSlug || buildArticleNewsSlug(article)
+        );
+        return candidateSlug === newsSlug;
+      })
+      .sort((a, b) => {
+        const byTimestamp = getItemTimestamp(b) - getItemTimestamp(a);
+        if (byTimestamp !== 0) return byTimestamp;
+
+        const scoreA = Number(a?.refined?.score || 0);
+        const scoreB = Number(b?.refined?.score || 0);
+        if (scoreB !== scoreA) return scoreB - scoreA;
+
+        const seenA = Number(a?.refined?.timesSeen || 0);
+        const seenB = Number(b?.refined?.timesSeen || 0);
+        if (seenB !== seenA) return seenB - seenA;
+
+        return String(a?.id || "").localeCompare(String(b?.id || ""));
+      });
+
+    if (!matches.length) {
+      return res.status(404).json({
+        error: "Artigo não encontrado.",
+      });
+    }
+
+    return res.json({
+      item: toArticleContract(matches[0]),
+      candidates: matches.length,
+    });
+  } catch (error) {
+    logger.error("[API:/articles/slug/:slug] Falha ao buscar artigo:", error);
+    return res.status(500).json({
+      error: "Falha ao buscar artigo.",
     });
   }
 });

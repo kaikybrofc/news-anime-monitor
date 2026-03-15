@@ -1,22 +1,141 @@
 import Link from "next/link";
+import { permanentRedirect } from "next/navigation";
 import { fetchMonitor } from "@/lib/api";
 import { getArticleLifecycleBadges } from "@/lib/article-state";
 import {
+  extractArticleIdFromNewsParam,
   formatDateTime,
   formatNumber,
+  getArticleDetailPath,
   getArticleImageUrl,
   getArticleTitle,
   getArticleUrl,
+  isLikelyArticleId,
+  summarizeText,
 } from "@/lib/formatters";
 
 export const dynamic = "force-dynamic";
 
+async function loadArticleById(articleId = "") {
+  const parsedId = String(articleId || "").trim();
+  if (!parsedId) return null;
+  const payload = await fetchMonitor(`/articles/${encodeURIComponent(parsedId)}`);
+  return payload?.item || null;
+}
+
+async function loadArticleBySlug(newsSlug = "") {
+  const parsedSlug = String(newsSlug || "").trim();
+  if (!parsedSlug) return null;
+  const payload = await fetchMonitor(`/articles/slug/${encodeURIComponent(parsedSlug)}`);
+  return payload?.item || null;
+}
+
+async function resolveArticleByNewsParam(rawParam = "") {
+  const raw = String(rawParam || "").trim();
+  if (!raw) {
+    return {
+      status: "not_found",
+      item: null,
+      articleId: "",
+      errorMessage: "",
+    };
+  }
+
+  const hasLegacyMarker = raw.includes("--");
+  const legacyExtractedId = hasLegacyMarker ? extractArticleIdFromNewsParam(raw) : "";
+
+  if (hasLegacyMarker && isLikelyArticleId(legacyExtractedId)) {
+    try {
+      const item = await loadArticleById(legacyExtractedId);
+      return {
+        status: item ? "ready" : "not_found",
+        item,
+        articleId: legacyExtractedId,
+        errorMessage: "",
+      };
+    } catch (error) {
+      if (error?.status !== 404) {
+        return {
+          status: "error",
+          item: null,
+          articleId: legacyExtractedId,
+          errorMessage: error.message,
+        };
+      }
+    }
+  }
+
+  if (isLikelyArticleId(raw)) {
+    try {
+      const item = await loadArticleById(raw);
+      return {
+        status: item ? "ready" : "not_found",
+        item,
+        articleId: raw,
+        errorMessage: "",
+      };
+    } catch (error) {
+      if (error?.status !== 404) {
+        return {
+          status: "error",
+          item: null,
+          articleId: raw,
+          errorMessage: error.message,
+        };
+      }
+    }
+  }
+
+  try {
+    const item = await loadArticleBySlug(raw);
+    return {
+      status: item ? "ready" : "not_found",
+      item,
+      articleId: String(item?.id || ""),
+      errorMessage: "",
+    };
+  } catch (error) {
+    if (error?.status === 404) {
+      return {
+        status: "not_found",
+        item: null,
+        articleId: legacyExtractedId || raw,
+        errorMessage: "",
+      };
+    }
+
+    return {
+      status: "error",
+      item: null,
+      articleId: legacyExtractedId || raw,
+      errorMessage: error.message,
+    };
+  }
+}
+
 export async function generateMetadata(props) {
   const resolvedProps = await props;
   const resolvedParams = await resolvedProps?.params;
-  const articleId = String(resolvedParams?.id || "");
+  const rawArticleParam = String(resolvedParams?.id || "").trim();
+  const resolved = await resolveArticleByNewsParam(rawArticleParam);
+
+  if (resolved.status !== "ready" || !resolved.item) {
+    return {
+      title: "Noticia | OmniZap Anime Radar",
+    };
+  }
+
+  const article = resolved.item;
+  const title = getArticleTitle(article);
+  const description = summarizeText(article?.refined?.summary || "", 160);
+  const canonicalPath = getArticleDetailPath(article);
+
   return {
-    title: `Noticia ${articleId} | OmniZap Anime Radar`,
+    title: `${title} | OmniZap Anime Radar`,
+    description: description || "Detalhe de noticia no OmniZap Anime Radar.",
+    alternates: canonicalPath.startsWith("/noticias/")
+      ? { canonical: canonicalPath }
+      : undefined,
   };
 }
 
@@ -32,25 +151,14 @@ function buildNotFoundState(articleId) {
 export default async function NoticiaDetailPage(props) {
   const resolvedProps = await props;
   const resolvedParams = await resolvedProps?.params;
-  const articleId = String(resolvedParams?.id || "").trim();
+  const rawArticleParam = String(resolvedParams?.id || "").trim();
+  const resolved = await resolveArticleByNewsParam(rawArticleParam);
   let state = {
-    status: "ready",
-    articleId,
-    item: null,
-    errorMessage: "",
+    status: resolved.status,
+    articleId: resolved.articleId || rawArticleParam,
+    item: resolved.item || null,
+    errorMessage: resolved.errorMessage || "",
   };
-
-  try {
-    const payload = await fetchMonitor(`/articles/${encodeURIComponent(articleId)}`);
-    state.item = payload?.item || null;
-  } catch (error) {
-    if (error?.status === 404) {
-      state = buildNotFoundState(articleId);
-    } else {
-      state.status = "error";
-      state.errorMessage = error.message;
-    }
-  }
 
   if (state.status === "not_found") {
     return (
@@ -95,6 +203,14 @@ export default async function NoticiaDetailPage(props) {
   const lastSeenAt = refined.lastSeenAt || article.timestamp;
   const badges = getArticleLifecycleBadges(article);
   const score = formatNumber(refined.score || 0);
+  const canonicalPath = getArticleDetailPath(article);
+
+  if (rawArticleParam && canonicalPath.startsWith("/noticias/")) {
+    const requestedPath = `/noticias/${rawArticleParam}`;
+    if (requestedPath !== canonicalPath) {
+      permanentRedirect(canonicalPath);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-8">

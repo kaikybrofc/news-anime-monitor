@@ -15,6 +15,36 @@ export function formatNumber(value) {
   return new Intl.NumberFormat("pt-BR").format(parsed);
 }
 
+function normalizeToAscii(value = "") {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function slugify(value = "", maxLength = 80) {
+  const cleaned = normalizeToAscii(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-+/g, "-")
+    .trim();
+
+  if (!cleaned) return "noticia";
+  if (cleaned.length <= maxLength) return cleaned;
+
+  return cleaned.slice(0, maxLength).replace(/-+$/g, "");
+}
+
+function toDateSlug(value) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "sem-data";
+
+  const year = parsed.getUTCFullYear();
+  const month = String(parsed.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function titleFromSlug(slug = "") {
   return String(slug || "")
     .split("-")
@@ -51,6 +81,45 @@ export function getArticleUrl(article = {}) {
 export function getArticleImageUrl(article = {}) {
   const refined = article?.refined || {};
   return String(refined.image || article.image || "").trim();
+}
+
+export function extractArticleIdFromNewsParam(param = "") {
+  const raw = String(param || "").trim();
+  if (!raw) return "";
+
+  const marker = "--";
+  if (raw.includes(marker)) {
+    const maybeId = raw.split(marker).pop()?.trim();
+    if (maybeId) return maybeId;
+  }
+
+  return raw;
+}
+
+export function isLikelyArticleId(value = "") {
+  return /^[a-f0-9]{40}$/i.test(String(value || "").trim());
+}
+
+function getArticlePublishedAt(article = {}) {
+  const refined = article?.refined || {};
+  return refined.publishedAt || article.publishedAt || article.timestamp || "";
+}
+
+export function getArticleSeoSlug(article = {}) {
+  const refined = article?.refined || {};
+  const providedSlug = String(refined.newsSlug || "").trim();
+  if (providedSlug) return providedSlug;
+
+  const title = getArticleTitle(article);
+  const titleSlug = slugify(title, 84);
+  const dateSlug = toDateSlug(getArticlePublishedAt(article));
+  return `${titleSlug}-${dateSlug}`;
+}
+
+export function getArticleDetailPath(article = {}) {
+  const seoSlug = getArticleSeoSlug(article);
+  if (!seoSlug) return "/noticias";
+  return `/noticias/${seoSlug}`;
 }
 
 export function summarizeText(value = "", maxLength = 220) {

@@ -3,6 +3,7 @@ import { getArticleLifecycleBadges } from "@/lib/article-state";
 import {
   formatDateTime,
   formatNumber,
+  getArticleDetailPath,
   getArticleImageUrl,
   getArticleTitle,
   getArticleUrl,
@@ -22,7 +23,6 @@ function buildTagList(article) {
 
 export function ArticleCard({ article }) {
   const refined = article?.refined || {};
-  const articleId = String(article?.id || "").trim();
   const title = getArticleTitle(article);
   const url = getArticleUrl(article);
   const imageUrl = getArticleImageUrl(article);
@@ -32,7 +32,7 @@ export function ArticleCard({ article }) {
   const sourceName = String(refined.sourceName || refined.sourceId || "fonte desconhecida");
   const publishedAt = refined.publishedAt || article.publishedAt || article.timestamp;
   const score = formatNumber(refined.score || 0);
-  const detailHref = articleId ? `/noticias/${articleId}` : "/noticias";
+  const detailHref = getArticleDetailPath(article);
 
   return (
     <article className="info-card article-card group">

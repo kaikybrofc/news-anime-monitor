@@ -1,13 +1,6 @@
 import Link from "next/link";
 import { ArticleCard } from "@/components/article-card";
 import { fetchMonitor } from "@/lib/api";
-import { formatNumber } from "@/lib/formatters";
-
-const highlights = [
-  "Agregacao de multiplas fontes com filtros por origem.",
-  "Pipeline com dedupe, score e historico de aparicao.",
-  "Pronto para portal editorial e API publica.",
-];
 
 export const dynamic = "force-dynamic";
 
@@ -41,25 +34,6 @@ export default async function HomePage() {
             Explorar API
           </Link>
         </div>
-      </div>
-
-      <article className="info-card split-card">
-        <div>
-          <h2>Cobertura monitorada</h2>
-          <p className="kpi-number">{formatNumber(latestPayload.total || 0)}</p>
-        </div>
-        <div className="meta-stack">
-          <p>Noticias processadas no storage principal</p>
-          <p>Atualizacao continua por fonte</p>
-        </div>
-      </article>
-
-      <div className="grid-cards">
-        {highlights.map((item) => (
-          <article key={item} className="info-card">
-            <p>{item}</p>
-          </article>
-        ))}
       </div>
 
       <section className="stack">

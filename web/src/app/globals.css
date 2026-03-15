@@ -128,7 +128,7 @@
   }
 
   .info-card {
-    @apply rounded-2xl border border-[#334155] bg-[#1e293b] p-6 shadow-sm transition-all hover:border-slate-500 hover:bg-[#232f46];
+    @apply h-full rounded-2xl border border-[#334155] bg-[#1e293b] p-6 shadow-sm transition-all hover:border-slate-500 hover:bg-[#232f46];
   }
 
   .warning-card {
@@ -154,15 +154,15 @@
 
   /* Grids */
   .article-grid {
-    @apply grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+    @apply grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 items-stretch;
   }
 
   .grid-cards {
-    @apply grid grid-cols-1 gap-4 md:grid-cols-3;
+    @apply grid grid-cols-1 gap-4 md:grid-cols-3 items-stretch;
   }
 
   .kpi-grid {
-    @apply grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4;
+    @apply grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 items-stretch;
   }
 
   .split-card {
@@ -233,6 +233,31 @@
 
   .inline-link {
     @apply text-sm font-semibold text-[#f43f5e] hover:underline;
+  }
+
+  /* Trends & Lists */
+  .list-stack {
+    @apply flex flex-col gap-1;
+  }
+
+  .line-link, .line-item {
+    @apply flex flex-col gap-1 p-3 rounded-xl transition-colors border border-transparent;
+  }
+
+  .line-link {
+    @apply hover:bg-slate-800 hover:border-slate-700;
+  }
+
+  .line-link strong, .line-item strong {
+    @apply text-sm font-bold text-slate-100;
+  }
+
+  .line-link span, .line-item span {
+    @apply text-[11px] text-slate-500 font-medium;
+  }
+
+  .trend-badge {
+    @apply inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded;
   }
 
   /* Utils */

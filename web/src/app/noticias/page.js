@@ -1,7 +1,6 @@
 import { ArticleCard } from "@/components/article-card";
 import { Pagination } from "@/components/pagination";
 import { clampInt, fetchMonitor, readQueryInt, readQueryString } from "@/lib/api";
-import { formatNumber } from "@/lib/formatters";
 
 export const metadata = {
   title: "Noticias | OmniZap Anime Radar",
@@ -50,21 +49,6 @@ export default async function NoticiasPage({ searchParams }) {
   return (
     <section className="stack">
       <h1>Noticias</h1>
-      <p className="lead">
-        Feed de artigos processados pelo monitor com score, bucket, tipo de conteudo
-        e historico de aparicao.
-      </p>
-
-      <article className="info-card split-card">
-        <div>
-          <h2>Total de artigos</h2>
-          <p className="kpi-number">{formatNumber(payload.total)}</p>
-        </div>
-        <div className="meta-stack">
-          <p>Limite: {formatNumber(payload.limit || limit)}</p>
-          <p>Offset: {formatNumber(payload.offset || offset)}</p>
-        </div>
-      </article>
 
       {errorMessage ? (
         <article className="info-card warning-card">
