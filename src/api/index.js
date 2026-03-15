@@ -46,6 +46,9 @@ const {
   loadArticleById,
   loadAllArticles,
   queryArticles,
+  queryFranchiseSummary,
+  querySourceSummary,
+  queryTrendSnapshot,
   saveAllArticlesSnapshot,
 } = require("../db/articles-repository.js");
 const { hasDbConfig } = require("../db/mysql.js");
@@ -1566,6 +1569,19 @@ app.get("/trends", async (req, res) => {
   try {
     const windowHours = toPositiveInt(req.query.windowHours, 72);
     const top = normalizeLimit(req.query.top, 10);
+
+    if (USE_MYSQL) {
+      const trendSnapshot = await queryTrendSnapshot({ top, windowHours });
+      return res.json({
+        generatedAt: new Date().toISOString(),
+        windowHours,
+        totals: trendSnapshot.totals,
+        topFranchises: trendSnapshot.topFranchises,
+        topTopics: trendSnapshot.topTopics,
+        topSources: trendSnapshot.topSources,
+      });
+    }
+
     const allArticles = await loadAllArticlesForContract();
     const inWindow = filterArticlesByWindowHours(allArticles, windowHours);
     const topFranchises = buildFranchiseSummary(inWindow).slice(0, top);
@@ -1599,6 +1615,34 @@ app.get("/franchises", async (req, res) => {
     const windowHours = toPositiveInt(req.query.windowHours, 0);
     const hasPagination =
       req.query.limit !== undefined || req.query.offset !== undefined;
+
+    if (USE_MYSQL) {
+      const summary = await queryFranchiseSummary({
+        top,
+        limit: req.query.limit,
+        offset: req.query.offset,
+        windowHours,
+        includePagination: hasPagination,
+        includeRanking: true,
+        rankingLimit: 5,
+      });
+
+      return res.json({
+        generatedAt: new Date().toISOString(),
+        total: summary.total,
+        top,
+        limit: summary.limit,
+        offset: summary.offset,
+        hasMore: summary.hasMore,
+        windowHours: windowHours > 0 ? windowHours : null,
+        ranking: summary.ranking,
+        items: summary.items.map((item) => ({
+          ...item,
+          name: item.name || slugToName(item.slug),
+        })),
+      });
+    }
+
     const allArticles = await loadAllArticlesForContract();
     const scoped =
       windowHours > 0
@@ -1723,13 +1767,22 @@ app.get("/sources", async (req, res) => {
   try {
     const top = normalizeLimit(req.query.top, 200);
     const windowHours = toPositiveInt(req.query.windowHours, 0);
-    const allArticles = await loadAllArticlesForContract();
-    const scoped = windowHours
-      ? filterArticlesByWindowHours(allArticles, windowHours)
-      : allArticles;
-    const summaryBySource = new Map(
-      buildSourceSummary(scoped).map((row) => [String(row.sourceId), row])
-    );
+    let summaryBySource = new Map();
+
+    if (USE_MYSQL) {
+      const sourceSummary = await querySourceSummary({ top, windowHours });
+      summaryBySource = new Map(
+        sourceSummary.items.map((row) => [String(row.sourceId), row])
+      );
+    } else {
+      const allArticles = await loadAllArticlesForContract();
+      const scoped = windowHours
+        ? filterArticlesByWindowHours(allArticles, windowHours)
+        : allArticles;
+      summaryBySource = new Map(
+        buildSourceSummary(scoped).map((row) => [String(row.sourceId), row])
+      );
+    }
 
     const items = Object.values(SOURCE_DEFINITIONS)
       .map((source) => {
