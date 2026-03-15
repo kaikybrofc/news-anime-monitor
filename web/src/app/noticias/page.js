@@ -89,7 +89,7 @@ export default async function NoticiasPage(props) {
       </script>
 
       {/* Search */}
-      <section className="animate-fade-in-up delay-50">
+      <section className="relative z-30 animate-fade-in-up delay-50">
         <div className="info-card glass !p-1 md:!p-2 shadow-2xl overflow-visible rounded-[2rem]">
           <UnifiedSearch
             initialQuery={filters.q}
@@ -107,7 +107,7 @@ export default async function NoticiasPage(props) {
       ) : null}
 
       {/* Grid Section */}
-      <section className="flex flex-col gap-8">
+      <section className="relative z-10 flex flex-col gap-8">
         {payload.items?.length ? (
           <div className="article-grid">
             {payload.items.map((article, idx) => (

@@ -201,7 +201,7 @@ export function UnifiedSearch({
       </form>
 
       {open ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-40 rounded-2xl border border-slate-700 bg-slate-950/95 p-2 shadow-2xl backdrop-blur">
+        <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[120] rounded-2xl border border-slate-700 bg-slate-950/95 p-2 shadow-2xl backdrop-blur">
           {loading ? (
             <p className="px-3 py-4 text-sm text-slate-400">Buscando sugestões...</p>
           ) : null}

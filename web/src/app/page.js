@@ -91,12 +91,12 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="animate-fade-in-up">
+      <section className="relative z-30 animate-fade-in-up">
         <UnifiedSearch className="mx-auto w-full max-w-3xl" />
       </section>
 
       {/* Latest News Section */}
-      <section className="flex flex-col gap-10">
+      <section className="relative z-10 flex flex-col gap-10">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 animate-fade-in">
           <div className="flex flex-col gap-2">
             <h2 className="!text-3xl md:!text-4xl">Últimas do Radar</h2>
