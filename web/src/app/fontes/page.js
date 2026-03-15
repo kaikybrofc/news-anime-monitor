@@ -2,67 +2,76 @@ import Link from "next/link";
 import { fetchMonitor } from "@/lib/api";
 import { formatNumber } from "@/lib/formatters";
 
-const SOURCE_DEFINITIONS = [
-  { id: "animenew", name: "AnimeNew" },
-  { id: "animecorner", name: "Anime Corner" },
-  { id: "animenewsnetwork", name: "Anime News Network" },
-];
-
 export const metadata = {
-  title: "Fontes | OmniZap Anime Radar",
-  description:
-    "Visão por fonte monitorada com volume de artigos, qualidade de ingestão e score médio de cobertura.",
-  alternates: {
-    canonical: "/fontes",
-  },
+  title: "Fontes Monitoradas | Anime Radar",
+  description: "Lista de portais e fontes agregadas pelo monitor em tempo real.",
 };
 
 export const dynamic = "force-dynamic";
 
 export default async function FontesPage() {
-  let payload = null;
+  let sources = [];
   let errorMessage = "";
 
   try {
-    payload = await fetchMonitor("/trends", { top: 20 });
+    const payload = await fetchMonitor("/sources");
+    sources = payload?.items || [];
   } catch (error) {
     errorMessage = error.message;
   }
 
-  const sourceStats = new Map(
-    (payload?.topSources || []).map((item) => [String(item.sourceId), item])
-  );
-
   return (
-    <section className="stack">
-      <h1>Fontes</h1>
-      <p className="lead">Visão por origem, cobertura e qualidade da ingestão.</p>
+    <div className="flex flex-col gap-10">
+      <section className="flex flex-col gap-4 animate-fade-in">
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-1 bg-rose-500 rounded-full" />
+          <h1 className="!text-4xl">Fontes Monitoradas</h1>
+        </div>
+        <p className="lead max-w-2xl">
+          Nossa pipeline consome dados de diversos portais, blogs e redes sociais oficiais 
+          para garantir que você nunca perca uma atualização.
+        </p>
+      </section>
 
       {errorMessage ? (
-        <article className="info-card warning-card">
-          <h2>Falha ao carregar fontes</h2>
+        <article className="info-card warning-card animate-fade-in">
+          <h2 className="text-rose-400">Falha ao carregar fontes</h2>
           <p>{errorMessage}</p>
         </article>
       ) : null}
 
-      <div className="grid-cards">
-        {SOURCE_DEFINITIONS.map((source) => {
-          const stats = sourceStats.get(source.id);
-
-          return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {sources.length ? (
+          sources.map((source, idx) => (
             <Link
               key={source.id}
-              className="info-card link-card"
               href={`/fontes/${source.id}`}
+              className="info-card group animate-fade-in-up flex flex-col justify-between"
+              style={{ animationDelay: `${0.05 * idx}s` }}
             >
-              <h2>{source.name}</h2>
-              <p>ID: {source.id}</p>
-              <p>Artigos: {formatNumber(stats?.count || 0)}</p>
-              <p>Score médio: {formatNumber(stats?.avgScore || 0)}</p>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-rose-500">{source.type || "RSS/Web"}</span>
+                  <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                </div>
+                <h2 className="text-xl font-bold text-slate-100 group-hover:text-rose-400 transition-colors">
+                  {source.name}
+                </h2>
+                <p className="text-sm text-slate-500 line-clamp-2">
+                  {source.description || "Fonte oficial de notícias e atualizações do ecossistema anime."}
+                </p>
+              </div>
+              
+              <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between text-[11px] font-medium text-slate-400">
+                <span>ID: {source.id}</span>
+                <span className="text-slate-500 group-hover:text-rose-500 transition-colors">Explorar Artigos →</span>
+              </div>
             </Link>
-          );
-        })}
+          ))
+        ) : (
+          <p className="text-slate-500 animate-fade-in">Nenhuma fonte cadastrada no momento.</p>
+        )}
       </div>
-    </section>
+    </div>
   );
 }

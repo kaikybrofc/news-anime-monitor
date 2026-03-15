@@ -1432,6 +1432,33 @@ app.get("/trends", async (req, res) => {
   }
 });
 
+app.get("/franchises", async (req, res) => {
+  try {
+    const top = normalizeLimit(req.query.top, 120);
+    const windowHours = toPositiveInt(req.query.windowHours, 0);
+    const allArticles = await loadAllArticlesForContract();
+    const scoped =
+      windowHours > 0
+        ? filterArticlesByWindowHours(allArticles, windowHours)
+        : allArticles;
+    const summaries = buildFranchiseSummary(scoped);
+    const items = summaries.slice(0, top);
+
+    res.json({
+      generatedAt: new Date().toISOString(),
+      total: summaries.length,
+      top,
+      windowHours: windowHours > 0 ? windowHours : null,
+      items,
+    });
+  } catch (error) {
+    logger.error("[API:/franchises] Falha ao listar franquias:", error);
+    res.status(500).json({
+      error: "Falha ao listar franquias.",
+    });
+  }
+});
+
 app.get("/franchises/:slug", async (req, res) => {
   try {
     const slug = normalizeQueryText(req.params.slug);
@@ -1488,6 +1515,69 @@ app.get("/franchises/:slug", async (req, res) => {
     logger.error("[API:/franchises/:slug] Falha ao buscar franquia:", error);
     res.status(500).json({
       error: "Falha ao buscar franquia.",
+    });
+  }
+});
+
+app.get("/sources", async (req, res) => {
+  try {
+    const top = normalizeLimit(req.query.top, 200);
+    const windowHours = toPositiveInt(req.query.windowHours, 0);
+    const allArticles = await loadAllArticlesForContract();
+    const scoped = windowHours
+      ? filterArticlesByWindowHours(allArticles, windowHours)
+      : allArticles;
+    const summaryBySource = new Map(
+      buildSourceSummary(scoped).map((row) => [String(row.sourceId), row])
+    );
+
+    const items = Object.values(SOURCE_DEFINITIONS)
+      .map((source) => {
+        const stats = summaryBySource.get(source.id) || null;
+        const hasFeed = Boolean(source.feedUrl);
+        const hasHome = Array.isArray(source.homeLinkSelectors) && source.homeLinkSelectors.length > 0;
+        const hasSitemap = Boolean(source.enableSitemap && source.sitemapIndexUrl);
+        const channels = [
+          hasFeed ? "Feed" : "",
+          hasHome ? "Home" : "",
+          hasSitemap ? "Sitemap" : "",
+        ].filter(Boolean);
+
+        return {
+          id: source.id,
+          name: source.name,
+          type: channels.length ? channels.join(" + ") : "Web",
+          description: `Coleta via ${channels.length ? channels.join(", ") : "web"} em ${source.domains?.[0] || source.monitorUrl}.`,
+          monitorUrl: source.monitorUrl,
+          feedUrl: source.feedUrl || "",
+          sitemapIndexUrl: source.sitemapIndexUrl || "",
+          enabledSitemap: Boolean(source.enableSitemap),
+          collectionPriority: Array.isArray(source.collectionPriority)
+            ? source.collectionPriority
+            : [],
+          stats: {
+            count: Number(stats?.count || 0),
+            avgScore: Number(stats?.avgScore || 0),
+            newCount: Number(stats?.newCount || 0),
+            revisitedCount: Number(stats?.revisitedCount || 0),
+            updatedCount: Number(stats?.updatedCount || 0),
+          },
+        };
+      })
+      .sort((a, b) => b.stats.count - a.stats.count)
+      .slice(0, top);
+
+    res.json({
+      generatedAt: new Date().toISOString(),
+      total: items.length,
+      top,
+      windowHours: windowHours || null,
+      items,
+    });
+  } catch (error) {
+    logger.error("[API:/sources] Falha ao listar fontes:", error);
+    res.status(500).json({
+      error: "Falha ao listar fontes.",
     });
   }
 });
