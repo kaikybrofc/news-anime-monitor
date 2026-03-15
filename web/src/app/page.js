@@ -24,11 +24,11 @@ export default async function HomePage() {
   }
 
   return (
-    <div className="flex flex-col gap-16 md:gap-24 overflow-hidden">
+    <div className="flex flex-col gap-16 md:gap-24">
       {/* Hero Section */}
       <section className="relative py-12 md:py-24 animate-fade-in">
-        <div className="absolute top-0 right-0 -z-10 h-64 w-64 rounded-full bg-rose-500/20 blur-3xl" />
-        <div className="absolute bottom-0 left-0 -z-10 h-64 w-64 rounded-full bg-sky-500/10 blur-3xl" />
+        <div className="absolute top-0 right-0 -z-10 h-96 w-96 rounded-full bg-rose-500/10 blur-[120px]" />
+        <div className="absolute bottom-0 left-0 -z-10 h-80 w-80 rounded-full bg-sky-500/5 blur-[100px]" />
         
         <div className="flex flex-col gap-6 max-w-3xl">
           <span className="eyebrow animate-fade-in-up">Sistema de Monitoramento 24/7</span>

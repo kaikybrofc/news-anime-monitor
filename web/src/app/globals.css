@@ -27,6 +27,9 @@
   body {
     @apply min-h-screen bg-[#0f172a] text-[#f1f5f9] antialiased;
     font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+    background-image: 
+      radial-gradient(circle at 2px 2px, rgba(255,255,255,0.02) 1px, transparent 0);
+    background-size: 24px 24px;
   }
 
   a {
@@ -124,16 +127,19 @@
 
   /* Cards */
   .hero-card {
-    @apply relative overflow-hidden rounded-3xl bg-[#1e293b] p-8 shadow-xl border border-[#334155] md:p-12;
+    @apply relative rounded-[2.5rem] bg-[#1e293b] p-8 shadow-2xl border border-white/5 md:p-12;
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(244, 63, 94, 0.05) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(14, 165, 233, 0.05) 0px, transparent 50%);
   }
 
   .hero-card::before {
     content: "";
-    @apply absolute -top-24 -right-24 h-64 w-64 rounded-full bg-rose-500/10 blur-3xl;
+    @apply absolute -top-24 -right-24 h-80 w-80 rounded-full bg-rose-500/15 blur-[100px] -z-10;
   }
 
   .info-card {
-    @apply h-full rounded-2xl border border-[#334155] bg-[#1e293b] p-6 shadow-sm transition-all hover:border-slate-500 hover:bg-[#232f46];
+    @apply relative h-full rounded-2xl border border-[#334155] bg-[#1e293b] p-6 shadow-sm transition-all hover:border-slate-500 hover:bg-[#232f46];
   }
 
   .warning-card {
