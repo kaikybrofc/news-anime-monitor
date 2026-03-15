@@ -116,6 +116,13 @@ async function loadAllArticles() {
   return rows.map(parseArticleRow);
 }
 
+async function loadArticleById(articleId) {
+  const id = String(articleId || "").trim();
+  if (!id) return null;
+
+  return loadSingleArticleByWhere("id = ?", [id]);
+}
+
 async function loadSingleArticleByWhere(whereSql, params = []) {
   await pingDatabase();
   const db = getPool();
@@ -336,6 +343,7 @@ async function saveAllArticlesSnapshot(articles = []) {
 module.exports = {
   ensureDatabaseAndTable,
   loadAllArticles,
+  loadArticleById,
   findMatchingArticle,
   queryArticles,
   saveAllArticlesSnapshot,

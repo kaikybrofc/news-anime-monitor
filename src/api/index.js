@@ -3,7 +3,10 @@ const fs = require("fs");
 const path = require("path");
 const logger = require("../utils/logger.js");
 const { toPositiveInt } = require("../utils/http.js");
-const { getNewsSources } = require("../config/news-sources.js");
+const {
+  getNewsSources,
+  SOURCE_DEFINITIONS,
+} = require("../config/news-sources.js");
 const {
   processArticleCandidate,
   processWithConcurrency,
@@ -36,6 +39,7 @@ const {
 const {
   ensureDatabaseAndTable,
   findMatchingArticle,
+  loadArticleById,
   loadAllArticles,
   queryArticles,
   saveAllArticlesSnapshot,
@@ -113,7 +117,13 @@ function enforceInMemoryWindow() {
 }
 
 function getItemTimestamp(item) {
-  const dateValue = item.publishedAt || item.pubDate || item.lastmod;
+  const dateValue =
+    item?.publishedAt ||
+    item?.pubDate ||
+    item?.lastmod ||
+    item?.timestamp ||
+    item?.refined?.publishedAt ||
+    item?.refined?.lastSeenAt;
   if (!dateValue) return 0;
 
   const parsed = Date.parse(dateValue);
@@ -295,6 +305,288 @@ async function getArticlePage(filters = {}, pagination = {}) {
   };
 }
 
+const FRANCHISE_STOPWORDS = new Set([
+  "anime",
+  "news",
+  "trailer",
+  "teaser",
+  "visual",
+  "announces",
+  "announce",
+  "reveals",
+  "reveal",
+  "update",
+  "updates",
+  "official",
+  "episode",
+  "season",
+  "movie",
+  "film",
+  "tv",
+  "daily",
+  "brief",
+  "briefs",
+  "new",
+]);
+
+function slugToName(slug) {
+  return String(slug || "")
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function tokenizeFranchise(value = "") {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3 && !FRANCHISE_STOPWORDS.has(token));
+}
+
+function deriveFranchiseFromRefined(refined = {}) {
+  const explicitSlug = String(refined.franchiseSlug || "").trim().toLowerCase();
+  if (explicitSlug) {
+    return {
+      slug: explicitSlug,
+      name: String(refined.franchiseName || slugToName(explicitSlug)),
+    };
+  }
+
+  const clusterHint = String(refined.clusterHint || "");
+  if (clusterHint) {
+    const parts = clusterHint.split("|");
+    const franchiseToken = String(parts[2] || "").trim().toLowerCase();
+    if (franchiseToken && franchiseToken !== "na") {
+      return {
+        slug: franchiseToken,
+        name: slugToName(franchiseToken),
+      };
+    }
+  }
+
+  const topicKey = String(refined.topicKey || "");
+  if (topicKey) {
+    const parts = topicKey.split("|");
+    const topicToken = String(parts[1] || "").trim().toLowerCase();
+    if (topicToken && topicToken !== "na") {
+      return {
+        slug: topicToken,
+        name: slugToName(topicToken),
+      };
+    }
+  }
+
+  const titleTokens = tokenizeFranchise(refined.titleNormalized || refined.name || "");
+  if (titleTokens.length) {
+    const slug = titleTokens.slice(0, 3).join("-");
+    return {
+      slug,
+      name: slugToName(slug),
+    };
+  }
+
+  return { slug: "", name: "" };
+}
+
+function toArticleContract(article) {
+  const hydrated = applyArticleDefaults(article);
+  const franchise = deriveFranchiseFromRefined(hydrated.refined);
+
+  return {
+    ...hydrated,
+    refined: {
+      ...hydrated.refined,
+      franchiseSlug: franchise.slug || "",
+      franchiseName: franchise.name || "",
+    },
+  };
+}
+
+async function loadAllArticlesForContract() {
+  if (USE_MYSQL) {
+    const all = await loadAllArticles();
+    return all.map((article) => toArticleContract(article));
+  }
+
+  return processedArticles.map((article) => toArticleContract(article));
+}
+
+function filterArticlesByWindowHours(articles = [], windowHours = 72) {
+  const parsedWindow = Number(windowHours);
+  if (!Number.isFinite(parsedWindow) || parsedWindow <= 0) {
+    return articles.slice();
+  }
+
+  const now = Date.now();
+  const maxAgeMs = parsedWindow * 60 * 60 * 1000;
+
+  return articles.filter((article) => {
+    const refined = article?.refined || {};
+    const timestamp = Date.parse(refined.lastSeenAt || article.timestamp || "");
+    if (!timestamp || Number.isNaN(timestamp)) return false;
+    return now - timestamp <= maxAgeMs;
+  });
+}
+
+function paginateList(items = [], pagination = {}) {
+  const limit = normalizeLimit(pagination.limit, API_DEFAULT_LIMIT);
+  const offset = normalizeOffset(pagination.offset);
+  const pageItems = items.slice(offset, offset + limit);
+
+  return {
+    total: items.length,
+    limit,
+    offset,
+    hasMore: offset + pageItems.length < items.length,
+    items: pageItems,
+  };
+}
+
+function buildSourceSummary(articles = []) {
+  const summaryMap = new Map();
+
+  for (const article of articles) {
+    const refined = article?.refined || {};
+    const sourceId = String(refined.sourceId || "unknown");
+    const sourceName =
+      String(refined.sourceName || "") ||
+      SOURCE_DEFINITIONS[sourceId]?.name ||
+      sourceId;
+    const key = sourceId;
+
+    if (!summaryMap.has(key)) {
+      summaryMap.set(key, {
+        sourceId,
+        sourceName,
+        count: 0,
+        scoreTotal: 0,
+        newCount: 0,
+        revisitedCount: 0,
+        updatedCount: 0,
+      });
+    }
+
+    const row = summaryMap.get(key);
+    row.count += 1;
+    row.scoreTotal += Number(refined.score || 0);
+    if (refined.lastSeenEvent === "new") row.newCount += 1;
+    if (refined.lastSeenEvent === "revisited") row.revisitedCount += 1;
+    if (refined.lastSeenEvent === "updated") row.updatedCount += 1;
+  }
+
+  return Array.from(summaryMap.values())
+    .map((row) => ({
+      ...row,
+      avgScore: row.count ? Number((row.scoreTotal / row.count).toFixed(2)) : 0,
+    }))
+    .sort((a, b) => b.count - a.count);
+}
+
+function buildFranchiseSummary(articles = []) {
+  const franchiseMap = new Map();
+
+  for (const article of articles) {
+    const refined = article?.refined || {};
+    const franchise = deriveFranchiseFromRefined(refined);
+    if (!franchise.slug) continue;
+
+    if (!franchiseMap.has(franchise.slug)) {
+      franchiseMap.set(franchise.slug, {
+        slug: franchise.slug,
+        name: franchise.name || slugToName(franchise.slug),
+        mentions: 0,
+        scoreTotal: 0,
+        sourceSet: new Set(),
+        maxTrendScore: 0,
+        lastSeenAt: "",
+      });
+    }
+
+    const row = franchiseMap.get(franchise.slug);
+    row.mentions += 1;
+    row.scoreTotal += Number(refined.score || 0);
+    row.sourceSet.add(String(refined.sourceId || "unknown"));
+    row.maxTrendScore = Math.max(row.maxTrendScore, Number(refined.topicTrendScore || 0));
+
+    const currentLastSeen = Date.parse(String(row.lastSeenAt || ""));
+    const articleLastSeen = Date.parse(String(refined.lastSeenAt || article.timestamp || ""));
+    if (
+      articleLastSeen &&
+      !Number.isNaN(articleLastSeen) &&
+      (!currentLastSeen || Number.isNaN(currentLastSeen) || articleLastSeen > currentLastSeen)
+    ) {
+      row.lastSeenAt = new Date(articleLastSeen).toISOString();
+    }
+  }
+
+  return Array.from(franchiseMap.values())
+    .map((row) => ({
+      slug: row.slug,
+      name: row.name,
+      mentions: row.mentions,
+      sourceCount: row.sourceSet.size,
+      avgScore: row.mentions ? Number((row.scoreTotal / row.mentions).toFixed(2)) : 0,
+      maxTrendScore: row.maxTrendScore,
+      lastSeenAt: row.lastSeenAt || "",
+    }))
+    .sort((a, b) => {
+      if (b.mentions !== a.mentions) return b.mentions - a.mentions;
+      if (b.maxTrendScore !== a.maxTrendScore) return b.maxTrendScore - a.maxTrendScore;
+      return b.avgScore - a.avgScore;
+    });
+}
+
+function buildTopicSummary(articles = []) {
+  const topicMap = new Map();
+
+  for (const article of articles) {
+    const refined = article?.refined || {};
+    const topicKey = String(refined.topicKey || "").trim();
+    if (!topicKey) continue;
+
+    if (!topicMap.has(topicKey)) {
+      topicMap.set(topicKey, {
+        topicKey,
+        mentions: 0,
+        scoreTotal: 0,
+        sourceSet: new Set(),
+        lastSeenAt: "",
+      });
+    }
+
+    const row = topicMap.get(topicKey);
+    row.mentions += 1;
+    row.scoreTotal += Number(refined.score || 0);
+    row.sourceSet.add(String(refined.sourceId || "unknown"));
+
+    const currentLastSeen = Date.parse(String(row.lastSeenAt || ""));
+    const articleLastSeen = Date.parse(String(refined.lastSeenAt || article.timestamp || ""));
+    if (
+      articleLastSeen &&
+      !Number.isNaN(articleLastSeen) &&
+      (!currentLastSeen || Number.isNaN(currentLastSeen) || articleLastSeen > currentLastSeen)
+    ) {
+      row.lastSeenAt = new Date(articleLastSeen).toISOString();
+    }
+  }
+
+  return Array.from(topicMap.values())
+    .map((row) => ({
+      topicKey: row.topicKey,
+      mentions: row.mentions,
+      sourceCount: row.sourceSet.size,
+      avgScore: row.mentions ? Number((row.scoreTotal / row.mentions).toFixed(2)) : 0,
+      lastSeenAt: row.lastSeenAt || "",
+    }))
+    .sort((a, b) => {
+      if (b.mentions !== a.mentions) return b.mentions - a.mentions;
+      return b.avgScore - a.avgScore;
+    });
+}
+
 // Garante que o diretório de dados exista
 const dataDir = path.dirname(DATA_FILE);
 if (!fs.existsSync(dataDir)) {
@@ -412,11 +704,227 @@ app.get("/articles", async (req, res) => {
     };
 
     const result = await getArticlePage(filters, pagination);
-    res.json(result);
+    res.json({
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+      hasMore: result.hasMore,
+      filters,
+      items: result.items.map((item) => toArticleContract(item)),
+    });
   } catch (error) {
     logger.error("[API:/articles] Falha ao listar artigos:", error);
     res.status(500).json({
       error: "Falha ao listar artigos.",
+    });
+  }
+});
+
+app.get("/articles/:id", async (req, res) => {
+  try {
+    const articleId = String(req.params.id || "").trim();
+    if (!articleId) {
+      return res.status(400).json({
+        error: "Parâmetro id inválido.",
+      });
+    }
+
+    if (USE_MYSQL) {
+      const found = await loadArticleById(articleId);
+      if (!found) {
+        return res.status(404).json({
+          error: "Artigo não encontrado.",
+        });
+      }
+
+      return res.json({
+        item: toArticleContract(found),
+      });
+    }
+
+    const found = processedArticles.find((article) => article.id === articleId);
+    if (!found) {
+      return res.status(404).json({
+        error: "Artigo não encontrado.",
+      });
+    }
+
+    return res.json({
+      item: toArticleContract(found),
+    });
+  } catch (error) {
+    logger.error("[API:/articles/:id] Falha ao buscar artigo:", error);
+    return res.status(500).json({
+      error: "Falha ao buscar artigo.",
+    });
+  }
+});
+
+app.get("/trends", async (req, res) => {
+  try {
+    const windowHours = toPositiveInt(req.query.windowHours, 72);
+    const top = normalizeLimit(req.query.top, 10);
+    const allArticles = await loadAllArticlesForContract();
+    const inWindow = filterArticlesByWindowHours(allArticles, windowHours);
+    const topFranchises = buildFranchiseSummary(inWindow).slice(0, top);
+    const topTopics = buildTopicSummary(inWindow).slice(0, top);
+    const topSources = buildSourceSummary(inWindow).slice(0, top);
+
+    res.json({
+      generatedAt: new Date().toISOString(),
+      windowHours,
+      totals: {
+        articles: inWindow.length,
+        sources: topSources.length,
+        franchises: topFranchises.length,
+        topics: topTopics.length,
+      },
+      topFranchises,
+      topTopics,
+      topSources,
+    });
+  } catch (error) {
+    logger.error("[API:/trends] Falha ao montar tendências:", error);
+    res.status(500).json({
+      error: "Falha ao montar tendências.",
+    });
+  }
+});
+
+app.get("/franchises/:slug", async (req, res) => {
+  try {
+    const slug = normalizeQueryText(req.params.slug);
+    if (!slug) {
+      return res.status(400).json({
+        error: "Slug de franquia inválido.",
+      });
+    }
+
+    const filters = {
+      sourceId: normalizeQueryText(req.query.source || req.query.sourceId),
+      bucket: normalizeQueryText(req.query.bucket),
+      contentType: normalizeQueryText(req.query.contentType),
+      lastSeenEvent: normalizeQueryText(req.query.lastSeenEvent),
+      from: parseQueryDate(req.query.from),
+      to: parseQueryDate(req.query.to),
+    };
+
+    const allArticles = await loadAllArticlesForContract();
+    const scoped = filterArticlesInMemory(allArticles, filters)
+      .filter((article) => {
+        const franchise = deriveFranchiseFromRefined(article?.refined || {});
+        return franchise.slug === slug;
+      })
+      .sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
+
+    const paged = paginateList(scoped, {
+      limit: req.query.limit,
+      offset: req.query.offset,
+    });
+
+    const sourceDistribution = buildSourceSummary(scoped);
+    const contentTypeDistribution = scoped.reduce((acc, article) => {
+      const key = String(article?.refined?.contentType || "unknown");
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+
+    res.json({
+      slug,
+      name: slugToName(slug),
+      total: paged.total,
+      limit: paged.limit,
+      offset: paged.offset,
+      hasMore: paged.hasMore,
+      filters,
+      stats: {
+        sourceDistribution,
+        contentTypeDistribution,
+      },
+      items: paged.items.map((article) => toArticleContract(article)),
+    });
+  } catch (error) {
+    logger.error("[API:/franchises/:slug] Falha ao buscar franquia:", error);
+    res.status(500).json({
+      error: "Falha ao buscar franquia.",
+    });
+  }
+});
+
+app.get("/sources/:sourceId", async (req, res) => {
+  try {
+    const sourceId = normalizeQueryText(req.params.sourceId);
+    const sourceDefinition = SOURCE_DEFINITIONS[sourceId];
+
+    if (!sourceDefinition) {
+      return res.status(404).json({
+        error: "Fonte não encontrada.",
+      });
+    }
+
+    const filters = {
+      sourceId,
+      bucket: normalizeQueryText(req.query.bucket),
+      contentType: normalizeQueryText(req.query.contentType),
+      lastSeenEvent: normalizeQueryText(req.query.lastSeenEvent),
+      from: parseQueryDate(req.query.from),
+      to: parseQueryDate(req.query.to),
+    };
+
+    const allArticles = await loadAllArticlesForContract();
+    const scoped = filterArticlesInMemory(allArticles, filters).sort(
+      (a, b) => getItemTimestamp(b) - getItemTimestamp(a)
+    );
+    const paged = paginateList(scoped, {
+      limit: req.query.limit,
+      offset: req.query.offset,
+    });
+
+    const lifecycle = scoped.reduce(
+      (acc, article) => {
+        const event = String(article?.refined?.lastSeenEvent || "unknown");
+        if (acc[event] === undefined) {
+          acc[event] = 0;
+        }
+        acc[event] += 1;
+        return acc;
+      },
+      {
+        new: 0,
+        revisited: 0,
+        updated: 0,
+        fetch_restricted: 0,
+        unknown: 0,
+      }
+    );
+
+    res.json({
+      source: {
+        id: sourceDefinition.id,
+        name: sourceDefinition.name,
+        monitorUrl: sourceDefinition.monitorUrl,
+        feedUrl: sourceDefinition.feedUrl || "",
+        enabledSitemap: Boolean(sourceDefinition.enableSitemap),
+      },
+      total: paged.total,
+      limit: paged.limit,
+      offset: paged.offset,
+      hasMore: paged.hasMore,
+      filters,
+      stats: {
+        lifecycle,
+        contentTypes: scoped.reduce((acc, article) => {
+          const key = String(article?.refined?.contentType || "unknown");
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {}),
+      },
+      items: paged.items.map((article) => toArticleContract(article)),
+    });
+  } catch (error) {
+    logger.error("[API:/sources/:sourceId] Falha ao buscar fonte:", error);
+    res.status(500).json({
+      error: "Falha ao buscar fonte.",
     });
   }
 });
