@@ -5,29 +5,42 @@ import {
   isDebugPasswordValid,
 } from "@/lib/debug-auth";
 
+function buildRelativeLocation(pathname = "/", query = {}) {
+  const url = new URL(pathname, "http://localhost");
+  Object.entries(query).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    url.searchParams.set(key, String(value));
+  });
+  return `${url.pathname}${url.search}`;
+}
+
+function redirectRelative(pathname, query = {}) {
+  const location = buildRelativeLocation(pathname, query);
+  return new NextResponse(null, {
+    status: 303,
+    headers: {
+      Location: location,
+    },
+  });
+}
+
 export async function POST(request) {
   const formData = await request.formData();
   const password = String(formData.get("password") || "").trim();
 
-  const loginUrl = new URL("/debug/login", request.url);
-  const dashboardUrl = new URL("/debug", request.url);
-
   if (!getDebugDashboardPassword()) {
-    loginUrl.searchParams.set("error", "not_configured");
-    return NextResponse.redirect(loginUrl, { status: 303 });
+    return redirectRelative("/debug/login", { error: "not_configured" });
   }
 
   if (!password) {
-    loginUrl.searchParams.set("error", "password_missing");
-    return NextResponse.redirect(loginUrl, { status: 303 });
+    return redirectRelative("/debug/login", { error: "password_missing" });
   }
 
   if (!isDebugPasswordValid(password)) {
-    loginUrl.searchParams.set("error", "invalid_password");
-    return NextResponse.redirect(loginUrl, { status: 303 });
+    return redirectRelative("/debug/login", { error: "invalid_password" });
   }
 
-  const response = NextResponse.redirect(dashboardUrl, { status: 303 });
+  const response = redirectRelative("/debug");
   const sessionCookie = createDebugSessionCookie();
   response.cookies.set(
     sessionCookie.name,

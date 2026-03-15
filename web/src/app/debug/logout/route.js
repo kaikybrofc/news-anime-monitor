@@ -12,17 +12,21 @@ function clearSessionCookie(response) {
   });
 }
 
-function redirectToLogin(request) {
-  const loginUrl = new URL("/debug/login", request.url);
-  const response = NextResponse.redirect(loginUrl, { status: 303 });
+function redirectToLogin() {
+  const response = new NextResponse(null, {
+    status: 303,
+    headers: {
+      Location: "/debug/login",
+    },
+  });
   clearSessionCookie(response);
   return response;
 }
 
-export async function POST(request) {
-  return redirectToLogin(request);
+export async function POST() {
+  return redirectToLogin();
 }
 
-export async function GET(request) {
-  return redirectToLogin(request);
+export async function GET() {
+  return redirectToLogin();
 }
