@@ -1436,20 +1436,59 @@ app.get("/franchises", async (req, res) => {
   try {
     const top = normalizeLimit(req.query.top, 120);
     const windowHours = toPositiveInt(req.query.windowHours, 0);
+    const hasPagination =
+      req.query.limit !== undefined || req.query.offset !== undefined;
     const allArticles = await loadAllArticlesForContract();
     const scoped =
       windowHours > 0
         ? filterArticlesByWindowHours(allArticles, windowHours)
         : allArticles;
     const summaries = buildFranchiseSummary(scoped);
-    const items = summaries.slice(0, top);
+    const ranking = {
+      byMentions: summaries.slice(0, 5),
+      byAvgScore: summaries
+        .slice()
+        .sort((a, b) => {
+          if (b.avgScore !== a.avgScore) return b.avgScore - a.avgScore;
+          if (b.mentions !== a.mentions) return b.mentions - a.mentions;
+          return b.maxTrendScore - a.maxTrendScore;
+        })
+        .slice(0, 5),
+      byTrend: summaries
+        .slice()
+        .sort((a, b) => {
+          if (b.maxTrendScore !== a.maxTrendScore) {
+            return b.maxTrendScore - a.maxTrendScore;
+          }
+          if (b.mentions !== a.mentions) return b.mentions - a.mentions;
+          return b.avgScore - a.avgScore;
+        })
+        .slice(0, 5),
+    };
+
+    const paged = hasPagination
+      ? paginateList(summaries, {
+          limit: req.query.limit,
+          offset: req.query.offset,
+        })
+      : {
+          total: summaries.length,
+          limit: top,
+          offset: 0,
+          hasMore: top < summaries.length,
+          items: summaries.slice(0, top),
+        };
 
     res.json({
       generatedAt: new Date().toISOString(),
       total: summaries.length,
       top,
+      limit: paged.limit,
+      offset: paged.offset,
+      hasMore: paged.hasMore,
       windowHours: windowHours > 0 ? windowHours : null,
-      items,
+      ranking,
+      items: paged.items,
     });
   } catch (error) {
     logger.error("[API:/franchises] Falha ao listar franquias:", error);
