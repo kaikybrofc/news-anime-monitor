@@ -1,6 +1,10 @@
 const express = require("express");
+const cors = require("cors");
 const fs = require("fs");
+const helmet = require("helmet");
 const path = require("path");
+const rateLimit = require("express-rate-limit");
+const crypto = require("crypto");
 const logger = require("../utils/logger.js");
 const { toPositiveInt } = require("../utils/http.js");
 const {
@@ -46,6 +50,13 @@ const {
 } = require("../db/articles-repository.js");
 const { hasDbConfig } = require("../db/mysql.js");
 
+function parseCommaSeparatedList(value = "") {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 // --- CONFIGURAÇÃO ---
 const NEWS_SOURCES = getNewsSources();
 const DAYS_BACK = toPositiveInt(process.env.DAYS_BACK, 3);
@@ -83,6 +94,17 @@ const API_MAX_LIMIT = toPositiveInt(process.env.API_MAX_LIMIT, 200);
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || "127.0.0.1";
 const USE_MYSQL = hasDbConfig();
+const CORS_ALLOWED_ORIGINS = parseCommaSeparatedList(
+  process.env.CORS_ALLOWED_ORIGINS ||
+    "https://omnizap.xyz,https://www.omnizap.xyz,http://localhost:3010,http://127.0.0.1:3010"
+);
+const RATE_LIMIT_WINDOW_MS = toPositiveInt(
+  process.env.RATE_LIMIT_WINDOW_MS,
+  60 * 1000
+);
+const RATE_LIMIT_MAX = toPositiveInt(process.env.RATE_LIMIT_MAX, 180);
+const DEBUG_RATE_LIMIT_MAX = toPositiveInt(process.env.DEBUG_RATE_LIMIT_MAX, 30);
+const DEBUG_SOURCES_TOKEN = String(process.env.DEBUG_SOURCES_TOKEN || "").trim();
 const DATA_FILE = path.resolve(
   __dirname,
   "..",
@@ -92,12 +114,151 @@ const DATA_FILE = path.resolve(
 // --- FIM DA CONFIGURAÇÃO ---
 
 const app = express();
+app.disable("x-powered-by");
+app.set("trust proxy", 1);
+
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  })
+);
+
+const corsMiddleware = cors({
+  origin(origin, callback) {
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    if (CORS_ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error("Origin não permitida."));
+  },
+  methods: ["GET", "HEAD", "OPTIONS"],
+  credentials: false,
+  maxAge: 60 * 60 * 24,
+});
+
+app.use((req, res, next) => {
+  corsMiddleware(req, res, (error) => {
+    if (error) {
+      return res.status(403).json({
+        error: "Origin não permitida.",
+      });
+    }
+
+    return next();
+  });
+});
+
+app.options(/.*/, corsMiddleware);
+
+const apiRateLimiter = rateLimit({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  max: RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: "Muitas requisições. Tente novamente em instantes.",
+  },
+});
+
+const debugRateLimiter = rateLimit({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  max: DEBUG_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: "Muitas requisições ao endpoint de debug.",
+  },
+});
+
+app.use(apiRateLimiter);
+
 const knownArticleUrls = new Set();
 let processedArticles = [];
 let isCheckingNews = false;
 let isShuttingDown = false;
 let lastCycleMetrics = null;
 let lastSourceMetrics = [];
+
+function normalizeIp(value = "") {
+  const text = String(value || "").trim();
+  if (!text) return "";
+
+  const first = text.split(",")[0].trim();
+  if (!first) return "";
+
+  if (first.startsWith("::ffff:")) {
+    return first.slice("::ffff:".length);
+  }
+
+  return first;
+}
+
+function isLoopbackIp(value = "") {
+  const ip = normalizeIp(value);
+  return ip === "127.0.0.1" || ip === "::1" || ip === "localhost";
+}
+
+function getRequestToken(req) {
+  const headerToken = String(req.get("x-debug-token") || "").trim();
+  if (headerToken) return headerToken;
+
+  const authHeader = String(req.get("authorization") || "").trim();
+  if (authHeader.toLowerCase().startsWith("bearer ")) {
+    return authHeader.slice(7).trim();
+  }
+
+  return String(req.query.token || "").trim();
+}
+
+function safeTokenMatch(providedToken = "", expectedToken = "") {
+  const provided = String(providedToken || "").trim();
+  const expected = String(expectedToken || "").trim();
+  if (!provided || !expected) return false;
+
+  const providedBuffer = Buffer.from(provided);
+  const expectedBuffer = Buffer.from(expected);
+
+  if (providedBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
+}
+
+function isLocalDebugRequest(req) {
+  const forwardedIp = normalizeIp(req.get("x-forwarded-for"));
+  if (forwardedIp) {
+    return isLoopbackIp(forwardedIp);
+  }
+
+  return (
+    isLoopbackIp(req.socket?.remoteAddress) ||
+    isLoopbackIp(req.connection?.remoteAddress)
+  );
+}
+
+function requireDebugAccess(req, res, next) {
+  if (isLocalDebugRequest(req)) {
+    return next();
+  }
+
+  const token = getRequestToken(req);
+  if (DEBUG_SOURCES_TOKEN && safeTokenMatch(token, DEBUG_SOURCES_TOKEN)) {
+    return next();
+  }
+
+  return res.status(403).json({
+    error:
+      "Acesso negado ao endpoint de debug. Use localhost ou um token válido em x-debug-token.",
+  });
+}
 
 function rebuildKnownArticleUrls() {
   knownArticleUrls.clear();
@@ -1834,7 +1995,7 @@ app.get("/seo/:type/:slug", async (req, res) => {
   }
 });
 
-app.get("/debug/sources", (_req, res) => {
+app.get("/debug/sources", debugRateLimiter, requireDebugAccess, (_req, res) => {
   res.json({
     isCheckingNews,
     isShuttingDown,
