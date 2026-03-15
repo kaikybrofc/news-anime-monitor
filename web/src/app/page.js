@@ -38,6 +38,33 @@ export default async function HomePage() {
 
       <section className="stack">
         <div className="split-card">
+          <h2>Páginas programáticas</h2>
+          <p className="text-sm text-slate-400">
+            Landings automáticas por entidade para ampliar cobertura SEO.
+          </p>
+        </div>
+        <div className="grid-cards">
+          <Link href="/anime" className="info-card link-card">
+            <h2>Animes</h2>
+            <p>Páginas de anime com notícias relacionadas.</p>
+          </Link>
+          <Link href="/personagem" className="info-card link-card">
+            <h2>Personagens</h2>
+            <p>Páginas de personagens detectados na cobertura.</p>
+          </Link>
+          <Link href="/estudio" className="info-card link-card">
+            <h2>Estúdios</h2>
+            <p>Páginas de estúdios citados nas matérias.</p>
+          </Link>
+          <Link href="/tag" className="info-card link-card">
+            <h2>Tags</h2>
+            <p>Páginas temáticas para categorias e tópicos recorrentes.</p>
+          </Link>
+        </div>
+      </section>
+
+      <section className="stack">
+        <div className="split-card">
           <h2>Últimas notícias</h2>
           <Link href="/noticias" className="inline-link">
             Ver lista completa
