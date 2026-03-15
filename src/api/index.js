@@ -382,6 +382,76 @@ const FRANCHISE_STOPWORDS = new Set([
   "new",
 ]);
 
+const SEO_ENTITY_TYPES = new Set(["anime", "character", "studio", "tag"]);
+
+const STUDIO_MATCHERS = [
+  { slug: "mappa", name: "MAPPA", pattern: /\bmappa\b/i },
+  { slug: "toei-animation", name: "Toei Animation", pattern: /\btoei\b|\btoei animation\b/i },
+  { slug: "a-1-pictures", name: "A-1 Pictures", pattern: /\ba-1 pictures\b|\ba1 pictures\b/i },
+  { slug: "wit-studio", name: "Wit Studio", pattern: /\bwit studio\b/i },
+  { slug: "bones", name: "Bones", pattern: /\bbones\b/i },
+  { slug: "ufotable", name: "ufotable", pattern: /\bufotable\b/i },
+  { slug: "trigger", name: "Trigger", pattern: /\btrigger\b/i },
+  { slug: "madhouse", name: "Madhouse", pattern: /\bmadhouse\b/i },
+  { slug: "cloverworks", name: "CloverWorks", pattern: /\bcloverworks\b/i },
+  { slug: "pierrot", name: "Pierrot", pattern: /\bpierrot\b/i },
+  { slug: "production-i-g", name: "Production I.G", pattern: /\bproduction i\.?g\b/i },
+  { slug: "kyoto-animation", name: "Kyoto Animation", pattern: /\bkyoto animation\b|\bkyoani\b/i },
+  { slug: "studio-ghibli", name: "Studio Ghibli", pattern: /\bstudio ghibli\b|\bghibli\b/i },
+  { slug: "sunrise", name: "Sunrise", pattern: /\bsunrise\b/i },
+];
+
+const CHARACTER_HINT_PATTERN =
+  /\b(character|cast|voice|seiyuu|portrays|joins|reveals|introduces|debut|live-action)\b/i;
+
+const CHARACTER_SLUG_BLOCKLIST = new Set([
+  "anime",
+  "animation",
+  "announcement",
+  "cast",
+  "daily-brief",
+  "daily-briefs",
+  "episode",
+  "film",
+  "japanese-animation",
+  "live-action",
+  "movie",
+  "news",
+  "official",
+  "ranking",
+  "season",
+  "series",
+  "song",
+  "teaser",
+  "trailer",
+  "tv-ranking",
+  "visual",
+]);
+
+const CHARACTER_TOKEN_BLOCKLIST = new Set([
+  "action",
+  "anime",
+  "april",
+  "cast",
+  "chapter",
+  "episode",
+  "game",
+  "live",
+  "main",
+  "movie",
+  "news",
+  "official",
+  "reveals",
+  "season",
+  "series",
+  "song",
+  "story",
+  "teaser",
+  "trailer",
+  "video",
+  "voice",
+]);
+
 function slugToName(slug) {
   return String(slug || "")
     .split("-")
@@ -444,10 +514,277 @@ function deriveFranchiseFromRefined(refined = {}) {
   return { slug: "", name: "" };
 }
 
+function ensureStringArray(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => String(entry || "").trim())
+      .filter(Boolean);
+  }
+
+  const text = String(value || "").trim();
+  return text ? [text] : [];
+}
+
+function toEntityDisplayName(value = "") {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+
+  return text
+    .split(" ")
+    .map((part) => {
+      if (!part) return "";
+      if (part === part.toUpperCase()) return part;
+      return part.charAt(0).toUpperCase() + part.slice(1);
+    })
+    .join(" ");
+}
+
+function dedupeEntities(entities = []) {
+  const bySlug = new Map();
+
+  for (const entity of entities) {
+    const slug = normalizeQueryText(entity?.slug);
+    if (!slug || bySlug.has(slug)) {
+      continue;
+    }
+
+    bySlug.set(slug, {
+      slug,
+      name: String(entity?.name || slugToName(slug)),
+    });
+  }
+
+  return Array.from(bySlug.values());
+}
+
+function buildAnimeEntities(article = {}) {
+  const refined = article?.refined || {};
+  let franchise = { slug: "", name: "" };
+
+  const explicitSlug = normalizeQueryText(refined.franchiseSlug);
+  if (explicitSlug) {
+    franchise = {
+      slug: explicitSlug,
+      name: String(refined.franchiseName || slugToName(explicitSlug)),
+    };
+  } else {
+    const clusterHint = String(refined.clusterHint || "");
+    if (clusterHint) {
+      const clusterParts = clusterHint.split("|");
+      const clusterToken = normalizeQueryText(clusterParts[2]);
+      if (clusterToken && clusterToken !== "na") {
+        franchise = {
+          slug: clusterToken,
+          name: slugToName(clusterToken),
+        };
+      }
+    }
+  }
+
+  if (!franchise.slug) {
+    const topicKey = String(refined.topicKey || "");
+    if (topicKey) {
+      const topicParts = topicKey.split("|");
+      const topicToken = normalizeQueryText(topicParts[1]);
+      if (topicToken && topicToken !== "na") {
+        franchise = {
+          slug: topicToken,
+          name: slugToName(topicToken),
+        };
+      }
+    }
+  }
+
+  if (!franchise.slug) {
+    return [];
+  }
+
+  return [
+    {
+      slug: normalizeQueryText(franchise.slug),
+      name: String(franchise.name || slugToName(franchise.slug)),
+    },
+  ];
+}
+
+function buildTagEntities(article = {}) {
+  const refined = article?.refined || {};
+  const tags = [];
+
+  const rawCategories = [
+    ...ensureStringArray(refined.categoriesNormalized),
+    ...ensureStringArray(refined.categories),
+  ];
+
+  for (const category of rawCategories) {
+    const normalized = normalizeQueryText(category)
+      .replace(/[_/]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!normalized) continue;
+
+    const slug = slugifyNewsText(normalized, 64);
+    if (!slug) continue;
+
+    tags.push({
+      slug,
+      name: toEntityDisplayName(normalized),
+    });
+  }
+
+  const contentType = normalizeQueryText(refined.contentType);
+  if (contentType && contentType !== "unknown") {
+    tags.push({
+      slug: slugifyNewsText(contentType, 64),
+      name: toEntityDisplayName(contentType),
+    });
+  }
+
+  const topicParts = String(refined.topicKey || "")
+    .split("|")
+    .map((part) => normalizeQueryText(part))
+    .filter(Boolean);
+  if (topicParts[1] && topicParts[1] !== "na") {
+    const topicTag = topicParts[1].replace(/-/g, " ");
+    tags.push({
+      slug: slugifyNewsText(topicTag, 64),
+      name: toEntityDisplayName(topicTag),
+    });
+  }
+
+  return dedupeEntities(tags);
+}
+
+function buildStudioEntities(article = {}) {
+  const refined = article?.refined || {};
+  const contextText = `${refined.name || article.name || ""} ${
+    refined.summary || ""
+  }`;
+
+  if (!String(contextText).trim()) {
+    return [];
+  }
+
+  const studios = STUDIO_MATCHERS.filter((studio) => studio.pattern.test(contextText)).map(
+    (studio) => ({
+      slug: studio.slug,
+      name: studio.name,
+    })
+  );
+
+  return dedupeEntities(studios);
+}
+
+function cleanCharacterCandidate(value = "") {
+  const cleaned = String(value || "")
+    .replace(/[“”]/g, '"')
+    .replace(/[’]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return cleaned
+    .replace(/\b(Series|Season|Trailer|Teaser|Visual|Song|News|Anime|Movie|Film|Episode)\b$/i, "")
+    .trim();
+}
+
+function isLikelyCharacterName(value = "") {
+  const text = String(value || "").trim();
+  if (!text) return false;
+
+  const tokens = text
+    .toLowerCase()
+    .split(/\s+/)
+    .map((token) => token.replace(/[^a-z0-9'-]/g, ""))
+    .filter(Boolean);
+  if (!tokens.length || tokens.length > 3) return false;
+  if (tokens.some((token) => CHARACTER_TOKEN_BLOCKLIST.has(token))) return false;
+
+  return true;
+}
+
+function buildCharacterEntities(article = {}) {
+  const refined = article?.refined || {};
+  const rawTitle = String(refined.name || article.name || "").trim();
+  const rawSummary = String(refined.summary || "").trim();
+  const contextText = `${rawTitle} ${rawSummary}`.trim();
+
+  if (!rawTitle || !CHARACTER_HINT_PATTERN.test(contextText)) {
+    return [];
+  }
+
+  const animeEntities = buildAnimeEntities(article);
+  const animeSlugs = new Set(animeEntities.map((item) => item.slug));
+  const candidates = [];
+
+  const revealPattern =
+    /\b(?:reveals?|introduces?|features?|starring|joins?|portrays)\s+([A-Z][A-Za-z0-9'’-]{2,}(?:\s+[A-Z][A-Za-z0-9'’-]{2,})?)/g;
+  for (const match of rawTitle.matchAll(revealPattern)) {
+    const candidate = cleanCharacterCandidate(match[1]);
+    if (candidate && isLikelyCharacterName(candidate)) {
+      candidates.push(candidate);
+    }
+  }
+
+  const asPattern =
+    /\b(?:as|character)\s+([A-Z][A-Za-z0-9'’-]{2,}(?:\s+[A-Z][A-Za-z0-9'’-]{2,})?)/g;
+  for (const match of rawTitle.matchAll(asPattern)) {
+    const candidate = cleanCharacterCandidate(match[1]);
+    if (candidate && isLikelyCharacterName(candidate)) {
+      candidates.push(candidate);
+    }
+  }
+
+  const quotedPattern = /["“”]([A-Z][A-Za-z0-9'’-]{2,}(?:\s+[A-Z][A-Za-z0-9'’-]{2,})?)["“”]/g;
+  for (const match of rawTitle.matchAll(quotedPattern)) {
+    const candidate = cleanCharacterCandidate(match[1]);
+    if (candidate && isLikelyCharacterName(candidate)) {
+      candidates.push(candidate);
+    }
+  }
+
+  const characters = dedupeEntities(
+    candidates
+      .map((candidate) => {
+        const slug = slugifyNewsText(candidate, 64);
+        if (!slug || CHARACTER_SLUG_BLOCKLIST.has(slug) || animeSlugs.has(slug)) {
+          return null;
+        }
+
+        return {
+          slug,
+          name: candidate,
+        };
+      })
+      .filter(Boolean)
+  );
+
+  return characters.slice(0, 4);
+}
+
+function extractSeoEntities(article = {}) {
+  return {
+    anime: buildAnimeEntities(article),
+    characters: buildCharacterEntities(article),
+    studios: buildStudioEntities(article),
+    tags: buildTagEntities(article),
+  };
+}
+
+function getEntitiesByType(entities = {}, type = "") {
+  if (type === "anime") return Array.isArray(entities?.anime) ? entities.anime : [];
+  if (type === "character") {
+    return Array.isArray(entities?.characters) ? entities.characters : [];
+  }
+  if (type === "studio") return Array.isArray(entities?.studios) ? entities.studios : [];
+  if (type === "tag") return Array.isArray(entities?.tags) ? entities.tags : [];
+  return [];
+}
+
 function toArticleContract(article) {
   const hydrated = applyArticleDefaults(article);
   const franchise = deriveFranchiseFromRefined(hydrated.refined);
   const newsSlug = buildArticleNewsSlug(hydrated);
+  const entities = extractSeoEntities(hydrated);
 
   return {
     ...hydrated,
@@ -456,6 +793,7 @@ function toArticleContract(article) {
       franchiseSlug: franchise.slug || "",
       franchiseName: franchise.name || "",
       newsSlug,
+      entities,
     },
   };
 }
@@ -640,6 +978,114 @@ function buildTopicSummary(articles = []) {
       if (b.mentions !== a.mentions) return b.mentions - a.mentions;
       return b.avgScore - a.avgScore;
     });
+}
+
+function createEntityAggregationRow(type, entity) {
+  return {
+    type,
+    slug: String(entity?.slug || ""),
+    name: String(entity?.name || ""),
+    count: 0,
+    scoreTotal: 0,
+    sourceSet: new Set(),
+    lastSeenAt: "",
+  };
+}
+
+function pushEntityAggregation(bucket, type, entity, article) {
+  const slug = normalizeQueryText(entity?.slug);
+  if (!slug) return;
+
+  const key = `${type}:${slug}`;
+  if (!bucket.has(key)) {
+    bucket.set(key, createEntityAggregationRow(type, entity));
+  }
+
+  const row = bucket.get(key);
+  row.count += 1;
+  row.scoreTotal += Number(article?.refined?.score || 0);
+  row.sourceSet.add(String(article?.refined?.sourceId || "unknown"));
+
+  const currentLastSeen = Date.parse(String(row.lastSeenAt || ""));
+  const articleLastSeen = Date.parse(
+    String(article?.refined?.lastSeenAt || article?.timestamp || "")
+  );
+  if (
+    articleLastSeen &&
+    !Number.isNaN(articleLastSeen) &&
+    (!currentLastSeen || Number.isNaN(currentLastSeen) || articleLastSeen > currentLastSeen)
+  ) {
+    row.lastSeenAt = new Date(articleLastSeen).toISOString();
+  }
+}
+
+function serializeEntityAggregations(bucket) {
+  return Array.from(bucket.values())
+    .map((row) => ({
+      type: row.type,
+      slug: row.slug,
+      name: row.name,
+      count: row.count,
+      sourceCount: row.sourceSet.size,
+      avgScore: row.count ? Number((row.scoreTotal / row.count).toFixed(2)) : 0,
+      lastSeenAt: row.lastSeenAt || "",
+    }))
+    .sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      if (b.sourceCount !== a.sourceCount) return b.sourceCount - a.sourceCount;
+      return b.avgScore - a.avgScore;
+    });
+}
+
+function buildEntityIndex(articles = []) {
+  const index = {
+    anime: new Map(),
+    character: new Map(),
+    studio: new Map(),
+    tag: new Map(),
+  };
+
+  for (const article of articles) {
+    const entities = article?.refined?.entities || extractSeoEntities(article);
+    for (const entity of getEntitiesByType(entities, "anime")) {
+      pushEntityAggregation(index.anime, "anime", entity, article);
+    }
+    for (const entity of getEntitiesByType(entities, "character")) {
+      pushEntityAggregation(index.character, "character", entity, article);
+    }
+    for (const entity of getEntitiesByType(entities, "studio")) {
+      pushEntityAggregation(index.studio, "studio", entity, article);
+    }
+    for (const entity of getEntitiesByType(entities, "tag")) {
+      pushEntityAggregation(index.tag, "tag", entity, article);
+    }
+  }
+
+  return index;
+}
+
+function articleContainsEntity(article = {}, type = "", slug = "") {
+  const normalizedType = normalizeQueryText(type);
+  const normalizedSlug = normalizeQueryText(slug);
+  if (!normalizedType || !normalizedSlug) return false;
+
+  const entities = article?.refined?.entities || extractSeoEntities(article);
+  if (normalizedType === "anime") {
+    return (entities.anime || []).some((entity) => normalizeQueryText(entity?.slug) === normalizedSlug);
+  }
+  if (normalizedType === "character") {
+    return (entities.characters || []).some(
+      (entity) => normalizeQueryText(entity?.slug) === normalizedSlug
+    );
+  }
+  if (normalizedType === "studio") {
+    return (entities.studios || []).some((entity) => normalizeQueryText(entity?.slug) === normalizedSlug);
+  }
+  if (normalizedType === "tag") {
+    return (entities.tags || []).some((entity) => normalizeQueryText(entity?.slug) === normalizedSlug);
+  }
+
+  return false;
 }
 
 // Garante que o diretório de dados exista
@@ -1031,6 +1477,141 @@ app.get("/sources/:sourceId", async (req, res) => {
     logger.error("[API:/sources/:sourceId] Falha ao buscar fonte:", error);
     res.status(500).json({
       error: "Falha ao buscar fonte.",
+    });
+  }
+});
+
+app.get("/seo/entities", async (req, res) => {
+  try {
+    const requestedType = normalizeQueryText(req.query.type);
+    const top = normalizeLimit(req.query.top, 30);
+    const windowHours = toPositiveInt(req.query.windowHours, 0);
+    const allArticles = await loadAllArticlesForContract();
+    const scoped = windowHours
+      ? filterArticlesByWindowHours(allArticles, windowHours)
+      : allArticles;
+    const entityIndex = buildEntityIndex(scoped);
+
+    if (requestedType) {
+      if (!SEO_ENTITY_TYPES.has(requestedType)) {
+        return res.status(400).json({
+          error: "Tipo de entidade inválido. Use: anime, character, studio ou tag.",
+        });
+      }
+
+      const rows = serializeEntityAggregations(entityIndex[requestedType]).slice(0, top);
+      return res.json({
+        generatedAt: new Date().toISOString(),
+        type: requestedType,
+        total: rows.length,
+        windowHours: windowHours || null,
+        items: rows,
+      });
+    }
+
+    const payload = {
+      anime: serializeEntityAggregations(entityIndex.anime).slice(0, top),
+      character: serializeEntityAggregations(entityIndex.character).slice(0, top),
+      studio: serializeEntityAggregations(entityIndex.studio).slice(0, top),
+      tag: serializeEntityAggregations(entityIndex.tag).slice(0, top),
+    };
+
+    return res.json({
+      generatedAt: new Date().toISOString(),
+      top,
+      windowHours: windowHours || null,
+      totals: {
+        anime: payload.anime.length,
+        character: payload.character.length,
+        studio: payload.studio.length,
+        tag: payload.tag.length,
+      },
+      items: payload,
+    });
+  } catch (error) {
+    logger.error("[API:/seo/entities] Falha ao montar entidades SEO:", error);
+    return res.status(500).json({
+      error: "Falha ao montar entidades SEO.",
+    });
+  }
+});
+
+app.get("/seo/:type/:slug", async (req, res) => {
+  try {
+    const type = normalizeQueryText(req.params.type);
+    const slug = normalizeQueryText(req.params.slug);
+
+    if (!SEO_ENTITY_TYPES.has(type)) {
+      return res.status(400).json({
+        error: "Tipo de entidade inválido. Use: anime, character, studio ou tag.",
+      });
+    }
+
+    if (!slug) {
+      return res.status(400).json({
+        error: "Slug inválido.",
+      });
+    }
+
+    const filters = {
+      sourceId: normalizeQueryText(req.query.source || req.query.sourceId),
+      bucket: normalizeQueryText(req.query.bucket),
+      contentType: normalizeQueryText(req.query.contentType),
+      lastSeenEvent: normalizeQueryText(req.query.lastSeenEvent),
+      from: parseQueryDate(req.query.from),
+      to: parseQueryDate(req.query.to),
+    };
+
+    const allArticles = await loadAllArticlesForContract();
+    const scoped = filterArticlesInMemory(allArticles, filters)
+      .filter((article) => articleContainsEntity(article, type, slug))
+      .sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
+
+    if (!scoped.length) {
+      return res.status(404).json({
+        error: "Entidade não encontrada.",
+      });
+    }
+
+    const paged = paginateList(scoped, {
+      limit: req.query.limit,
+      offset: req.query.offset,
+    });
+
+    const entityIndex = buildEntityIndex(scoped);
+    const targetEntity = serializeEntityAggregations(entityIndex[type]).find(
+      (entity) => entity.slug === slug
+    );
+
+    return res.json({
+      entity: targetEntity || {
+        type,
+        slug,
+        name: slugToName(slug),
+        count: scoped.length,
+        sourceCount: 0,
+        avgScore: 0,
+        lastSeenAt: "",
+      },
+      total: paged.total,
+      limit: paged.limit,
+      offset: paged.offset,
+      hasMore: paged.hasMore,
+      filters,
+      stats: {
+        sourceDistribution: buildSourceSummary(scoped),
+        contentTypeDistribution: scoped.reduce((acc, article) => {
+          const key = String(article?.refined?.contentType || "unknown");
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {}),
+      },
+      items: paged.items.map((article) => toArticleContract(article)),
+    });
+  } catch (error) {
+    logger.error("[API:/seo/:type/:slug] Falha ao buscar entidade SEO:", error);
+    return res.status(500).json({
+      error: "Falha ao buscar entidade SEO.",
     });
   }
 });
