@@ -20,6 +20,9 @@ const {
   applyTopicTrendScores,
   buildInventoryMetrics,
 } = require("../services/monitor-analytics.js");
+const {
+  createObservabilityTracker,
+} = require("../services/observability-alerts.js");
 
 const { collectItemsFromSource } = require("../pipeline/ingestion.js");
 const { normalizeCollectedItems } = require("../pipeline/normalization.js");
@@ -58,6 +61,12 @@ function parseCommaSeparatedList(value = "") {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function toPositiveNumber(value, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return parsed;
 }
 
 // --- CONFIGURAÇÃO ---
@@ -108,6 +117,48 @@ const RATE_LIMIT_WINDOW_MS = toPositiveInt(
 const RATE_LIMIT_MAX = toPositiveInt(process.env.RATE_LIMIT_MAX, 180);
 const DEBUG_RATE_LIMIT_MAX = toPositiveInt(process.env.DEBUG_RATE_LIMIT_MAX, 30);
 const DEBUG_SOURCES_TOKEN = String(process.env.DEBUG_SOURCES_TOKEN || "").trim();
+const ALERT_HISTORY_SIZE = toPositiveInt(process.env.ALERT_HISTORY_SIZE, 72);
+const ALERT_BASELINE_WINDOW = toPositiveInt(process.env.ALERT_BASELINE_WINDOW, 12);
+const ALERT_FETCH_DROP_WARNING_RATIO = toPositiveNumber(
+  process.env.ALERT_FETCH_DROP_WARNING_RATIO,
+  0.55
+);
+const ALERT_FETCH_DROP_CRITICAL_RATIO = toPositiveNumber(
+  process.env.ALERT_FETCH_DROP_CRITICAL_RATIO,
+  0.3
+);
+const ALERT_ACCEPTED_DROP_WARNING_RATIO = toPositiveNumber(
+  process.env.ALERT_ACCEPTED_DROP_WARNING_RATIO,
+  0.55
+);
+const ALERT_ACCEPTED_DROP_CRITICAL_RATIO = toPositiveNumber(
+  process.env.ALERT_ACCEPTED_DROP_CRITICAL_RATIO,
+  0.3
+);
+const ALERT_PARSE_ERROR_WARNING_RATE = toPositiveNumber(
+  process.env.ALERT_PARSE_ERROR_WARNING_RATE,
+  0.1
+);
+const ALERT_PARSE_ERROR_CRITICAL_RATE = toPositiveNumber(
+  process.env.ALERT_PARSE_ERROR_CRITICAL_RATE,
+  0.3
+);
+const ALERT_REJECT_SPIKE_MULTIPLIER = toPositiveNumber(
+  process.env.ALERT_REJECT_SPIKE_MULTIPLIER,
+  2
+);
+const ALERT_REJECT_SPIKE_MIN_DELTA = toPositiveNumber(
+  process.env.ALERT_REJECT_SPIKE_MIN_DELTA,
+  0.2
+);
+const ALERT_DURATION_SPIKE_MULTIPLIER = toPositiveNumber(
+  process.env.ALERT_DURATION_SPIKE_MULTIPLIER,
+  2
+);
+const ALERT_DURATION_SPIKE_MIN_MS = toPositiveInt(
+  process.env.ALERT_DURATION_SPIKE_MIN_MS,
+  2000
+);
 const DATA_FILE = path.resolve(
   __dirname,
   "..",
@@ -188,6 +239,20 @@ let isCheckingNews = false;
 let isShuttingDown = false;
 let lastCycleMetrics = null;
 let lastSourceMetrics = [];
+const observabilityTracker = createObservabilityTracker(NEWS_SOURCES, {
+  historySize: ALERT_HISTORY_SIZE,
+  baselineWindow: ALERT_BASELINE_WINDOW,
+  fetchedDropWarningRatio: ALERT_FETCH_DROP_WARNING_RATIO,
+  fetchedDropCriticalRatio: ALERT_FETCH_DROP_CRITICAL_RATIO,
+  acceptedDropWarningRatio: ALERT_ACCEPTED_DROP_WARNING_RATIO,
+  acceptedDropCriticalRatio: ALERT_ACCEPTED_DROP_CRITICAL_RATIO,
+  parseErrorWarningRate: ALERT_PARSE_ERROR_WARNING_RATE,
+  parseErrorCriticalRate: ALERT_PARSE_ERROR_CRITICAL_RATE,
+  rejectSpikeMultiplier: ALERT_REJECT_SPIKE_MULTIPLIER,
+  rejectSpikeMinDelta: ALERT_REJECT_SPIKE_MIN_DELTA,
+  durationSpikeMultiplier: ALERT_DURATION_SPIKE_MULTIPLIER,
+  durationSpikeMinMs: ALERT_DURATION_SPIKE_MIN_MS,
+});
 
 function normalizeIp(value = "") {
   const text = String(value || "").trim();
@@ -261,6 +326,46 @@ function requireDebugAccess(req, res, next) {
     error:
       "Acesso negado ao endpoint de debug. Use localhost ou um token válido em x-debug-token.",
   });
+}
+
+let previousAlertKeys = new Set();
+
+function buildAlertKey(alert = {}) {
+  return [
+    String(alert.source || ""),
+    String(alert.code || ""),
+    String(alert.severity || ""),
+  ].join("|");
+}
+
+function emitObservabilityAlerts(snapshot = {}) {
+  const alerts = Array.isArray(snapshot.activeAlerts)
+    ? snapshot.activeAlerts
+    : [];
+  const currentKeys = new Set(alerts.map((alert) => buildAlertKey(alert)));
+
+  alerts.forEach((alert) => {
+    const key = buildAlertKey(alert);
+    if (previousAlertKeys.has(key)) return;
+
+    const line = `[Alert][${alert.severity || "warning"}][${alert.source || "source"}] ${
+      alert.code || "unknown"
+    }: ${alert.message || ""}`;
+
+    if (alert.severity === "critical") {
+      logger.error(line);
+      return;
+    }
+
+    logger.warn(line);
+  });
+
+  previousAlertKeys.forEach((key) => {
+    if (currentKeys.has(key)) return;
+    logger.success(`[Alert][resolved] ${key}`);
+  });
+
+  previousAlertKeys = currentKeys;
 }
 
 function rebuildKnownArticleUrls() {
@@ -2060,7 +2165,12 @@ app.get("/debug/sources", debugRateLimiter, requireDebugAccess, (_req, res) => {
     inventory: buildInventoryMetrics(processedArticles),
     lastCycle: lastCycleMetrics,
     sourceRuns: lastSourceMetrics,
+    observability: observabilityTracker.getSnapshot(),
   });
+});
+
+app.get("/debug/alerts", debugRateLimiter, requireDebugAccess, (_req, res) => {
+  res.json(observabilityTracker.getSnapshot());
 });
 
 async function checkPageForNews() {
@@ -2283,6 +2393,15 @@ async function checkPageForNews() {
   } finally {
     lastCycleMetrics = finishCycleMetrics(cycleMetrics);
     lastSourceMetrics = cycleMetrics.sourceRuns;
+    try {
+      observabilityTracker.ingestCycleMetrics(lastCycleMetrics);
+      emitObservabilityAlerts(observabilityTracker.getSnapshot());
+    } catch (observabilityError) {
+      logger.error(
+        "[Observability] Falha ao atualizar dashboard/alertas:",
+        observabilityError?.message || observabilityError
+      );
+    }
     isCheckingNews = false;
   }
 }
