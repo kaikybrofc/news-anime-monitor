@@ -6,280 +6,269 @@
 
 > [!WARNING]
 > Este projeto nao tem intencao de atacar, sobrecarregar ou prejudicar qualquer site.
-> As requisicoes sao feitas de forma nao agressiva, com limites e boas praticas.
-> Nao promovemos uso para ataques, abuso ou qualquer atividade maliciosa.
-> O uso deste projeto e destinado a estudo, aprendizado e testes de scraping.
+> As requisicoes sao feitas de forma nao agressiva, com limites, retries e boas praticas.
+> O uso e destinado a estudo, aprendizado e monitoramento tecnico.
 
-`News Anime Monitor` é um sistema de monitoramento e sumarização de notícias automatizado e inteligente. Ele rastreia múltiplas fontes de notícias de anime, extrai novos artigos, utiliza a API da OpenAI para gerar resumos concisos e os expõe através de uma API REST local. Com persistência de dados, sistema de logs avançado e suporte a gerenciamento de processos via PM2, é uma solução completa para acompanhar notícias de anime.
+`News Anime Monitor` e um monitor de noticias de anime com pipeline modular de ingestao, filtros por fonte, enriquecimento semantico, dedupe em camadas, score de relevancia, historico de aparicao e API REST.
 
-## ✨ Funcionalidades Principais
+O projeto possui duas camadas:
+- `API monitor` (Node.js + Express) para coleta/processamento e endpoints.
+- `Frontend` (Next.js em `web/`) para portal editorial e navegacao.
 
-- **Monitoramento Contínuo:** Verifica periodicamente a página de notícias em busca de novos artigos (intervalo configurável, padrão: 15 minutos).
-- **Respeito a robots.txt:** Aplica automaticamente regras de rastreamento permitidas por cada domínio monitorado.
-- **Múltiplas Fontes:** Suporte nativo a AnimeNew, Anime Corner e Anime News Network, com filtros específicos por domínio/fonte.
-- **Sumarização com IA:** Utiliza modelos da OpenAI para criar resumos inteligentes, informativos e contextualizados dos artigos.
-- **API REST:** Disponibiliza os artigos processados e seus resumos através de um endpoint HTTP local para fácil integração.
-- **Persistência de Dados:** Salva as notícias em um arquivo JSON (`processed_articles.json`), garantindo que os dados não sejam perdidos ao reiniciar o servidor.
-- **Sistema de Logs Avançado:** Logs coloridos e organizados (INFO, SUCCESS, ERROR) para fácil depuração e monitoramento da aplicação.
-- **Limpeza Automática:** Remove notícias antigas (mais de 24 horas) automaticamente para manter a base de dados relevante e otimizada.
-- **Graceful Shutdown:** Encerramento gracioso que salva o estado antes de desligar, garantindo integridade dos dados.
-- **Suporte PM2:** Configuração pronta para gerenciamento de processos em produção com PM2.
+## Funcionalidades
 
-## 🚀 Começando
+- Monitoramento continuo com ciclo configuravel.
+- Suporte real a buckets `feed`, `home` e `sitemap` por fonte.
+- Regras por fonte em `SOURCE_DEFINITIONS` (autoridade de coleta/filtro).
+- Respeito a `robots.txt` com modo de descoberta e fetch restrito.
+- Enriquecimento de artigo com campos de pipeline (`bucket`, `sourceType`, `contentType`, `canonicalUrl`, `score`, `timesSeen`, etc).
+- Dedupe por `canonicalUrl`, `titleNormalized`, `contentHash` e reconciliacao com storage.
+- Persistencia com MySQL (preferencial) e fallback JSON local.
+- Observabilidade por ciclo e por fonte em `/debug/sources`.
+- Frontend com paginas de noticias, tendencias, fontes e franquias.
 
-Siga estas instruções para ter o projeto rodando em sua máquina local.
+## Fontes suportadas
 
-### Pré-requisitos
+As fontes ativas no projeto sao:
+- `animenew`
+- `animecorner`
+- `animenewsnetwork`
 
-- [Node.js](https://nodejs.org/) (versão 20.18.1 ou superior recomendada)
-- Uma chave de API da [OpenAI](https://platform.openai.com/api-keys)
-- (Opcional) [PM2](https://pm2.keymetrics.io/) para gerenciamento de processos em produção
+Cada fonte preserva regras proprias de:
+- `collectionPriority`
+- `enableSitemap`
+- `excludedPathPrefixes`
+- `allowedPathPrefixes` (quando aplicavel)
+- `requiredFeedCategories` (quando aplicavel)
+- `homeLinkSelectors`
+- `requestHeaders`/cookies (ANN)
+- `mergeBuckets`
+- `maxItems`
 
-### Instalação
+## Arquitetura do pipeline
 
-1.  **Clone o repositório:**
-    ```bash
-    git clone https://github.com/kaikybrofc/news-anime-monitor.git
-    cd news-anime-monitor
-    ```
+Fluxo principal:
+1. Coleta bruta por fonte e bucket.
+2. Normalizacao de URL/campos.
+3. Filtro por regras reais da fonte.
+4. Enriquecimento semantico.
+5. Dedupe/reconciliacao.
+6. Decisao de aceitacao/rejeicao.
+7. Persistencia.
+8. Metricas e exposicao via API.
 
-2.  **Instale as dependências:**
-    ```bash
-    npm install
-    ```
+Modulos principais:
+- `src/pipeline/ingestion.js`
+- `src/pipeline/normalization.js`
+- `src/pipeline/filtering.js`
+- `src/pipeline/enrichment.js`
+- `src/pipeline/dedupe.js`
+- `src/pipeline/scoring.js`
+- `src/pipeline/decisioning.js`
+- `src/pipeline/metrics.js`
 
-3.  **Configure as variáveis de ambiente:**
-    - Copie o arquivo de exemplo:
-      ```bash
-      cp .env.example .env
-      ```
-    - Edite o arquivo `.env` e adicione sua chave da OpenAI:
-      ```
-      OPENAI_API_KEY=SUA_CHAVE_DE_API_AQUI
-      ```
+## Persistencia
 
-### Uso
+- MySQL e usado quando `DB_HOST`, `DB_USER` e `DB_NAME` estao definidos.
+- A tabela `articles` e criada automaticamente quando necessario.
+- Se MySQL nao estiver configurado, o sistema usa cache local em:
+  - `src/data/processed_articles.json`
 
-#### Desenvolvimento / Modo Padrão
+## API REST
 
-Para iniciar o servidor em modo de desenvolvimento, execute:
+Base local padrao: `http://127.0.0.1:3000`
 
+Endpoints principais:
+- `GET /` - inventario bruto atual em memoria.
+- `GET /articles` - lista paginada com filtros.
+- `GET /articles/:id` - detalhe por id.
+- `GET /articles/slug/:slug` - detalhe por slug SEO.
+- `GET /trends` - tendencias agregadas por janela.
+- `GET /franchises` - ranking de franquias.
+- `GET /franchises/:slug` - detalhe de franquia com artigos.
+- `GET /sources` - resumo por fonte.
+- `GET /sources/:sourceId` - detalhe de uma fonte.
+- `GET /seo/entities` - agregados por entidades SEO.
+- `GET /seo/:type/:slug` - detalhe de entidade (`anime`, `character`, `studio`, `tag`).
+- `GET /debug/sources` - metricas internas do monitor.
+
+Filtros comuns em endpoints listados:
+- `limit`, `offset`, `q`, `source`, `bucket`, `contentType`, `lastSeenEvent`, `from`, `to`.
+
+## Frontend (Next.js)
+
+App em `web/` com navegacao:
+- `Home`
+- `Noticias`
+- `Tendencias`
+- `Franquias`
+- `Fontes`
+- `API`
+- `Sobre`
+
+Rotas editoriais principais:
+- `/`
+- `/noticias`
+- `/noticias/[id]`
+- `/tendencias`
+- `/franquias`
+- `/franquias/[slug]`
+- `/fontes`
+- `/fontes/[sourceId]`
+
+## Instalacao
+
+1. Clone o repositorio:
 ```bash
-npm start
+git clone https://github.com/kaikybrofc/news-anime-monitor.git
+cd news-anime-monitor
 ```
 
-O servidor será iniciado na porta 3000 (ou na porta definida pela variável de ambiente `PORT`). Os logs no console mostrarão o status do monitoramento e do processamento das notícias em tempo real.
+2. Instale dependencias da API:
+```bash
+npm install
+```
 
-#### Produção com PM2
+3. Instale dependencias do frontend:
+```bash
+npm --prefix web install
+```
 
-Para executar em produção com gerenciamento de processos PM2:
+4. Configure ambiente:
+```bash
+cp .env.example .env
+```
+
+## Scripts (raiz)
+
+- `npm start` ou `npm run api:start` - inicia a API monitor.
+- `npm run monitor:log` - executa script auxiliar de monitoramento/log.
+- `npm run start:pm2` - sobe API via PM2 (`news-anime-monitor`).
+- `npm run pm2:restart` - reinicia API no PM2.
+- `npm run pm2:logs` - logs da API no PM2.
+- `npm run web:dev` - sobe frontend em dev (`web`, porta 3010).
+- `npm run web:build` - build do frontend.
+- `npm run web:start` - start do frontend built.
+- `npm run web:pm2:start` - sobe frontend no PM2 (`news-anime-web`).
+- `npm run web:pm2:restart` - reinicia frontend no PM2.
+- `npm run web:pm2:logs` - logs do frontend no PM2.
+
+## Variaveis de ambiente
+
+### API
+
+Obrigatoria:
+- `OPENAI_API_KEY`
+
+Principais opcionais:
+- `PORT` (padrao `3000`)
+- `NODE_ENV`
+- `OPENAI_MODEL`
+- `NEWS_SOURCE_IDS`
+- `MAX_ITEMS_PER_SOURCE`
+- `MAX_SITEMAPS_PER_SOURCE`
+- `MAX_NEW_ARTICLES_PER_CYCLE`
+- `CHECK_INTERVAL_MS`
+- `ARTICLE_PROCESS_CONCURRENCY`
+- `IN_MEMORY_MAX_ARTICLES`
+- `API_DEFAULT_LIMIT`
+- `API_MAX_LIMIT`
+
+MySQL:
+- `DB_HOST`
+- `DB_USER`
+- `DB_PASSWORD`
+- `DB_NAME`
+- `DB_POOL_LIMIT`
+
+ANN (cookie opcional):
+- `ANIMENEWSNETWORK_COOKIE`
+- `ANN_COOKIE`
+
+### Frontend
+
+Para apontar o frontend para a API monitor:
+- `NEWS_MONITOR_API_URL`
+
+Fallbacks aceitos no frontend:
+- `MONITOR_API_URL`
+- `API_BASE_URL`
+
+Se nada for definido, o frontend usa `http://127.0.0.1:3001` por padrao.
+
+## Deploy com PM2 + Nginx (exemplo)
+
+### 1) Subir processos
 
 ```bash
 npm run start:pm2
+npm run web:pm2:start
 ```
 
-Este comando iniciará o aplicativo usando a configuração do `ecosystem.config.js`, que inclui:
-- Reinício automático em caso de falhas
-- Logs estruturados em arquivos (`./logs/out.log` e `./logs/error.log`)
-- Gerenciamento de processos otimizado
+### 2) Nginx para `omnizap.xyz`
 
-**Comandos úteis do PM2:**
+Exemplo de bloco server (ajuste paths de certificado):
 
-```bash
-# Ver logs em tempo real
-npm run pm2:logs
+```nginx
+server {
+    listen 80;
+    server_name omnizap.xyz www.omnizap.xyz;
+    return 301 https://$host$request_uri;
+}
 
-# Parar o processo
-pm2 stop news-anime-monitor
+server {
+    listen 443 ssl http2;
+    server_name omnizap.xyz www.omnizap.xyz;
 
-# Reiniciar o processo
-pm2 restart news-anime-monitor
+    ssl_certificate /etc/letsencrypt/live/omnizap.xyz/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/omnizap.xyz/privkey.pem;
 
-# Ver status
-pm2 status
-
-# Ver informações detalhadas
-pm2 show news-anime-monitor
-```
-
-## 📡 API
-
-Uma vez que o servidor esteja rodando, você pode acessar as notícias processadas através do seguinte endpoint:
-
-- **Endpoint:** `GET /`
-- **URL:** `http://localhost:3000/`
-
-#### Exemplo de Resposta (Sucesso)
-
-```json
-[
-  {
-    "id": "a1b2c3d4e5f6...",
-    "timestamp": "2025-10-19T12:00:00.000Z",
-    "refined": {
-      "name": "Título da Notícia Exemplo",
-      "url": "https://exemplonews.com/noticia-1",
-      "image": "https://exemplonews.com/imagem-1.jpg",
-      "summary": "Este é um resumo gerado pela IA sobre a notícia..."
+    location / {
+        proxy_pass http://127.0.0.1:3010;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
-  }
-]
+
+    location /monitor-api/ {
+        proxy_pass http://127.0.0.1:3001/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
 ```
 
-#### Exemplo de Resposta (Sem Notícias)
+## Estrutura de pastas
 
-Se nenhuma notícia foi processada ainda, a resposta será um array vazio:
-
-```json
-[]
-```
-
-## 📁 Estrutura de Arquivos
-
-```
+```txt
 news-anime-monitor/
 ├── src/
 │   ├── api/
-│   │   └── index.js           # Servidor Express, endpoints da API e loop de monitoramento
 │   ├── config/
-│   │   └── news-sources.js    # Definição das fontes monitoradas e filtros por fonte
+│   ├── db/
+│   ├── pipeline/
 │   ├── services/
-│   │   └── summarizer.js      # Integração com a API da OpenAI para geração de resumos
 │   ├── utils/
-│   │   ├── logger.js          # Sistema centralizado de logs com formatação colorida
-│   │   ├── http.js            # HTTP com timeout/retry para coleta de páginas e feed/sitemap
-│   │   └── article-utils.js   # Regras compartilhadas de parsing e filtragem de artigos
-│   ├── scripts/
-│   │   └── monitor-log.js     # Script auxiliar para monitoramento e logging
 │   └── data/
-│       └── processed_articles.json  # Cache local das notícias processadas
-├── logs/                      # Diretório de logs (criado automaticamente)
-├── ecosystem.config.js        # Configuração do PM2
-├── package.json              # Dependências e scripts do projeto
-├── .env                      # Variáveis de ambiente (não versionado)
-└── README.md                 # Este arquivo
+├── web/
+├── logs/
+├── ecosystem.config.js
+├── package.json
+└── README.md
 ```
 
-## ⚙️ Configuração Avançada
+## Troubleshooting rapido
 
-O sistema pode ser configurado através de variáveis de ambiente e constantes no código.
+- API nao sobe: valide `.env` e porta configurada.
+- Frontend sem dados: configure `NEWS_MONITOR_API_URL` para a API correta.
+- MySQL nao conecta: confira `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`.
+- ANN com restricao: configure `ANIMENEWSNETWORK_COOKIE` (ou `ANN_COOKIE`) e mantenha fallback guest.
 
-### Variáveis de Ambiente
+## Licenca
 
-Crie um arquivo `.env` na raiz do projeto com as seguintes variáveis:
-
-```env
-# Obrigatório
-OPENAI_API_KEY=sua_chave_de_api_da_openai
-
-# Opcional
-PORT=3000                      # Porta do servidor (padrão: 3000)
-NODE_ENV=production           # Ambiente de execução
-OPENAI_MODEL=gpt-5-nano-2025-08-07
-OPENAI_TIMEOUT_MS=20000
-OPENAI_MAX_ATTEMPTS=3
-OPENAI_RETRY_BASE_MS=1200
-OPENAI_REASONING_EFFORT=minimal
-SUMMARY_MAX_INPUT_CHARS=12000
-SUMMARY_MAX_OUTPUT_TOKENS=360
-SUMMARY_RETRY_MAX_OUTPUT_TOKENS=1200
-HTTP_TIMEOUT_MS=15000
-HTTP_MAX_ATTEMPTS=3
-HTTP_RETRY_BASE_MS=600
-ROBOTS_RESPECT=true
-ROBOTS_USER_AGENT=news-anime-monitor
-ROBOTS_STRICT=false
-ROBOTS_CACHE_TTL_MS=21600000
-ROBOTS_FAILURE_TTL_MS=900000
-ROBOTS_FETCH_ATTEMPTS=2
-ANIMENEWSNETWORK_COOKIE=
-ANN_COOKIE=
-ARTICLE_PROCESS_CONCURRENCY=1
-NEWS_SOURCE_IDS=animenew,animecorner,animenewsnetwork
-MAX_ITEMS_PER_SOURCE=50
-MAX_SITEMAPS_PER_SOURCE=5
-MAX_NEW_ARTICLES_PER_CYCLE=100
-MAX_MONITOR_LOG_ITEMS=100
-```
-
-### Configurações do Sistema
-
-As seguintes configurações podem ser ajustadas por variáveis de ambiente:
-
-- **`NEWS_SOURCE_IDS`**: Fontes ativas (padrão: `animenew,animecorner,animenewsnetwork`)
-- **`ROBOTS_RESPECT`**: Habilita respeito automático ao `robots.txt` (padrão: `true`)
-- **`ROBOTS_USER_AGENT`**: User-agent usado na leitura/interpretação de `robots.txt`
-- **`ROBOTS_STRICT`**: Se `true`, bloqueia rastreamento quando `robots.txt` não puder ser lido
-- **`ANIMENEWSNETWORK_COOKIE`**: Cookie opcional enviado apenas para requests do Anime News Network
-- **`CHECK_INTERVAL_MS`**: Intervalo de verificação de novas notícias em milissegundos (padrão: 900000 = 15 minutos)
-- **`MAX_ITEMS_PER_SOURCE`**: Limite de itens coletados por fonte em cada ciclo
-- **`MAX_NEW_ARTICLES_PER_CYCLE`**: Limite global de artigos novos processados por ciclo (controle de custo)
-- **`EXPIRATION_TIME_MS`**: Tempo de expiração das notícias em milissegundos (padrão: 86400000 = 24 horas)
-- **`CLEANUP_INTERVAL_MS`**: Intervalo de limpeza automática em milissegundos (padrão: 3600000 = 1 hora)
-
-## 🔧 Troubleshooting
-
-### Erro: "A variável de ambiente OPENAI_API_KEY não foi definida"
-
-**Solução:** Certifique-se de que o arquivo `.env` existe na raiz do projeto e contém sua chave de API válida da OpenAI.
-
-### Nenhuma notícia está sendo processada
-
-**Soluções:**
-1. Verifique sua conexão com a internet
-2. Confirme se as fontes ativas em `NEWS_SOURCE_IDS` estão acessíveis
-3. Verifique os logs para identificar possíveis erros
-4. Aguarde pelo menos um ciclo de verificação (15 minutos por padrão)
-
-### Erro ao salvar/carregar notícias
-
-**Solução:** Verifique as permissões de escrita no diretório `src/data/`. O aplicativo precisa de permissões para criar e modificar arquivos neste diretório.
-
-### PM2 não encontrado
-
-**Solução:** Instale o PM2 globalmente:
-```bash
-npm install -g pm2
-```
-
-## 🤝 Contribuindo
-
-Contribuições são bem-vindas! Se você deseja contribuir com este projeto:
-
-Antes de contribuir, leia nosso [Código de Conduta](CODE_OF_CONDUCT.md).
-
-1. Faça um fork do repositório
-2. Crie uma branch para sua feature (`git checkout -b feature/MinhaNovaFeature`)
-3. Commit suas mudanças (`git commit -m 'Adiciona nova feature'`)
-4. Push para a branch (`git push origin feature/MinhaNovaFeature`)
-5. Abra um Pull Request
-
-## 📋 Roadmap
-
-- [x] Suporte a múltiplas fontes de notícias
-- [ ] Interface web para visualização das notícias
-- [ ] Sistema de notificações (email, Discord, Telegram)
-- [ ] Filtros personalizáveis por categoria/tag
-- [ ] API com autenticação
-- [ ] Suporte a múltiplos provedores de IA além da OpenAI
-
-## 📝 Licença
-
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
-
-## 👤 Autor
-
-**Kaiky Brito**
-- GitHub: [@kaikybrofc](https://github.com/kaikybrofc)
-
-## 🌟 Agradecimentos
-
-- [OpenAI](https://platform.openai.com/) - API de IA generativa
-- [AnimeNew](https://animenew.com.br/) - Fonte de notícias
-- [Anime Corner](https://animecorner.me/category/news/anime-news/) - Fonte de notícias
-- [Anime News Network](https://www.animenewsnetwork.com/news) - Fonte de notícias
-- Comunidade open source
-
----
-
-⭐ Se este projeto foi útil para você, considere dar uma estrela no repositório!
+Projeto sob licenca MIT. Veja `LICENSE`.

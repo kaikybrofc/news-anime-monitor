@@ -1,12 +1,21 @@
 {
   "name": "news-anime-monitor",
   "version": "1.0.3",
-  "description": "A script to monitor a web page for changes.",
+  "description": "Monitor de noticias de anime com pipeline inteligente, API REST e frontend Next.js.",
   "main": "src/api/index.js",
   "scripts": {
     "start": "node src/api/index.js",
+    "api:start": "node src/api/index.js",
+    "monitor:log": "node src/scripts/monitor-log.js",
     "start:pm2": "pm2 start ecosystem.config.js --env production",
-    "pm2:logs": "pm2 logs news-anime-monitor --lines 200"
+    "pm2:restart": "pm2 restart news-anime-monitor",
+    "pm2:logs": "pm2 logs news-anime-monitor --lines 200",
+    "web:dev": "npm --prefix web run dev",
+    "web:build": "npm --prefix web run build",
+    "web:start": "npm --prefix web run start",
+    "web:pm2:start": "pm2 start npm --name news-anime-web --cwd web -- start",
+    "web:pm2:restart": "pm2 restart news-anime-web",
+    "web:pm2:logs": "pm2 logs news-anime-web --lines 200"
   },
   "dependencies": {
     "axios": "^1.13.5",
