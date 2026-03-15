@@ -28,48 +28,36 @@ export default async function HomePage() {
 
   return (
     <section className="stack">
-      <div className="hero-card">
-        <p className="eyebrow">OmniZap Anime Radar</p>
-        <h1>Notícias e inteligência sobre anime em uma única camada.</h1>
-        <p>
-          Este frontend é a base do portal: navegação pronta, layout responsivo e
-          estrutura para evoluir páginas editoriais e técnicas.
-        </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link href="/noticias" className="btn btn-primary">
-            Ver notícias
-          </Link>
-          <Link href="/api" className="btn btn-secondary">
-            Explorar API
-          </Link>
-        </div>
-      </div>
-
-      <section className="stack">
+      <section className="info-card">
         <div className="split-card">
-          <h2>Páginas programáticas</h2>
-          <p className="text-sm text-slate-400">
-            Landings automáticas por entidade para ampliar cobertura SEO.
-          </p>
+          <div className="flex flex-col gap-2">
+            <p className="eyebrow">Busca avançada</p>
+            <h2>Encontre notícias com um único campo</h2>
+            <p className="text-sm text-slate-400">
+              Digite o tema e o monitor retorna os melhores resultados por
+              relevância e atualização.
+            </p>
+          </div>
         </div>
-        <div className="grid-cards">
-          <Link href="/anime" className="info-card link-card">
-            <h2>Animes</h2>
-            <p>Páginas de anime com notícias relacionadas.</p>
-          </Link>
-          <Link href="/personagem" className="info-card link-card">
-            <h2>Personagens</h2>
-            <p>Páginas de personagens detectados na cobertura.</p>
-          </Link>
-          <Link href="/estudio" className="info-card link-card">
-            <h2>Estúdios</h2>
-            <p>Páginas de estúdios citados nas matérias.</p>
-          </Link>
-          <Link href="/tag" className="info-card link-card">
-            <h2>Tags</h2>
-            <p>Páginas temáticas para categorias e tópicos recorrentes.</p>
-          </Link>
-        </div>
+
+        <form action="/noticias" method="get" className="mt-6">
+          <label className="flex flex-col gap-2">
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
+              Termo da busca
+            </span>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <input
+                type="text"
+                name="q"
+                placeholder="Ex.: one piece, trailer, mappa, crunchyroll..."
+                className="w-full rounded-xl border border-slate-700 bg-slate-900/50 px-4 py-3 text-sm text-slate-100 outline-none focus:border-rose-500"
+              />
+              <button type="submit" className="btn btn-primary sm:min-w-40">
+                Buscar
+              </button>
+            </div>
+          </label>
+        </form>
       </section>
 
       <section className="stack">

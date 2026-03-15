@@ -14,20 +14,28 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 function normalizeFilters(searchParams) {
+  const q = readQueryString(searchParams, "q");
   const source = readQueryString(searchParams, "source");
   const bucket = readQueryString(searchParams, "bucket");
   const contentType = readQueryString(searchParams, "contentType");
   const lastSeenEvent = readQueryString(searchParams, "lastSeenEvent");
+  const from = readQueryString(searchParams, "from");
+  const to = readQueryString(searchParams, "to");
 
   return {
+    q: q.trim(),
     source: source.toLowerCase(),
     bucket: bucket.toLowerCase(),
     contentType: contentType.toLowerCase(),
     lastSeenEvent: lastSeenEvent.toLowerCase(),
+    from: from.trim(),
+    to: to.trim(),
   };
 }
 
-export default async function NoticiasPage({ searchParams }) {
+export default async function NoticiasPage(props) {
+  const resolvedProps = await props;
+  const searchParams = await resolvedProps?.searchParams;
   const limit = clampInt(readQueryInt(searchParams, "limit", 20), 1, 50, 20);
   const offset = clampInt(readQueryInt(searchParams, "offset", 0), 0, 100000, 0);
   const filters = normalizeFilters(searchParams);
@@ -54,6 +62,11 @@ export default async function NoticiasPage({ searchParams }) {
   return (
     <section className="stack">
       <h1>Notícias</h1>
+      {filters.q ? (
+        <p className="lead">
+          Resultado da busca por <strong>&quot;{filters.q}&quot;</strong>.
+        </p>
+      ) : null}
 
       {errorMessage ? (
         <article className="info-card warning-card">

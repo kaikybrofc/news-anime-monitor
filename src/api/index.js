@@ -220,6 +220,81 @@ function normalizeQueryText(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function normalizeSearchText(value) {
+  return normalizeToAscii(String(value || "")).toLowerCase().trim();
+}
+
+function articleMatchesTextQuery(article, queryText = "") {
+  const normalizedQuery = normalizeSearchText(queryText);
+  if (!normalizedQuery) {
+    return true;
+  }
+
+  const refined = article?.refined || {};
+  const entities = refined.entities || {};
+  const searchTokens = normalizedQuery
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 8);
+
+  if (!searchTokens.length) {
+    return true;
+  }
+
+  const searchableParts = [
+    refined.name,
+    article?.name,
+    refined.titleNormalized,
+    refined.summary,
+    refined.sourceName,
+    refined.sourceId,
+    refined.bucket,
+    refined.contentType,
+    refined.lastSeenEvent,
+    refined.canonicalUrl,
+    refined.url,
+    article?.id,
+  ];
+
+  if (Array.isArray(refined.categories)) {
+    searchableParts.push(refined.categories.join(" "));
+  }
+  if (Array.isArray(refined.categoriesNormalized)) {
+    searchableParts.push(refined.categoriesNormalized.join(" "));
+  }
+  if (Array.isArray(entities.anime)) {
+    searchableParts.push(
+      entities.anime
+        .map((item) => `${item?.name || ""} ${item?.slug || ""}`.trim())
+        .join(" ")
+    );
+  }
+  if (Array.isArray(entities.characters)) {
+    searchableParts.push(
+      entities.characters
+        .map((item) => `${item?.name || ""} ${item?.slug || ""}`.trim())
+        .join(" ")
+    );
+  }
+  if (Array.isArray(entities.studios)) {
+    searchableParts.push(
+      entities.studios
+        .map((item) => `${item?.name || ""} ${item?.slug || ""}`.trim())
+        .join(" ")
+    );
+  }
+  if (Array.isArray(entities.tags)) {
+    searchableParts.push(
+      entities.tags
+        .map((item) => `${item?.name || ""} ${item?.slug || ""}`.trim())
+        .join(" ")
+    );
+  }
+
+  const haystack = normalizeSearchText(searchableParts.join(" "));
+  return searchTokens.every((token) => haystack.includes(token));
+}
+
 function normalizeToAscii(value = "") {
   return String(value || "")
     .normalize("NFD")
@@ -289,6 +364,10 @@ function filterArticlesInMemory(articles, filters) {
   return articles.filter((article) => {
     const refined = article?.refined || {};
 
+    if (filters.q && !articleMatchesTextQuery(article, filters.q)) {
+      return false;
+    }
+
     if (filters.sourceId && normalizeQueryText(refined.sourceId) !== filters.sourceId) {
       return false;
     }
@@ -331,6 +410,7 @@ async function getArticlePage(filters = {}, pagination = {}) {
     const result = await queryArticles({
       limit,
       offset,
+      q: filters.q,
       sourceId: filters.sourceId,
       bucket: filters.bucket,
       contentType: filters.contentType,
@@ -346,7 +426,15 @@ async function getArticlePage(filters = {}, pagination = {}) {
   }
 
   const filtered = filterArticlesInMemory(processedArticles, filters).sort(
-    (a, b) => getItemTimestamp(b) - getItemTimestamp(a)
+    (a, b) => {
+      if (filters.q) {
+        const scoreDiff =
+          Number(b?.refined?.score || 0) - Number(a?.refined?.score || 0);
+        if (scoreDiff !== 0) return scoreDiff;
+      }
+
+      return getItemTimestamp(b) - getItemTimestamp(a);
+    }
   );
   const items = filtered.slice(offset, offset + limit);
   return {
@@ -1191,6 +1279,7 @@ app.get("/", (_req, res) => {
 app.get("/articles", async (req, res) => {
   try {
     const filters = {
+      q: String(req.query.q || "").trim(),
       sourceId: normalizeQueryText(req.query.source || req.query.sourceId),
       bucket: normalizeQueryText(req.query.bucket),
       contentType: normalizeQueryText(req.query.contentType),

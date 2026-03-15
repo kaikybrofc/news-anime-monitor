@@ -200,6 +200,7 @@ async function queryArticles(params = {}) {
 
   const limit = normalizeLimit(params.limit, 50);
   const offset = Math.max(0, normalizeLimit(params.offset, 0));
+  const q = String(params.q || "").trim().toLowerCase();
   const sourceId = String(params.sourceId || "").trim();
   const bucket = String(params.bucket || "").trim();
   const contentType = String(params.contentType || "").trim();
@@ -213,6 +214,33 @@ async function queryArticles(params = {}) {
   if (sourceId) {
     where.push("source_id = ?");
     values.push(sourceId);
+  }
+
+  if (q) {
+    const searchTokens = q.split(/\s+/).filter(Boolean).slice(0, 8);
+    const searchableColumns = [
+      "LOWER(canonical_url)",
+      "LOWER(source_id)",
+      "LOWER(source_name)",
+      "LOWER(bucket)",
+      "LOWER(content_type)",
+      "LOWER(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(refined_json, '$.name')), ''))",
+      "LOWER(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(refined_json, '$.titleNormalized')), ''))",
+      "LOWER(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(refined_json, '$.summary')), ''))",
+      "LOWER(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(refined_json, '$.categoriesNormalized')), ''))",
+      "LOWER(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(refined_json, '$.entities.tags')), ''))",
+      "LOWER(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(refined_json, '$.entities.anime')), ''))",
+      "LOWER(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(refined_json, '$.entities.characters')), ''))",
+      "LOWER(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(refined_json, '$.entities.studios')), ''))",
+    ];
+
+    searchTokens.forEach((token) => {
+      const tokenWhere = searchableColumns.map((column) => `${column} LIKE ?`).join(" OR ");
+      where.push(`(${tokenWhere})`);
+
+      const tokenLike = `%${token}%`;
+      searchableColumns.forEach(() => values.push(tokenLike));
+    });
   }
 
   if (bucket) {
@@ -243,6 +271,9 @@ async function queryArticles(params = {}) {
   }
 
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  const orderSql = q
+    ? "ORDER BY score DESC, COALESCE(last_seen_at, timestamp) DESC, timestamp DESC"
+    : "ORDER BY timestamp DESC";
 
   const [countRows] = await db.query(
     `SELECT COUNT(*) AS total FROM ${quoteIdentifier(TABLE_NAME)} ${whereSql}`,
@@ -254,7 +285,7 @@ async function queryArticles(params = {}) {
     `SELECT id, DATE_FORMAT(timestamp, '%Y-%m-%dT%H:%i:%s.%fZ') AS timestamp, refined_json
      FROM ${quoteIdentifier(TABLE_NAME)}
      ${whereSql}
-     ORDER BY timestamp DESC
+     ${orderSql}
      LIMIT ? OFFSET ?`,
     [...values, limit, offset]
   );
