@@ -7,7 +7,13 @@ export function SiteHeader() {
       <div className="site-container header-inner">
         <div className="flex items-center gap-4">
           <Link href="/" className="brand" aria-label="Ir para a página inicial">
-            <span className="brand-dot" aria-hidden="true" />
+            <img
+              src="/brand/logo-64.png"
+              alt="OmniZap Anime Radar"
+              className="brand-logo"
+              width="28"
+              height="28"
+            />
             <span>Anime Radar</span>
           </Link>
         </div>
