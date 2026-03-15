@@ -58,20 +58,16 @@ function calculateArticleScores(article = {}) {
   }
 
   if (article.isWeakDuplicate) {
-    qualityScore -= 25;
-    trendScore += 4;
+    qualityScore -= 10;
   }
 
   if (isGenericTitle(article.titleNormalized)) {
     qualityScore -= 15;
   }
 
-  if (Number(article.timesSeen || 1) > 1) {
-    trendScore += Math.min(20, Number(article.timesSeen || 1) * 2);
-  }
-
-  if (article.revisionCount && Number(article.revisionCount) > 1) {
-    trendScore += Math.min(12, Number(article.revisionCount) * 2);
+  const topicTrend = Number(article.topicTrendScore || 0);
+  if (Number.isFinite(topicTrend) && topicTrend > 0) {
+    trendScore += Math.min(30, topicTrend);
   }
 
   if (article.fetchRestricted) {

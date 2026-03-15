@@ -10,6 +10,7 @@ const {
 } = require("../services/article-processor.js");
 const {
   createSourceMetricsTracker,
+  applyTopicTrendScores,
   buildInventoryMetrics,
 } = require("../services/monitor-analytics.js");
 
@@ -34,7 +35,9 @@ const {
 } = require("../pipeline/metrics.js");
 const {
   ensureDatabaseAndTable,
+  findMatchingArticle,
   loadAllArticles,
+  queryArticles,
   saveAllArticlesSnapshot,
 } = require("../db/articles-repository.js");
 const { hasDbConfig } = require("../db/mysql.js");
@@ -67,6 +70,12 @@ const ARTICLE_PROCESS_CONCURRENCY = toPositiveInt(
   process.env.ARTICLE_PROCESS_CONCURRENCY,
   1
 );
+const IN_MEMORY_MAX_ARTICLES = toPositiveInt(
+  process.env.IN_MEMORY_MAX_ARTICLES,
+  0
+);
+const API_DEFAULT_LIMIT = toPositiveInt(process.env.API_DEFAULT_LIMIT, 50);
+const API_MAX_LIMIT = toPositiveInt(process.env.API_MAX_LIMIT, 200);
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || "127.0.0.1";
 const USE_MYSQL = hasDbConfig();
@@ -94,6 +103,15 @@ function rebuildKnownArticleUrls() {
   });
 }
 
+function enforceInMemoryWindow() {
+  if (!IN_MEMORY_MAX_ARTICLES) return;
+
+  processedArticles = processedArticles
+    .slice()
+    .sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a))
+    .slice(0, IN_MEMORY_MAX_ARTICLES);
+}
+
 function getItemTimestamp(item) {
   const dateValue = item.publishedAt || item.pubDate || item.lastmod;
   if (!dateValue) return 0;
@@ -115,6 +133,16 @@ function replaceArticle(oldArticle, updatedArticle) {
   processedArticles.unshift(updatedArticle);
 }
 
+function upsertArticleInMemory(article) {
+  const index = processedArticles.findIndex((item) => item.id === article.id);
+  if (index >= 0) {
+    processedArticles[index] = article;
+    return;
+  }
+
+  processedArticles.unshift(article);
+}
+
 function markExistingArticleSeen(existingArticle, candidate, reason, seenAt, indexes) {
   const updated = bumpArticleSeen(existingArticle, candidate, reason, seenAt);
   replaceArticle(existingArticle, updated);
@@ -126,6 +154,31 @@ function markExistingArticleSeen(existingArticle, candidate, reason, seenAt, ind
   return {
     article: updated,
     eventType: String(updated?.refined?.lastSeenEvent || "revisited"),
+  };
+}
+
+async function matchCandidateWithStorageFallback(candidate, indexes, options = {}) {
+  const memoryMatch = matchCandidateToExisting(candidate, indexes, options);
+  if (memoryMatch) {
+    return memoryMatch;
+  }
+
+  if (!USE_MYSQL) {
+    return null;
+  }
+
+  const storageMatch = await findMatchingArticle(candidate, options);
+  if (!storageMatch?.article) {
+    return null;
+  }
+
+  const hydrated = applyArticleDefaults(storageMatch.article);
+  upsertArticleInMemory(hydrated);
+  indexArticle(indexes, hydrated);
+
+  return {
+    article: hydrated,
+    reason: storageMatch.reason || "storage",
   };
 }
 
@@ -145,6 +198,101 @@ function loadArticlesFromJsonFile() {
 
 function saveArticlesToJsonFile(articles) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(articles, null, 2), "utf8");
+}
+
+function parseQueryDate(value) {
+  const parsed = Date.parse(String(value || "").trim());
+  if (Number.isNaN(parsed)) return "";
+  return new Date(parsed).toISOString();
+}
+
+function normalizeQueryText(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizeLimit(value, fallback = API_DEFAULT_LIMIT) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.min(API_MAX_LIMIT, Math.floor(parsed));
+}
+
+function normalizeOffset(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return Math.floor(parsed);
+}
+
+function filterArticlesInMemory(articles, filters) {
+  return articles.filter((article) => {
+    const refined = article?.refined || {};
+
+    if (filters.sourceId && normalizeQueryText(refined.sourceId) !== filters.sourceId) {
+      return false;
+    }
+
+    if (filters.bucket && normalizeQueryText(refined.bucket) !== filters.bucket) {
+      return false;
+    }
+
+    if (
+      filters.contentType &&
+      normalizeQueryText(refined.contentType) !== filters.contentType
+    ) {
+      return false;
+    }
+
+    if (
+      filters.lastSeenEvent &&
+      normalizeQueryText(refined.lastSeenEvent) !== filters.lastSeenEvent
+    ) {
+      return false;
+    }
+
+    const timestamp = Date.parse(refined.lastSeenAt || article.timestamp || "");
+    if (filters.from && (!timestamp || timestamp < Date.parse(filters.from))) {
+      return false;
+    }
+    if (filters.to && (!timestamp || timestamp > Date.parse(filters.to))) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+async function getArticlePage(filters = {}, pagination = {}) {
+  const limit = normalizeLimit(pagination.limit, API_DEFAULT_LIMIT);
+  const offset = normalizeOffset(pagination.offset);
+
+  if (USE_MYSQL) {
+    const result = await queryArticles({
+      limit,
+      offset,
+      sourceId: filters.sourceId,
+      bucket: filters.bucket,
+      contentType: filters.contentType,
+      lastSeenEvent: filters.lastSeenEvent,
+      from: filters.from,
+      to: filters.to,
+    });
+
+    return {
+      ...result,
+      items: result.items.map((item) => applyArticleDefaults(item)),
+    };
+  }
+
+  const filtered = filterArticlesInMemory(processedArticles, filters).sort(
+    (a, b) => getItemTimestamp(b) - getItemTimestamp(a)
+  );
+  const items = filtered.slice(offset, offset + limit);
+  return {
+    total: filtered.length,
+    limit,
+    offset,
+    hasMore: offset + items.length < filtered.length,
+    items,
+  };
 }
 
 // Garante que o diretório de dados exista
@@ -171,19 +319,22 @@ async function loadArticlesFromStorage() {
         processedArticles = dbArticles.map((article) =>
           applyArticleDefaults(article, nowIso)
         );
+        enforceInMemoryWindow();
         rebuildKnownArticleUrls();
         logger.success(
-          `Carregados ${processedArticles.length} artigos do MySQL.`
+          `Carregados ${processedArticles.length} artigos do MySQL em memória operacional.`
         );
         return;
       }
 
       if (fs.existsSync(DATA_FILE)) {
         const jsonArticles = loadArticlesFromJsonFile();
-        processedArticles = jsonArticles.map((article) =>
+        const hydratedJsonArticles = jsonArticles.map((article) =>
           applyArticleDefaults(article, nowIso)
         );
-        await saveAllArticlesSnapshot(processedArticles);
+        await saveAllArticlesSnapshot(hydratedJsonArticles);
+        processedArticles = hydratedJsonArticles;
+        enforceInMemoryWindow();
         rebuildKnownArticleUrls();
 
         logger.success(
@@ -209,6 +360,7 @@ async function loadArticlesFromStorage() {
 
     const parsed = loadArticlesFromJsonFile();
     processedArticles = parsed.map((article) => applyArticleDefaults(article, nowIso));
+    enforceInMemoryWindow();
     rebuildKnownArticleUrls();
 
     logger.success(
@@ -223,6 +375,9 @@ async function loadArticlesFromStorage() {
 
 async function saveArticlesToStorage() {
   try {
+    applyTopicTrendScores(processedArticles);
+    enforceInMemoryWindow();
+
     if (USE_MYSQL) {
       await saveAllArticlesSnapshot(processedArticles);
       logger.info("Notícias salvas com sucesso no MySQL.");
@@ -240,11 +395,41 @@ app.get("/", (_req, res) => {
   res.json(processedArticles);
 });
 
+app.get("/articles", async (req, res) => {
+  try {
+    const filters = {
+      sourceId: normalizeQueryText(req.query.source || req.query.sourceId),
+      bucket: normalizeQueryText(req.query.bucket),
+      contentType: normalizeQueryText(req.query.contentType),
+      lastSeenEvent: normalizeQueryText(req.query.lastSeenEvent),
+      from: parseQueryDate(req.query.from),
+      to: parseQueryDate(req.query.to),
+    };
+
+    const pagination = {
+      limit: req.query.limit,
+      offset: req.query.offset,
+    };
+
+    const result = await getArticlePage(filters, pagination);
+    res.json(result);
+  } catch (error) {
+    logger.error("[API:/articles] Falha ao listar artigos:", error);
+    res.status(500).json({
+      error: "Falha ao listar artigos.",
+    });
+  }
+});
+
 app.get("/debug/sources", (_req, res) => {
   res.json({
     isCheckingNews,
     isShuttingDown,
     sourcesActive: NEWS_SOURCES.map((source) => source.id),
+    inMemory: {
+      count: processedArticles.length,
+      max: IN_MEMORY_MAX_ARTICLES || null,
+    },
     inventory: buildInventoryMetrics(processedArticles),
     lastCycle: lastCycleMetrics,
     sourceRuns: lastSourceMetrics,
@@ -330,9 +515,13 @@ async function checkPageForNews() {
     let touchedExisting = false;
 
     for (const candidate of dedupedCandidates) {
-      const existingMatch = matchCandidateToExisting(candidate, existingIndexes, {
-        allowContentHash: false,
-      });
+      const existingMatch = await matchCandidateWithStorageFallback(
+        candidate,
+        existingIndexes,
+        {
+          allowContentHash: false,
+        }
+      );
 
       if (existingMatch) {
         const seenResult = markExistingArticleSeen(
@@ -410,9 +599,13 @@ async function checkPageForNews() {
         sourceMetricsTracker.incrementFetchRestricted(article.refined.sourceId, 1);
       }
 
-      const existingMatch = matchCandidateToExisting(article.refined, existingIndexes, {
-        allowContentHash: true,
-      });
+      const existingMatch = await matchCandidateWithStorageFallback(
+        article.refined,
+        existingIndexes,
+        {
+          allowContentHash: true,
+        }
+      );
 
       if (existingMatch) {
         const seenResult = markExistingArticleSeen(
@@ -452,6 +645,7 @@ async function checkPageForNews() {
     processedArticles = [...additions, ...processedArticles].map((article) =>
       applyArticleDefaults(article)
     );
+    enforceInMemoryWindow();
 
     rebuildKnownArticleUrls();
 

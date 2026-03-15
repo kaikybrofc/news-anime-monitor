@@ -67,7 +67,18 @@ function filterItemsBySource(items, source, metrics) {
 
     if (!validation.accepted) {
       rejected.push({ ...item, rejectedReason: validation.reason });
-      if (metrics) metrics.rejectedCount += 1;
+      if (metrics) {
+        metrics.rejectedCount += 1;
+        const reasonKey = String(validation.reason || "unknown");
+        if (metrics.rejectedByReason[reasonKey] === undefined) {
+          metrics.rejectedByReason[reasonKey] = 0;
+        }
+        metrics.rejectedByReason[reasonKey] += 1;
+
+        if (reasonKey === "required_scope_category_missing") {
+          metrics.requiredScopeCategoryRejectCount += 1;
+        }
+      }
       continue;
     }
 

@@ -15,6 +15,7 @@ function createSourceMetrics(source) {
     parseErrorCount: 0,
     emptyCategoryCount: 0,
     fetchRestrictedCount: 0,
+    requiredScopeCategoryRejectCount: 0,
     byBucket: {
       feed: 0,
       home: 0,
@@ -26,6 +27,7 @@ function createSourceMetrics(source) {
       sitemap: 0,
       unknown: 0,
     },
+    rejectedByReason: {},
     contentTypes: {},
   };
 }
@@ -62,6 +64,7 @@ function createCycleMetrics() {
       updatedCount: 0,
       parseErrorCount: 0,
       fetchRestrictedCount: 0,
+      requiredScopeCategoryRejectCount: 0,
     },
     byBucket: {
       feed: 0,
@@ -69,6 +72,7 @@ function createCycleMetrics() {
       sitemap: 0,
       unknown: 0,
     },
+    rejectedByReason: {},
     contentTypes: {},
   };
 }
@@ -93,6 +97,7 @@ function finishCycleMetrics(cycleMetrics) {
       acc.updatedCount += run.updatedCount;
       acc.parseErrorCount += run.parseErrorCount;
       acc.fetchRestrictedCount += run.fetchRestrictedCount;
+      acc.requiredScopeCategoryRejectCount += run.requiredScopeCategoryRejectCount;
       return acc;
     },
     {
@@ -105,6 +110,7 @@ function finishCycleMetrics(cycleMetrics) {
       updatedCount: 0,
       parseErrorCount: 0,
       fetchRestrictedCount: 0,
+      requiredScopeCategoryRejectCount: 0,
     }
   );
 
@@ -127,6 +133,13 @@ function finishCycleMetrics(cycleMetrics) {
   cycleMetrics.contentTypes = cycleMetrics.sourceRuns.reduce((acc, run) => {
     Object.entries(run.contentTypes || {}).forEach(([contentType, count]) => {
       acc[contentType] = (acc[contentType] || 0) + Number(count || 0);
+    });
+    return acc;
+  }, {});
+
+  cycleMetrics.rejectedByReason = cycleMetrics.sourceRuns.reduce((acc, run) => {
+    Object.entries(run.rejectedByReason || {}).forEach(([reason, count]) => {
+      acc[reason] = (acc[reason] || 0) + Number(count || 0);
     });
     return acc;
   }, {});

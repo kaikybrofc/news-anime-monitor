@@ -48,6 +48,12 @@ function parseArticleRow(row) {
   };
 }
 
+function toIsoDate(value) {
+  const parsed = Date.parse(String(value || ""));
+  if (Number.isNaN(parsed)) return "";
+  return new Date(parsed).toISOString();
+}
+
 function toSqlDate(value) {
   const parsed = Date.parse(String(value || ""));
   if (Number.isNaN(parsed)) {
@@ -55,6 +61,12 @@ function toSqlDate(value) {
   }
 
   return new Date(parsed).toISOString().slice(0, 23).replace("T", " ");
+}
+
+function normalizeLimit(value, fallback = 50) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.floor(parsed);
 }
 
 async function ensureDatabaseAndTable() {
@@ -102,6 +114,152 @@ async function loadAllArticles() {
   );
 
   return rows.map(parseArticleRow);
+}
+
+async function loadSingleArticleByWhere(whereSql, params = []) {
+  await pingDatabase();
+  const db = getPool();
+
+  const [rows] = await db.query(
+    `SELECT id, DATE_FORMAT(timestamp, '%Y-%m-%dT%H:%i:%s.%fZ') AS timestamp, refined_json
+     FROM ${quoteIdentifier(TABLE_NAME)}
+     WHERE ${whereSql}
+     ORDER BY updated_at DESC
+     LIMIT 1`,
+    params
+  );
+
+  if (!rows.length) return null;
+  return parseArticleRow(rows[0]);
+}
+
+async function findMatchingArticle(candidate = {}, options = {}) {
+  const {
+    allowTitleFallback = true,
+    allowContentHash = true,
+  } = options;
+
+  const canonicalUrl = String(candidate?.canonicalUrl || candidate?.url || "");
+  const sourceId = String(candidate?.sourceId || "");
+  const contentHash = String(candidate?.contentHash || "");
+  const identityHash = String(candidate?.identityHash || "");
+  const titleNormalized = String(candidate?.titleNormalized || "");
+
+  if (canonicalUrl) {
+    const byCanonical = await loadSingleArticleByWhere("canonical_url = ?", [
+      canonicalUrl,
+    ]);
+    if (byCanonical) {
+      return { article: byCanonical, reason: "canonicalUrl", stage: "storage" };
+    }
+  }
+
+  if (allowContentHash && sourceId && contentHash) {
+    const byContentHash = await loadSingleArticleByWhere(
+      "source_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(refined_json, '$.contentHash')) = ?",
+      [sourceId, contentHash]
+    );
+    if (byContentHash) {
+      return { article: byContentHash, reason: "contentHash", stage: "storage" };
+    }
+  }
+
+  if (sourceId && identityHash) {
+    const byIdentityHash = await loadSingleArticleByWhere(
+      "source_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(refined_json, '$.identityHash')) = ?",
+      [sourceId, identityHash]
+    );
+    if (byIdentityHash) {
+      return { article: byIdentityHash, reason: "identityHash", stage: "storage" };
+    }
+  }
+
+  if (allowTitleFallback && sourceId && titleNormalized) {
+    const byTitle = await loadSingleArticleByWhere(
+      "source_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(refined_json, '$.titleNormalized')) = ?",
+      [sourceId, titleNormalized]
+    );
+    if (byTitle) {
+      return { article: byTitle, reason: "titleNormalized", stage: "storage" };
+    }
+  }
+
+  return null;
+}
+
+async function queryArticles(params = {}) {
+  await pingDatabase();
+  const db = getPool();
+
+  const limit = normalizeLimit(params.limit, 50);
+  const offset = Math.max(0, normalizeLimit(params.offset, 0));
+  const sourceId = String(params.sourceId || "").trim();
+  const bucket = String(params.bucket || "").trim();
+  const contentType = String(params.contentType || "").trim();
+  const lastSeenEvent = String(params.lastSeenEvent || "").trim();
+  const from = toIsoDate(params.from);
+  const to = toIsoDate(params.to);
+
+  const where = [];
+  const values = [];
+
+  if (sourceId) {
+    where.push("source_id = ?");
+    values.push(sourceId);
+  }
+
+  if (bucket) {
+    where.push("bucket = ?");
+    values.push(bucket);
+  }
+
+  if (contentType) {
+    where.push("content_type = ?");
+    values.push(contentType);
+  }
+
+  if (lastSeenEvent) {
+    where.push(
+      "JSON_UNQUOTE(JSON_EXTRACT(refined_json, '$.lastSeenEvent')) = ?"
+    );
+    values.push(lastSeenEvent);
+  }
+
+  if (from) {
+    where.push("timestamp >= ?");
+    values.push(toSqlDate(from));
+  }
+
+  if (to) {
+    where.push("timestamp <= ?");
+    values.push(toSqlDate(to));
+  }
+
+  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+  const [countRows] = await db.query(
+    `SELECT COUNT(*) AS total FROM ${quoteIdentifier(TABLE_NAME)} ${whereSql}`,
+    values
+  );
+  const total = Number(countRows?.[0]?.total || 0);
+
+  const [rows] = await db.query(
+    `SELECT id, DATE_FORMAT(timestamp, '%Y-%m-%dT%H:%i:%s.%fZ') AS timestamp, refined_json
+     FROM ${quoteIdentifier(TABLE_NAME)}
+     ${whereSql}
+     ORDER BY timestamp DESC
+     LIMIT ? OFFSET ?`,
+    [...values, limit, offset]
+  );
+
+  const items = rows.map(parseArticleRow);
+  return {
+    total,
+    limit,
+    offset,
+    hasMore: offset + items.length < total,
+    items,
+  };
 }
 
 async function saveAllArticlesSnapshot(articles = []) {
@@ -178,5 +336,7 @@ async function saveAllArticlesSnapshot(articles = []) {
 module.exports = {
   ensureDatabaseAndTable,
   loadAllArticles,
+  findMatchingArticle,
+  queryArticles,
   saveAllArticlesSnapshot,
 };

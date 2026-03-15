@@ -6,6 +6,28 @@ function toTimestamp(candidate = {}) {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+const GENERIC_TITLE_TOKENS = new Set([
+  "anime",
+  "news",
+  "trailer",
+  "teaser",
+  "visual",
+  "announces",
+  "announce",
+  "reveals",
+  "reveal",
+  "update",
+  "updates",
+  "episode",
+  "season",
+  "movie",
+  "film",
+  "tv",
+  "official",
+  "video",
+  "new",
+]);
+
 function tokenizeTitle(title = "") {
   return String(title || "")
     .toLowerCase()
@@ -13,6 +35,39 @@ function tokenizeTitle(title = "") {
     .split(/\s+/)
     .map((token) => token.trim())
     .filter((token) => token.length >= 4);
+}
+
+function significantTokens(title = "") {
+  return tokenizeTitle(title).filter(
+    (token) => !GENERIC_TITLE_TOKENS.has(token)
+  );
+}
+
+function getCommonTokenCount(aTokens = [], bTokens = []) {
+  const bSet = new Set(bTokens);
+  return aTokens.reduce(
+    (acc, token) => (bSet.has(token) ? acc + 1 : acc),
+    0
+  );
+}
+
+function inferFranchiseToken(title = "") {
+  const tokens = significantTokens(title);
+  if (!tokens.length) return "";
+  return tokens.sort((a, b) => b.length - a.length)[0] || "";
+}
+
+function buildClusterHint(candidate = {}) {
+  const source = String(candidate.sourceId || "unknown");
+  const type = String(candidate.contentType || "unknown");
+  const franchise = inferFranchiseToken(candidate.titleNormalized || "");
+  const tokens = significantTokens(candidate.titleNormalized || "").slice(0, 3);
+  const date = String(candidate.publishedAt || candidate.pubDate || candidate.lastmod || "")
+    .slice(0, 10);
+
+  return [source, type, franchise || "na", tokens.join("-") || "na", date || "na"].join(
+    "|"
+  );
 }
 
 function computeJaccardSimilarity(aTokens = [], bTokens = []) {
@@ -35,12 +90,29 @@ function isCrossSourceWeakDuplicate(candidate, original) {
     return false;
   }
 
+  const candidateTokens = significantTokens(candidate.titleNormalized);
+  const originalTokens = significantTokens(original.titleNormalized);
+  const commonTokens = getCommonTokenCount(candidateTokens, originalTokens);
+  if (commonTokens < 2) {
+    return false;
+  }
+
+  const candidateFranchise = inferFranchiseToken(candidate.titleNormalized);
+  const originalFranchise = inferFranchiseToken(original.titleNormalized);
+  if (
+    !candidateFranchise ||
+    !originalFranchise ||
+    candidateFranchise !== originalFranchise
+  ) {
+    return false;
+  }
+
   const similarity = computeJaccardSimilarity(
-    tokenizeTitle(candidate.titleNormalized),
-    tokenizeTitle(original.titleNormalized)
+    candidateTokens,
+    originalTokens
   );
 
-  if (similarity < 0.72) {
+  if (similarity < 0.82) {
     return false;
   }
 
@@ -48,11 +120,11 @@ function isCrossSourceWeakDuplicate(candidate, original) {
   const originalTs = toTimestamp(original);
 
   if (!candidateTs || !originalTs) {
-    return similarity >= 0.84;
+    return similarity >= 0.9 && commonTokens >= 3;
   }
 
-  const twoDaysMs = 2 * 24 * 60 * 60 * 1000;
-  return Math.abs(candidateTs - originalTs) <= twoDaysMs;
+  const thirtySixHoursMs = 36 * 60 * 60 * 1000;
+  return Math.abs(candidateTs - originalTs) <= thirtySixHoursMs;
 }
 
 function dedupeCandidates(candidates = []) {
@@ -170,6 +242,8 @@ function dedupeCandidates(candidates = []) {
       ...candidate,
       isWeakDuplicate,
       duplicateOf: isWeakDuplicate ? weakDuplicateOf : "",
+      relatedTo: isWeakDuplicate ? weakDuplicateOf : "",
+      clusterHint: buildClusterHint(candidate),
     };
 
     accepted.push(acceptedItem);

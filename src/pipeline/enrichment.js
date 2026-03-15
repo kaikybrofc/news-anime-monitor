@@ -16,6 +16,13 @@ const {
   normalizeTitleForMatching,
 } = require("./normalization.js");
 const { calculateArticleScores } = require("./scoring.js");
+const {
+  DECISION_STAGES,
+  DECISION_EVENTS,
+  parseSeenReason,
+  buildDecisionEntry,
+  appendDecisionTrace,
+} = require("./decisioning.js");
 
 function toIsoOrEmpty(value) {
   if (!value) return "";
@@ -154,9 +161,20 @@ function ensureRefinedDefaults(refined = {}, nowIso = new Date().toISOString()) 
     revisionCount: toPositiveInt(refined.revisionCount, 1),
     lastContentChangeAt: toIsoOrEmpty(refined.lastContentChangeAt) || firstSeenAt,
     lastSeenEvent: String(refined.lastSeenEvent || "new"),
+    lastDecision:
+      refined.lastDecision && typeof refined.lastDecision === "object"
+        ? { ...refined.lastDecision }
+        : null,
+    decisionTrace: Array.isArray(refined.decisionTrace)
+      ? refined.decisionTrace.slice(0, 20)
+      : [],
     fetchRestricted: Boolean(
       refined.fetchRestricted || refined?.ingestionMeta?.fetchRestricted
     ),
+    topicKey: String(refined.topicKey || ""),
+    topicTrendScore: Number.isFinite(refined.topicTrendScore)
+      ? Number(refined.topicTrendScore)
+      : 0,
     image: String(refined.image || ""),
     summary: String(refined.summary || ""),
   };
@@ -244,6 +262,12 @@ function buildProcessedArticle({
       revisionCount: 1,
       lastContentChangeAt: seenAt,
       lastSeenEvent: "new",
+      decisionTrace: [],
+      lastDecision: null,
+      topicKey: String(candidate.topicKey || ""),
+      topicTrendScore: Number.isFinite(candidate.topicTrendScore)
+        ? Number(candidate.topicTrendScore)
+        : 0,
     },
     seenAt
   );
@@ -260,6 +284,21 @@ function buildProcessedArticle({
   baseRefined.qualityScore = scores.qualityScore;
   baseRefined.importanceScore = scores.importanceScore;
   baseRefined.trendScore = scores.trendScore;
+
+  const decisionEntry = buildDecisionEntry({
+    at: seenAt,
+    stage: candidate.fetchRestricted
+      ? DECISION_STAGES.FETCH_RESTRICTED
+      : DECISION_STAGES.NEW_PROCESSED,
+    event: candidate.fetchRestricted
+      ? DECISION_EVENTS.FETCH_RESTRICTED
+      : DECISION_EVENTS.NEW,
+    reason: candidate.fetchRestricted ? "robots_disallowed_fetch" : "new_candidate",
+    matchedBy: "",
+    fetchRestricted: Boolean(candidate.fetchRestricted),
+  });
+  baseRefined.lastDecision = decisionEntry;
+  baseRefined.decisionTrace = appendDecisionTrace([], decisionEntry, 20);
 
   const id = sha1(baseRefined.canonicalUrl || baseRefined.url);
 
@@ -280,6 +319,7 @@ function bumpArticleSeen(existingArticle, candidate, reason, seenAt) {
     candidate?.titleNormalized || candidateName
   );
   const shouldDetectRevision = String(reason || "").startsWith("post_process");
+  const reasonInfo = parseSeenReason(reason);
   const candidateContentHash =
     String(candidate?.contentHash || "") ||
     buildContentHash({
@@ -374,6 +414,23 @@ function bumpArticleSeen(existingArticle, candidate, reason, seenAt) {
     lastSeenSourceType: candidate.sourceType,
     fetchRestricted: Boolean(base.refined.fetchRestricted),
   };
+
+  const decisionEntry = buildDecisionEntry({
+    at: nowIso,
+    stage: reasonInfo.stage,
+    event: contentChanged ? DECISION_EVENTS.UPDATED : DECISION_EVENTS.REVISITED,
+    reason: reasonInfo.reason,
+    matchedBy: reasonInfo.matchedBy,
+    fetchRestricted: Boolean(base.refined.fetchRestricted),
+    duplicateReason: reasonInfo.matchedBy,
+  });
+  base.refined.lastDecision = decisionEntry;
+  base.refined.decisionTrace = appendDecisionTrace(
+    base.refined.decisionTrace,
+    decisionEntry,
+    20
+  );
+
   const scores = calculateArticleScores(base.refined);
   base.refined.score = scores.score;
   base.refined.qualityScore = scores.qualityScore;
