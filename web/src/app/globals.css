@@ -190,6 +190,42 @@
     @apply gap-3;
   }
 
+  .article-grid {
+    @apply grid gap-4;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (min-width: 768px) {
+    .article-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .article-grid {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .article-grid {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+  }
+
+  .article-cover {
+    @apply block overflow-hidden rounded-xl border border-black/10;
+    aspect-ratio: 16 / 9;
+  }
+
+  .article-cover img {
+    @apply h-full w-full object-cover transition;
+  }
+
+  .article-cover:hover img {
+    @apply scale-[1.02];
+  }
+
   .article-title-link h2 {
     @apply transition;
   }
@@ -204,6 +240,30 @@
 
   .meta-line {
     @apply flex flex-wrap gap-3 text-[0.9rem] text-[#6f675e];
+  }
+
+  .badge-row {
+    @apply flex flex-wrap gap-2;
+  }
+
+  .status-badge {
+    @apply rounded-full border px-2.5 py-0.5 text-[0.72rem] font-semibold uppercase tracking-[0.08em];
+  }
+
+  .status-new {
+    @apply border-emerald-700/35 bg-emerald-600/10 text-emerald-900;
+  }
+
+  .status-updated {
+    @apply border-amber-700/35 bg-amber-600/10 text-amber-900;
+  }
+
+  .status-restricted {
+    @apply border-rose-700/35 bg-rose-600/10 text-rose-900;
+  }
+
+  .article-actions {
+    @apply flex flex-wrap gap-3;
   }
 
   .inline-tags {
@@ -235,6 +295,31 @@
   .line-item span,
   .muted {
     @apply text-[0.9rem] text-[#6f675e];
+  }
+
+  .inline-link {
+    @apply text-sm font-semibold text-[#8f2f17] underline decoration-dotted underline-offset-4 transition;
+  }
+
+  .inline-link:hover {
+    @apply text-[#cb4c2a];
+  }
+
+  .detail-hero {
+    @apply gap-4;
+  }
+
+  .detail-cover {
+    @apply overflow-hidden rounded-xl border border-black/10;
+    aspect-ratio: 16 / 9;
+  }
+
+  .detail-cover img {
+    @apply h-full w-full object-cover;
+  }
+
+  .detail-grid {
+    @apply grid gap-1.5 text-[0.95rem] text-[#423b33] sm:grid-cols-2;
   }
 
   .pagination-row {

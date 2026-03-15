@@ -122,7 +122,7 @@ export default async function FonteDetailPage({ params, searchParams }) {
       </div>
 
       {payload.items?.length ? (
-        <div className="stack">
+        <div className="article-grid">
           {payload.items.map((article) => (
             <ArticleCard key={article.id} article={article} />
           ))}

@@ -48,10 +48,14 @@ export function getArticleUrl(article = {}) {
   return String(refined.canonicalUrl || refined.url || article.url || "").trim();
 }
 
+export function getArticleImageUrl(article = {}) {
+  const refined = article?.refined || {};
+  return String(refined.image || article.image || "").trim();
+}
+
 export function summarizeText(value = "", maxLength = 220) {
   const text = String(value || "").replace(/\s+/g, " ").trim();
   if (!text) return "";
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength - 1)}...`;
 }
-

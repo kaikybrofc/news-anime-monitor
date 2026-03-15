@@ -3,8 +3,10 @@ import { Pagination } from "@/components/pagination";
 import { clampInt, fetchMonitor, readQueryInt } from "@/lib/api";
 import { formatNumber, titleFromSlug } from "@/lib/formatters";
 
-export function generateMetadata({ params }) {
-  const name = titleFromSlug(params.slug || "");
+export async function generateMetadata(props) {
+  const resolvedProps = await props;
+  const resolvedParams = await resolvedProps?.params;
+  const name = titleFromSlug(resolvedParams?.slug || "");
   return {
     title: `${name} | Franquia | OmniZap Anime Radar`,
   };
@@ -12,8 +14,12 @@ export function generateMetadata({ params }) {
 
 export const dynamic = "force-dynamic";
 
-export default async function FranquiaDetailPage({ params, searchParams }) {
-  const slug = String(params.slug || "").toLowerCase();
+export default async function FranquiaDetailPage(props) {
+  const resolvedProps = await props;
+  const resolvedParams = await resolvedProps?.params;
+  const searchParams = resolvedProps?.searchParams;
+
+  const slug = String(resolvedParams?.slug || "").toLowerCase().trim();
   const title = titleFromSlug(slug);
   const limit = clampInt(readQueryInt(searchParams, "limit", 20), 1, 50, 20);
   const offset = clampInt(readQueryInt(searchParams, "offset", 0), 0, 100000, 0);
@@ -33,13 +39,17 @@ export default async function FranquiaDetailPage({ params, searchParams }) {
   };
   let errorMessage = "";
 
-  try {
-    payload = await fetchMonitor(`/franchises/${encodeURIComponent(slug)}`, {
-      limit,
-      offset,
-    });
-  } catch (error) {
-    errorMessage = error.message;
+  if (!slug) {
+    errorMessage = "Slug de franquia ausente.";
+  } else {
+    try {
+      payload = await fetchMonitor(`/franchises/${encodeURIComponent(slug)}`, {
+        limit,
+        offset,
+      });
+    } catch (error) {
+      errorMessage = error.message;
+    }
   }
 
   const sourceDistribution = payload?.stats?.sourceDistribution || [];
@@ -103,7 +113,7 @@ export default async function FranquiaDetailPage({ params, searchParams }) {
       </div>
 
       {payload.items?.length ? (
-        <div className="stack">
+        <div className="article-grid">
           {payload.items.map((article) => (
             <ArticleCard key={article.id} article={article} />
           ))}

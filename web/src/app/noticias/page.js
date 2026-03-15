@@ -74,7 +74,7 @@ export default async function NoticiasPage({ searchParams }) {
       ) : null}
 
       {payload.items?.length ? (
-        <div className="stack">
+        <div className="article-grid">
           {payload.items.map((article) => (
             <ArticleCard key={article.id} article={article} />
           ))}
