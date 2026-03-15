@@ -7,7 +7,7 @@ const {
   normalizeCategoriesForMatching,
 } = require("../utils/category-normalization.js");
 const { buildIdentityHash } = require("../utils/hashing.js");
-const { buildContentHash } = require("../utils/hashing.js");
+const { buildContentHash, buildContentVersionHash } = require("../utils/hashing.js");
 const { inferContentType } = require("../utils/content-type.js");
 
 const SOURCE_TYPE_BY_BUCKET = {
@@ -78,6 +78,21 @@ function normalizeCollectedItem(rawItem, source) {
     summaryNormalized,
     publishedAt,
   });
+  const contentType = inferContentType({
+    sourceId: source.id,
+    canonicalUrl: normalizedUrl.canonicalUrl,
+    url: normalizedUrl.url,
+  });
+  const contentVersionHash = buildContentVersionHash({
+    domain: normalizedUrl.hostname,
+    canonicalUrl: normalizedUrl.canonicalUrl,
+    pathname: normalizedUrl.pathname,
+    titleNormalized,
+    categoriesNormalized,
+    contentType,
+    image: rawItem?.image || "",
+    publishedAt,
+  });
 
   const nowIso = new Date().toISOString();
 
@@ -97,14 +112,11 @@ function normalizeCollectedItem(rawItem, source) {
     categoriesNormalized,
     bucket,
     sourceType,
-    contentType: inferContentType({
-      sourceId: source.id,
-      canonicalUrl: normalizedUrl.canonicalUrl,
-      url: normalizedUrl.url,
-    }),
+    contentType,
     publishedAt,
     identityHash,
     contentHash,
+    contentVersionHash,
     firstSeenAt: rawItem?.firstSeenAt || nowIso,
     lastSeenAt: rawItem?.lastSeenAt || nowIso,
     timesSeen: Number(rawItem?.timesSeen || 1),

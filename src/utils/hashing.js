@@ -18,6 +18,40 @@ function normalizeHashText(value) {
     .toLowerCase();
 }
 
+function normalizePathname(pathname = "") {
+  const raw = String(pathname || "").trim();
+  if (!raw) return "";
+
+  try {
+    const parsed = new URL(raw);
+    return normalizeHashText(parsed.pathname || "");
+  } catch {
+    return normalizeHashText(raw);
+  }
+}
+
+function normalizeImageRef(image = "") {
+  const raw = String(image || "").trim();
+  if (!raw) return "";
+
+  try {
+    const parsed = new URL(raw);
+    return normalizeHashText(`${parsed.hostname}${parsed.pathname}`);
+  } catch {
+    return normalizeHashText(raw);
+  }
+}
+
+function normalizeCategoryList(categories = []) {
+  if (!Array.isArray(categories)) return "";
+
+  return categories
+    .map((value) => normalizeHashText(value))
+    .filter(Boolean)
+    .sort()
+    .join("|");
+}
+
 function roundPublishedDate(publishedAt) {
   if (!publishedAt) return "";
 
@@ -53,10 +87,36 @@ function buildContentHash({
   return sha256(payload);
 }
 
+function buildContentVersionHash({
+  domain,
+  canonicalUrl,
+  pathname,
+  titleNormalized,
+  categoriesNormalized,
+  contentType,
+  image,
+  publishedAt,
+}) {
+  const normalizedPath =
+    normalizePathname(pathname) || normalizePathname(canonicalUrl);
+  const payload = [
+    normalizeHashText(domain),
+    normalizedPath,
+    normalizeHashText(titleNormalized),
+    normalizeCategoryList(categoriesNormalized),
+    normalizeHashText(contentType),
+    normalizeImageRef(image),
+    roundPublishedDate(publishedAt),
+  ].join("|");
+
+  return sha256(payload);
+}
+
 module.exports = {
   sha1,
   sha256,
   roundPublishedDate,
   buildIdentityHash,
   buildContentHash,
+  buildContentVersionHash,
 };

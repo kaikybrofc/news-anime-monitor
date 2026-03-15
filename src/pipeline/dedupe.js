@@ -192,13 +192,15 @@ function dedupeCandidates(candidates = []) {
     }
 
     let isWeakDuplicate = false;
-    let weakDuplicateOf = "";
+    let weakRelatedTo = "";
+    let weakDuplicateReason = "";
 
     if (candidate.titleNormalized && globalTitleMap.has(candidate.titleNormalized)) {
       const original = globalTitleMap.get(candidate.titleNormalized);
       if (original.sourceId !== candidate.sourceId) {
         isWeakDuplicate = true;
-        weakDuplicateOf = original.canonicalUrl || original.url;
+        weakRelatedTo = original.canonicalUrl || original.url;
+        weakDuplicateReason = "cross_source_title";
       }
     }
 
@@ -210,7 +212,8 @@ function dedupeCandidates(candidates = []) {
       const original = globalContentHashMap.get(candidate.contentHash);
       if (original.sourceId !== candidate.sourceId) {
         isWeakDuplicate = true;
-        weakDuplicateOf = original.canonicalUrl || original.url;
+        weakRelatedTo = original.canonicalUrl || original.url;
+        weakDuplicateReason = "cross_source_content_hash";
       }
     }
 
@@ -218,7 +221,8 @@ function dedupeCandidates(candidates = []) {
       const original = globalIdentityMap.get(candidate.identityHash);
       if (original.sourceId !== candidate.sourceId) {
         isWeakDuplicate = true;
-        weakDuplicateOf = original.canonicalUrl || original.url;
+        weakRelatedTo = original.canonicalUrl || original.url;
+        weakDuplicateReason = "cross_source_identity_hash";
       }
     }
 
@@ -233,16 +237,28 @@ function dedupeCandidates(candidates = []) {
 
       if (crossSourceCandidate) {
         isWeakDuplicate = true;
-        weakDuplicateOf =
+        weakRelatedTo =
           crossSourceCandidate.canonicalUrl || crossSourceCandidate.url;
+        weakDuplicateReason = "cross_source_semantic";
       }
+    }
+
+    const relatedUrls = new Set(
+      Array.isArray(candidate.relatedUrls) ? candidate.relatedUrls : []
+    );
+    if (weakRelatedTo) {
+      relatedUrls.add(weakRelatedTo);
     }
 
     const acceptedItem = {
       ...candidate,
       isWeakDuplicate,
-      duplicateOf: isWeakDuplicate ? weakDuplicateOf : "",
-      relatedTo: isWeakDuplicate ? weakDuplicateOf : "",
+      duplicateOf: isWeakDuplicate ? "" : String(candidate.duplicateOf || ""),
+      relatedTo: isWeakDuplicate
+        ? weakRelatedTo
+        : String(candidate.relatedTo || ""),
+      relatedUrls: Array.from(relatedUrls).filter(Boolean).slice(0, 20),
+      weakDuplicateReason: isWeakDuplicate ? weakDuplicateReason : "",
       clusterHint: buildClusterHint(candidate),
     };
 

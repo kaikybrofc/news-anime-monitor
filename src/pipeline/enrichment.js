@@ -11,6 +11,7 @@ const {
   sha1,
   buildIdentityHash,
   buildContentHash,
+  buildContentVersionHash,
 } = require("../utils/hashing.js");
 const {
   normalizeTitleForMatching,
@@ -177,6 +178,14 @@ function ensureRefinedDefaults(refined = {}, nowIso = new Date().toISOString()) 
       : 0,
     image: String(refined.image || ""),
     summary: String(refined.summary || ""),
+    relatedTo: String(refined.relatedTo || ""),
+    relatedUrls: Array.isArray(refined.relatedUrls)
+      ? refined.relatedUrls
+          .map((value) => normalizeText(value))
+          .filter(Boolean)
+          .slice(0, 20)
+      : [],
+    weakDuplicateReason: String(refined.weakDuplicateReason || ""),
   };
 
   normalizedRefined.identityHash =
@@ -188,6 +197,19 @@ function ensureRefinedDefaults(refined = {}, nowIso = new Date().toISOString()) 
       domain: normalizedRefined.domain,
       titleNormalized: normalizedRefined.titleNormalized,
       summaryNormalized: normalizeText(normalizedRefined.summary),
+      publishedAt: normalizedRefined.publishedAt,
+    });
+
+  normalizedRefined.contentVersionHash =
+    String(refined.contentVersionHash || "") ||
+    buildContentVersionHash({
+      domain: normalizedRefined.domain,
+      canonicalUrl: normalizedRefined.canonicalUrl,
+      pathname: normalizedRefined.pathname,
+      titleNormalized: normalizedRefined.titleNormalized,
+      categoriesNormalized: normalizedRefined.categoriesNormalized,
+      contentType: normalizedRefined.contentType,
+      image: normalizedRefined.image,
       publishedAt: normalizedRefined.publishedAt,
     });
 
@@ -256,8 +278,14 @@ function buildProcessedArticle({
       },
       identityHash: candidate.identityHash,
       contentHash: candidate.contentHash,
+      contentVersionHash: candidate.contentVersionHash,
       duplicateOf: candidate.duplicateOf || "",
       isWeakDuplicate: Boolean(candidate.isWeakDuplicate),
+      relatedTo: candidate.relatedTo || "",
+      relatedUrls: Array.isArray(candidate.relatedUrls)
+        ? candidate.relatedUrls.slice(0, 20)
+        : [],
+      weakDuplicateReason: candidate.weakDuplicateReason || "",
       fetchRestricted: Boolean(candidate.fetchRestricted),
       revisionCount: 1,
       lastContentChangeAt: seenAt,
@@ -276,6 +304,16 @@ function buildProcessedArticle({
     domain: baseRefined.domain,
     titleNormalized: baseRefined.titleNormalized,
     summaryNormalized: normalizeText(summaryText),
+    publishedAt: baseRefined.publishedAt,
+  });
+  baseRefined.contentVersionHash = buildContentVersionHash({
+    domain: baseRefined.domain,
+    canonicalUrl: baseRefined.canonicalUrl,
+    pathname: baseRefined.pathname,
+    titleNormalized: baseRefined.titleNormalized,
+    categoriesNormalized: baseRefined.categoriesNormalized,
+    contentType: baseRefined.contentType,
+    image: baseRefined.image,
     publishedAt: baseRefined.publishedAt,
   });
 
@@ -320,6 +358,18 @@ function bumpArticleSeen(existingArticle, candidate, reason, seenAt) {
   );
   const shouldDetectRevision = String(reason || "").startsWith("post_process");
   const reasonInfo = parseSeenReason(reason);
+  const existingContentVersionHash =
+    String(base.refined.contentVersionHash || "") ||
+    buildContentVersionHash({
+      domain: base.refined.domain,
+      canonicalUrl: base.refined.canonicalUrl,
+      pathname: base.refined.pathname,
+      titleNormalized: base.refined.titleNormalized,
+      categoriesNormalized: base.refined.categoriesNormalized,
+      contentType: base.refined.contentType,
+      image: base.refined.image,
+      publishedAt: base.refined.publishedAt,
+    });
   const candidateContentHash =
     String(candidate?.contentHash || "") ||
     buildContentHash({
@@ -328,10 +378,29 @@ function bumpArticleSeen(existingArticle, candidate, reason, seenAt) {
       summaryNormalized: candidateSummary,
       publishedAt: candidate?.publishedAt || base.refined.publishedAt,
     });
+  const computedCandidateContentVersionHash = buildContentVersionHash({
+      domain: candidate?.domain || base.refined.domain,
+      canonicalUrl:
+        candidate?.canonicalUrl || candidate?.url || base.refined.canonicalUrl,
+      pathname: candidate?.pathname || base.refined.pathname,
+      titleNormalized:
+        candidateTitleNormalized || base.refined.titleNormalized,
+      categoriesNormalized:
+        Array.isArray(candidate?.categoriesNormalized) &&
+        candidate.categoriesNormalized.length
+          ? candidate.categoriesNormalized
+          : base.refined.categoriesNormalized,
+      contentType: candidate?.contentType || base.refined.contentType,
+      image: candidateImage || base.refined.image,
+      publishedAt: candidate?.publishedAt || base.refined.publishedAt,
+    });
+  const candidateContentVersionHash =
+    computedCandidateContentVersionHash ||
+    String(candidate?.contentVersionHash || "");
   const contentChanged =
     shouldDetectRevision &&
-    candidateContentHash &&
-    candidateContentHash !== base.refined.contentHash;
+    candidateContentVersionHash &&
+    candidateContentVersionHash !== existingContentVersionHash;
 
   const mergedCategories = mergeUniqueStrings(
     base.refined.categories,
@@ -355,6 +424,9 @@ function bumpArticleSeen(existingArticle, candidate, reason, seenAt) {
   base.refined.lastSeenAt = nowIso;
   base.refined.timesSeen = toPositiveInt(base.refined.timesSeen, 1) + 1;
   base.refined.lastSeenEvent = contentChanged ? "updated" : "revisited";
+  if (!base.refined.contentVersionHash && existingContentVersionHash) {
+    base.refined.contentVersionHash = existingContentVersionHash;
+  }
   if (base.refined.bucket === "unknown" && candidate.bucket) {
     base.refined.bucket = candidate.bucket;
   }
@@ -399,6 +471,11 @@ function bumpArticleSeen(existingArticle, candidate, reason, seenAt) {
     if (candidateContentHash) {
       base.refined.previousContentHash = base.refined.contentHash || "";
       base.refined.contentHash = candidateContentHash;
+    }
+    if (candidateContentVersionHash) {
+      base.refined.previousContentVersionHash =
+        base.refined.contentVersionHash || existingContentVersionHash || "";
+      base.refined.contentVersionHash = candidateContentVersionHash;
     }
 
     base.refined.revisionCount = toPositiveInt(base.refined.revisionCount, 1) + 1;
