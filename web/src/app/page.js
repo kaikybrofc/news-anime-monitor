@@ -21,14 +21,14 @@ export default async function HomePage() {
     <section className="stack">
       <div className="hero-card">
         <p className="eyebrow">OmniZap Anime Radar</p>
-        <h1>Noticias e inteligencia anime em uma unica camada.</h1>
+        <h1>Notícias e inteligência sobre anime em uma única camada.</h1>
         <p>
-          Este frontend e a base do portal: navegacao pronta, layout responsivo e
-          estrutura para evoluir paginas editoriais e tecnicas.
+          Este frontend é a base do portal: navegação pronta, layout responsivo e
+          estrutura para evoluir páginas editoriais e técnicas.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href="/noticias" className="btn btn-primary">
-            Ver noticias
+            Ver notícias
           </Link>
           <Link href="/api" className="btn btn-secondary">
             Explorar API
@@ -38,7 +38,7 @@ export default async function HomePage() {
 
       <section className="stack">
         <div className="split-card">
-          <h2>Ultimas noticias</h2>
+          <h2>Últimas notícias</h2>
           <Link href="/noticias" className="inline-link">
             Ver lista completa
           </Link>
@@ -59,7 +59,7 @@ export default async function HomePage() {
           </div>
         ) : (
           <article className="info-card">
-            <p>Nenhuma noticia encontrada no momento.</p>
+            <p>Nenhuma notícia encontrada no momento.</p>
           </article>
         )}
       </section>

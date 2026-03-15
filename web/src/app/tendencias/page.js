@@ -3,7 +3,7 @@ import { clampInt, fetchMonitor, readQueryInt } from "@/lib/api";
 import { formatDateTime, formatNumber } from "@/lib/formatters";
 
 export const metadata = {
-  title: "Tendências | Anime Radar",
+  title: "Tendências | OmniZap Anime Radar",
 };
 
 export const dynamic = "force-dynamic";
@@ -40,8 +40,8 @@ export default async function TendenciasPage({ searchParams }) {
           <h1 className="!text-4xl">Tendências do Radar</h1>
         </div>
         <p className="lead max-w-2xl">
-          Análise de dados em tempo real nas últimas {windowHours} horas. 
-          Identificamos o que está em alta no ecossistema anime.
+          Análise de dados em tempo real nas últimas {windowHours} horas.
+          Identificamos o que está em alta no ecossistema de anime.
         </p>
       </section>
 
@@ -58,7 +58,7 @@ export default async function TendenciasPage({ searchParams }) {
           <div className="absolute -right-4 -top-4 text-slate-800/20 text-6xl font-black group-hover:text-rose-500/10 transition-colors">
             #
           </div>
-          <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Volume de Artigos</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Volume de artigos</span>
           <p className="kpi-number !text-5xl text-rose-500">{formatNumber(totals.articles || 0)}</p>
           <span className="text-[10px] text-slate-600 font-medium">Processados na janela atual</span>
         </article>
@@ -67,7 +67,7 @@ export default async function TendenciasPage({ searchParams }) {
           <div className="absolute -right-4 -top-4 text-slate-800/20 text-6xl font-black group-hover:text-rose-500/10 transition-colors">
             ★
           </div>
-          <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Franquias Ativas</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Franquias ativas</span>
           <p className="kpi-number !text-5xl">{formatNumber(totals.franchises || 0)}</p>
           <span className="text-[10px] text-slate-600 font-medium">Menções detectadas via pipeline</span>
         </article>
@@ -76,7 +76,7 @@ export default async function TendenciasPage({ searchParams }) {
           <div className="absolute -right-4 -top-4 text-slate-800/20 text-6xl font-black group-hover:text-rose-500/10 transition-colors">
             ●
           </div>
-          <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Tópicos Únicos</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Tópicos únicos</span>
           <p className="kpi-number !text-5xl">{formatNumber(totals.topics || 0)}</p>
           <span className="text-[10px] text-slate-600 font-medium">Categorias e temas identificados</span>
         </article>
@@ -87,7 +87,7 @@ export default async function TendenciasPage({ searchParams }) {
         {/* Top Franquias */}
         <section className="flex flex-col gap-4">
           <div className="flex items-center justify-between px-1">
-            <h2 className="text-sm font-black uppercase tracking-widest text-slate-100">Top Franquias</h2>
+            <h2 className="text-sm font-black uppercase tracking-widest text-slate-100">Top franquias</h2>
             <span className="trend-badge">Alta</span>
           </div>
           <div className="info-card !p-2">
@@ -118,7 +118,7 @@ export default async function TendenciasPage({ searchParams }) {
         {/* Top Fontes */}
         <section className="flex flex-col gap-4">
           <div className="flex items-center justify-between px-1">
-            <h2 className="text-sm font-black uppercase tracking-widest text-slate-100">Top Fontes</h2>
+            <h2 className="text-sm font-black uppercase tracking-widest text-slate-100">Top fontes</h2>
             <span className="trend-badge !text-sky-400 !bg-sky-500/10">Ativas</span>
           </div>
           <div className="info-card !p-2">
@@ -149,8 +149,8 @@ export default async function TendenciasPage({ searchParams }) {
         {/* Top Tópicos */}
         <section className="flex flex-col gap-4">
           <div className="flex items-center justify-between px-1">
-            <h2 className="text-sm font-black uppercase tracking-widest text-slate-100">Tópicos Recentes</h2>
-            <span className="trend-badge !text-amber-400 !bg-amber-500/10">News</span>
+            <h2 className="text-sm font-black uppercase tracking-widest text-slate-100">Tópicos recentes</h2>
+            <span className="trend-badge !text-amber-400 !bg-amber-500/10">Notícias</span>
           </div>
           <div className="info-card !p-2">
             <div className="list-stack">

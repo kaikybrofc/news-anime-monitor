@@ -13,7 +13,7 @@ export function MainNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="main-nav" aria-label="Navegacao principal">
+    <nav className="main-nav" aria-label="Navegação principal">
       <div className="flex items-center gap-1">
         {siteNav.map((item) => (
           <Link

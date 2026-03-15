@@ -24,13 +24,13 @@ export default async function ApiPage() {
     <section className="stack">
       <h1>API</h1>
       <p className="lead">
-        Area tecnica para status do monitor e referencia dos endpoints publicos.
+        Área técnica para status do monitor e referência dos endpoints públicos.
       </p>
 
       <article className="info-card">
-        <h2>Base atual da API (server-side)</h2>
+        <h2>Base atual da API (no servidor)</h2>
         <p>{endpointBase}</p>
-        <p>Prefixo publico recomendado no dominio: {publicPrefix}</p>
+        <p>Prefixo público recomendado no domínio: {publicPrefix}</p>
       </article>
 
       {errorMessage ? (
@@ -41,9 +41,9 @@ export default async function ApiPage() {
       ) : (
         <article className="info-card">
           <h2>Status do monitor</h2>
-          <p>Em execucao: {debugPayload?.isCheckingNews ? "sim" : "nao"}</p>
-          <p>Artigos em memoria: {formatNumber(debugPayload?.inMemory?.count || 0)}</p>
-          <p>Ultimo ciclo: {formatDateTime(debugPayload?.lastCycle?.finishedAt)}</p>
+          <p>Em execução: {debugPayload?.isCheckingNews ? "sim" : "não"}</p>
+          <p>Artigos em memória: {formatNumber(debugPayload?.inMemory?.count || 0)}</p>
+          <p>Último ciclo: {formatDateTime(debugPayload?.lastCycle?.finishedAt)}</p>
         </article>
       )}
 
@@ -70,7 +70,7 @@ export default async function ApiPage() {
           <p>
             <code>{publicPrefix}/debug/sources</code>
           </p>
-          <p>Ideal para acompanhar ciclo, bucket e metricas por fonte.</p>
+          <p>Ideal para acompanhar ciclo, bucket e métricas por fonte.</p>
         </article>
       </div>
     </section>

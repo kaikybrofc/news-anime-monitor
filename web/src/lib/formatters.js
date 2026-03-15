@@ -70,7 +70,7 @@ export function getArticleTitle(article = {}) {
   const normalizedTitle = humanizeNormalizedTitle(refined.titleNormalized || "");
   if (normalizedTitle) return normalizedTitle;
 
-  return String(refined.canonicalUrl || refined.url || article.id || "Sem titulo");
+  return String(refined.canonicalUrl || refined.url || article.id || "Sem título");
 }
 
 export function getArticleUrl(article = {}) {

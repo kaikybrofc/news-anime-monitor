@@ -26,7 +26,7 @@ export default async function FranquiasPage({ searchParams }) {
     <section className="stack">
       <h1>Franquias</h1>
       <p className="lead">
-        Visao agregada por franquia com recorte das tendencias recentes.
+        Visão agregada por franquia com recorte das tendências recentes.
       </p>
 
       {errorMessage ? (
@@ -46,17 +46,17 @@ export default async function FranquiasPage({ searchParams }) {
             >
               <h2>{franchise.name}</h2>
               <p>
-                {formatNumber(franchise.mentions)} mencoes ·{" "}
+                {formatNumber(franchise.mentions)} menções ·{" "}
                 {formatNumber(franchise.sourceCount)} fontes
               </p>
-              <p>Score medio: {formatNumber(franchise.avgScore)}</p>
-              <p>Ultimo seen: {formatDateTime(franchise.lastSeenAt)}</p>
+              <p>Score médio: {formatNumber(franchise.avgScore)}</p>
+              <p>Última aparição: {formatDateTime(franchise.lastSeenAt)}</p>
             </Link>
           ))
         ) : (
           <article className="info-card">
             <h2>Sem franquias no momento</h2>
-            <p>As franquias em alta aparecerao aqui quando houver dados.</p>
+            <p>As franquias em alta aparecerão aqui quando houver dados.</p>
           </article>
         )}
       </div>

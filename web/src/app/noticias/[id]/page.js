@@ -121,7 +121,7 @@ export async function generateMetadata(props) {
 
   if (resolved.status !== "ready" || !resolved.item) {
     return {
-      title: "Noticia | OmniZap Anime Radar",
+      title: "Notícia | OmniZap Anime Radar",
     };
   }
 
@@ -132,19 +132,10 @@ export async function generateMetadata(props) {
 
   return {
     title: `${title} | OmniZap Anime Radar`,
-    description: description || "Detalhe de noticia no OmniZap Anime Radar.",
+    description: description || "Detalhe de notícia no OmniZap Anime Radar.",
     alternates: canonicalPath.startsWith("/noticias/")
       ? { canonical: canonicalPath }
       : undefined,
-  };
-}
-
-function buildNotFoundState(articleId) {
-  return {
-    status: "not_found",
-    articleId,
-    item: null,
-    errorMessage: "",
   };
 }
 
@@ -165,11 +156,11 @@ export default async function NoticiaDetailPage(props) {
       <section className="stack">
         <div className="site-container">
           <Link href="/noticias" className="inline-link mb-4 inline-block">
-            ← Voltar para noticias
+            ← Voltar para notícias
           </Link>
           <article className="info-card warning-card">
-            <h1>Noticia nao encontrada</h1>
-            <p>O artigo `{state.articleId}` nao foi localizado na base atual.</p>
+            <h1>Notícia não encontrada</h1>
+            <p>O artigo `{state.articleId}` não foi localizado na base atual.</p>
           </article>
         </div>
       </section>
@@ -181,10 +172,10 @@ export default async function NoticiaDetailPage(props) {
       <section className="stack">
         <div className="site-container">
           <Link href="/noticias" className="inline-link mb-4 inline-block">
-            ← Voltar para noticias
+            ← Voltar para notícias
           </Link>
           <article className="info-card warning-card">
-            <h1>Falha ao carregar noticia</h1>
+            <h1>Falha ao carregar notícia</h1>
             <p>{state.errorMessage || "Erro inesperado."}</p>
           </article>
         </div>
@@ -215,7 +206,7 @@ export default async function NoticiaDetailPage(props) {
   return (
     <div className="flex flex-col gap-8">
       <Link href="/noticias" className="inline-link w-fit">
-        ← Voltar para noticias
+        ← Voltar para notícias
       </Link>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
@@ -255,7 +246,7 @@ export default async function NoticiaDetailPage(props) {
                     {summary}
                   </p>
                 ) : (
-                  <p className="text-slate-400 italic">Resumo indisponivel para este artigo.</p>
+                  <p className="text-slate-400 italic">Resumo indisponível para este artigo.</p>
                 )}
               </div>
 
@@ -267,11 +258,11 @@ export default async function NoticiaDetailPage(props) {
                     rel="noreferrer"
                     className="btn btn-primary"
                   >
-                    Ler na Fonte Original
+                    Ler na fonte original
                   </a>
                 )}
                 <Link href="/noticias" className="btn btn-secondary">
-                  Voltar para Lista
+                  Voltar para a lista
                 </Link>
               </div>
             </div>
@@ -282,7 +273,7 @@ export default async function NoticiaDetailPage(props) {
         <aside className="flex flex-col gap-6">
           <div className="info-card">
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-6 border-b border-slate-50 pb-2">
-              Informações Técnicas
+              Informações técnicas
             </h3>
             
             <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-1">

@@ -59,7 +59,7 @@ export default async function FranquiaDetailPage(props) {
     <section className="stack">
       <h1>{payload.name || title}</h1>
       <p className="lead">
-        Acompanhamento da franquia com artigos consolidados e distribuicao por fonte.
+        Acompanhamento da franquia com artigos consolidados e distribuição por fonte.
       </p>
 
       <article className="info-card split-card">
@@ -82,7 +82,7 @@ export default async function FranquiaDetailPage(props) {
 
       <div className="grid-cards">
         <article className="info-card">
-          <h2>Distribuicao por fonte</h2>
+          <h2>Distribuição por fonte</h2>
           <div className="list-stack">
             {sourceDistribution.length ? (
               sourceDistribution.map((row) => (
@@ -91,13 +91,13 @@ export default async function FranquiaDetailPage(props) {
                 </p>
               ))
             ) : (
-              <p className="muted">Sem dados de distribuicao.</p>
+              <p className="muted">Sem dados de distribuição.</p>
             )}
           </div>
         </article>
 
         <article className="info-card">
-          <h2>Tipos de conteudo</h2>
+          <h2>Tipos de conteúdo</h2>
           <div className="list-stack">
             {Object.keys(contentTypes).length ? (
               Object.entries(contentTypes).map(([key, count]) => (
@@ -106,7 +106,7 @@ export default async function FranquiaDetailPage(props) {
                 </p>
               ))
             ) : (
-              <p className="muted">Sem dados de tipo de conteudo.</p>
+              <p className="muted">Sem dados de tipo de conteúdo.</p>
             )}
           </div>
         </article>
@@ -120,8 +120,8 @@ export default async function FranquiaDetailPage(props) {
         </div>
       ) : (
         <article className="info-card">
-          <h2>Sem noticias para esta franquia</h2>
-          <p>Quando houver cobertura detectada, os artigos aparecerao aqui.</p>
+          <h2>Sem notícias para esta franquia</h2>
+          <p>Quando houver cobertura detectada, os artigos aparecerão aqui.</p>
         </article>
       )}
 

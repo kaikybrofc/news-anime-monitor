@@ -61,9 +61,9 @@ export default async function FonteDetailPage({ params, searchParams }) {
   if (notFound) {
     return (
       <section className="stack">
-        <h1>Fonte nao encontrada</h1>
+        <h1>Fonte não encontrada</h1>
         <article className="info-card">
-          <p>A fonte `{sourceId}` nao existe no monitor atual.</p>
+          <p>A fonte `{sourceId}` não existe no monitor atual.</p>
           <Link href="/fontes" className="btn btn-secondary">
             Voltar para fontes
           </Link>
@@ -94,29 +94,37 @@ export default async function FonteDetailPage({ params, searchParams }) {
         </div>
         <div className="meta-stack">
           <p>ID: {payload.source?.id || sourceId}</p>
-          <p>Sitemap: {payload.source?.enabledSitemap ? "sim" : "nao"}</p>
+          <p>Sitemap: {payload.source?.enabledSitemap ? "sim" : "não"}</p>
         </div>
       </article>
 
       <div className="grid-cards">
         <article className="info-card">
-          <h2>Lifecycle</h2>
+          <h2>Ciclo de vida</h2>
           <div className="list-stack">
-            {Object.entries(lifecycle).map(([key, count]) => (
-              <p key={key}>
-                {key}: {formatNumber(count)}
-              </p>
-            ))}
+            {Object.keys(lifecycle).length ? (
+              Object.entries(lifecycle).map(([key, count]) => (
+                <p key={key}>
+                  {key}: {formatNumber(count)}
+                </p>
+              ))
+            ) : (
+              <p className="muted">Sem dados de ciclo de vida.</p>
+            )}
           </div>
         </article>
         <article className="info-card">
-          <h2>Tipos de conteudo</h2>
+          <h2>Tipos de conteúdo</h2>
           <div className="list-stack">
-            {Object.entries(contentTypes).map(([key, count]) => (
-              <p key={key}>
-                {key}: {formatNumber(count)}
-              </p>
-            ))}
+            {Object.keys(contentTypes).length ? (
+              Object.entries(contentTypes).map(([key, count]) => (
+                <p key={key}>
+                  {key}: {formatNumber(count)}
+                </p>
+              ))
+            ) : (
+              <p className="muted">Sem dados de tipo de conteúdo.</p>
+            )}
           </div>
         </article>
       </div>
@@ -130,7 +138,7 @@ export default async function FonteDetailPage({ params, searchParams }) {
       ) : (
         <article className="info-card">
           <h2>Sem artigos para esta fonte</h2>
-          <p>Ajuste os filtros ou aguarde o proximo ciclo do monitor.</p>
+          <p>Ajuste os filtros ou aguarde o próximo ciclo do monitor.</p>
         </article>
       )}
 

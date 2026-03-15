@@ -7,14 +7,14 @@ export default function SobrePage() {
     <section className="stack">
       <h1>Sobre</h1>
       <p className="lead">
-        Projeto focado em monitoramento de noticias anime com consolidacao,
-        deduplicacao e enriquecimento de dados.
+        Projeto focado no monitoramento de notícias de anime, com consolidação,
+        deduplicação e enriquecimento de dados.
       </p>
       <article className="info-card">
         <h2>Escopo atual</h2>
         <p>
           Fontes suportadas: AnimeNew, Anime Corner e Anime News Network.
-          Historico de aparicao e score ja fazem parte do pipeline.
+          Histórico de aparição e score já fazem parte do pipeline.
         </p>
       </article>
     </section>

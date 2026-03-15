@@ -1,7 +1,7 @@
 export const siteNav = [
   { href: "/", label: "Home" },
-  { href: "/noticias", label: "Noticias" },
-  { href: "/tendencias", label: "Tendencias" },
+  { href: "/noticias", label: "Notícias" },
+  { href: "/tendencias", label: "Tendências" },
   { href: "/franquias", label: "Franquias" },
   { href: "/fontes", label: "Fontes" },
   { href: "/api", label: "API" },

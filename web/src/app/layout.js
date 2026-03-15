@@ -18,7 +18,7 @@ const bodyFont = Inter({
 export const metadata = {
   title: "OmniZap Anime Radar",
   description:
-    "Portal base para noticias, tendencias e inteligencia do monitor de anime.",
+    "Portal base para notícias, tendências e inteligência do monitor de anime.",
 };
 
 export default function RootLayout({ children }) {

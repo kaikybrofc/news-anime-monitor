@@ -31,7 +31,7 @@ export default async function FontesPage() {
   return (
     <section className="stack">
       <h1>Fontes</h1>
-      <p className="lead">Visao por origem, cobertura e qualidade de ingestao.</p>
+      <p className="lead">Visão por origem, cobertura e qualidade da ingestão.</p>
 
       {errorMessage ? (
         <article className="info-card warning-card">
@@ -53,7 +53,7 @@ export default async function FontesPage() {
               <h2>{source.name}</h2>
               <p>ID: {source.id}</p>
               <p>Artigos: {formatNumber(stats?.count || 0)}</p>
-              <p>Score medio: {formatNumber(stats?.avgScore || 0)}</p>
+              <p>Score médio: {formatNumber(stats?.avgScore || 0)}</p>
             </Link>
           );
         })}

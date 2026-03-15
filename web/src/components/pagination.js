@@ -46,10 +46,10 @@ export function Pagination({ pathname, searchParams, offset, limit, hasMore }) {
             limit: safeLimit,
           })}
         >
-          Pagina anterior
+          Página anterior
         </Link>
       ) : (
-        <span className="btn btn-disabled">Pagina anterior</span>
+        <span className="btn btn-disabled">Página anterior</span>
       )}
 
       {hasMore ? (
@@ -60,7 +60,7 @@ export function Pagination({ pathname, searchParams, offset, limit, hasMore }) {
             limit: safeLimit,
           })}
         >
-          Proxima pagina
+          Próxima página
         </Link>
       ) : (
         <span className="btn btn-disabled">Fim da lista</span>
@@ -68,4 +68,3 @@ export function Pagination({ pathname, searchParams, offset, limit, hasMore }) {
     </div>
   );
 }
-

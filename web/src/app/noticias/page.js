@@ -3,7 +3,7 @@ import { Pagination } from "@/components/pagination";
 import { clampInt, fetchMonitor, readQueryInt, readQueryString } from "@/lib/api";
 
 export const metadata = {
-  title: "Noticias | OmniZap Anime Radar",
+  title: "Notícias | OmniZap Anime Radar",
 };
 
 export const dynamic = "force-dynamic";
@@ -48,11 +48,11 @@ export default async function NoticiasPage({ searchParams }) {
 
   return (
     <section className="stack">
-      <h1>Noticias</h1>
+      <h1>Notícias</h1>
 
       {errorMessage ? (
         <article className="info-card warning-card">
-          <h2>Falha ao carregar noticias</h2>
+          <h2>Falha ao carregar notícias</h2>
           <p>{errorMessage}</p>
         </article>
       ) : null}

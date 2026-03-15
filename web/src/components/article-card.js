@@ -10,24 +10,12 @@ import {
   summarizeText,
 } from "@/lib/formatters";
 
-function buildTagList(article) {
-  const refined = article?.refined || {};
-  const tags = [];
-
-  if (refined.bucket) tags.push(`bucket:${refined.bucket}`);
-  if (refined.contentType) tags.push(`tipo:${refined.contentType}`);
-  if (Number.isFinite(Number(refined.timesSeen))) tags.push(`views:${refined.timesSeen}`);
-
-  return tags;
-}
-
 export function ArticleCard({ article }) {
   const refined = article?.refined || {};
   const title = getArticleTitle(article);
   const url = getArticleUrl(article);
   const imageUrl = getArticleImageUrl(article);
   const summary = summarizeText(refined.summary || "", 100);
-  const tags = buildTagList(article);
   const lifecycleBadges = getArticleLifecycleBadges(article);
   const sourceName = String(refined.sourceName || refined.sourceId || "fonte desconhecida");
   const publishedAt = refined.publishedAt || article.publishedAt || article.timestamp;
@@ -37,7 +25,7 @@ export function ArticleCard({ article }) {
   return (
     <article className="info-card article-card group">
       {imageUrl ? (
-        <Link href={detailHref} className="article-cover" title="Abrir detalhe da noticia">
+        <Link href={detailHref} className="article-cover" title="Abrir detalhes da notícia">
           <img src={imageUrl} alt={title} loading="lazy" />
         </Link>
       ) : (
@@ -91,7 +79,7 @@ export function ArticleCard({ article }) {
                 target="_blank" 
                 rel="noreferrer" 
                 className="btn btn-secondary !py-1.5 !px-3 !text-[11px]"
-                title="Link Externo"
+                title="Abrir link externo"
               >
                 🔗
               </a>

@@ -7,7 +7,7 @@ export function SiteFooter() {
         <div className="flex flex-col gap-2">
           <p className="font-bold text-[#0f172a]">OmniZap Anime Radar</p>
           <p className="max-w-xs text-xs">
-            Monitor de noticias e tendencias anime com inteligência de pipeline.
+            Monitor de notícias e tendências de anime com inteligência de pipeline.
           </p>
         </div>
         <div className="flex flex-col justify-end gap-2 md:text-right">

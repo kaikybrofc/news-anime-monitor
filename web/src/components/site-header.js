@@ -6,7 +6,7 @@ export function SiteHeader() {
     <header className="site-header">
       <div className="site-container header-inner">
         <div className="flex items-center gap-4">
-          <Link href="/" className="brand" aria-label="Ir para Home">
+          <Link href="/" className="brand" aria-label="Ir para a página inicial">
             <span className="brand-dot" aria-hidden="true" />
             <span>Anime Radar</span>
           </Link>
