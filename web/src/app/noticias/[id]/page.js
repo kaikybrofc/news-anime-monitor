@@ -13,6 +13,10 @@ import {
   isLikelyArticleId,
   summarizeText,
 } from "@/lib/formatters";
+import {
+  getArticleEntitiesByType,
+  getSeoEntityConfigByType,
+} from "@/lib/seo-entities";
 
 export const dynamic = "force-dynamic";
 
@@ -33,12 +37,7 @@ async function loadArticleBySlug(newsSlug = "") {
 async function resolveArticleByNewsParam(rawParam = "") {
   const raw = String(rawParam || "").trim();
   if (!raw) {
-    return {
-      status: "not_found",
-      item: null,
-      articleId: "",
-      errorMessage: "",
-    };
+    return { status: "not_found", item: null, articleId: "", errorMessage: "" };
   }
 
   const hasLegacyMarker = raw.includes("--");
@@ -47,69 +46,27 @@ async function resolveArticleByNewsParam(rawParam = "") {
   if (hasLegacyMarker && isLikelyArticleId(legacyExtractedId)) {
     try {
       const item = await loadArticleById(legacyExtractedId);
-      return {
-        status: item ? "ready" : "not_found",
-        item,
-        articleId: legacyExtractedId,
-        errorMessage: "",
-      };
+      return { status: item ? "ready" : "not_found", item, articleId: legacyExtractedId, errorMessage: "" };
     } catch (error) {
-      if (error?.status !== 404) {
-        return {
-          status: "error",
-          item: null,
-          articleId: legacyExtractedId,
-          errorMessage: error.message,
-        };
-      }
+      if (error?.status !== 404) return { status: "error", item: null, articleId: legacyExtractedId, errorMessage: error.message };
     }
   }
 
   if (isLikelyArticleId(raw)) {
     try {
       const item = await loadArticleById(raw);
-      return {
-        status: item ? "ready" : "not_found",
-        item,
-        articleId: raw,
-        errorMessage: "",
-      };
+      return { status: item ? "ready" : "not_found", item, articleId: raw, errorMessage: "" };
     } catch (error) {
-      if (error?.status !== 404) {
-        return {
-          status: "error",
-          item: null,
-          articleId: raw,
-          errorMessage: error.message,
-        };
-      }
+      if (error?.status !== 404) return { status: "error", item: null, articleId: raw, errorMessage: error.message };
     }
   }
 
   try {
     const item = await loadArticleBySlug(raw);
-    return {
-      status: item ? "ready" : "not_found",
-      item,
-      articleId: String(item?.id || ""),
-      errorMessage: "",
-    };
+    return { status: item ? "ready" : "not_found", item, articleId: String(item?.id || ""), errorMessage: "" };
   } catch (error) {
-    if (error?.status === 404) {
-      return {
-        status: "not_found",
-        item: null,
-        articleId: legacyExtractedId || raw,
-        errorMessage: "",
-      };
-    }
-
-    return {
-      status: "error",
-      item: null,
-      articleId: legacyExtractedId || raw,
-      errorMessage: error.message,
-    };
+    if (error?.status === 404) return { status: "not_found", item: null, articleId: legacyExtractedId || raw, errorMessage: "" };
+    return { status: "error", item: null, articleId: legacyExtractedId || raw, errorMessage: error.message };
   }
 }
 
@@ -119,23 +76,31 @@ export async function generateMetadata(props) {
   const rawArticleParam = String(resolvedParams?.id || "").trim();
   const resolved = await resolveArticleByNewsParam(rawArticleParam);
 
-  if (resolved.status !== "ready" || !resolved.item) {
-    return {
-      title: "Notícia | OmniZap Anime Radar",
-    };
-  }
+  if (resolved.status !== "ready" || !resolved.item) return { title: "Notícia | Anime Radar" };
 
   const article = resolved.item;
   const title = getArticleTitle(article);
   const description = summarizeText(article?.refined?.summary || "", 160);
   const canonicalPath = getArticleDetailPath(article);
+  const imageUrl = getArticleImageUrl(article);
 
   return {
-    title: `${title} | OmniZap Anime Radar`,
-    description: description || "Detalhe de notícia no OmniZap Anime Radar.",
-    alternates: canonicalPath.startsWith("/noticias/")
-      ? { canonical: canonicalPath }
-      : undefined,
+    title: `${title} | Anime Radar`,
+    description: description || "Detalhe de notícia no Anime Radar.",
+    alternates: canonicalPath.startsWith("/noticias/") ? { canonical: canonicalPath } : undefined,
+    openGraph: {
+      type: "article",
+      title,
+      description: description || "Notícia no Anime Radar.",
+      url: canonicalPath,
+      images: imageUrl ? [{ url: imageUrl }] : undefined,
+    },
+    twitter: {
+      card: imageUrl ? "summary_large_image" : "summary",
+      title,
+      description: description || "Notícia no Anime Radar.",
+      images: imageUrl ? [imageUrl] : undefined,
+    },
   };
 }
 
@@ -144,6 +109,7 @@ export default async function NoticiaDetailPage(props) {
   const resolvedParams = await resolvedProps?.params;
   const rawArticleParam = String(resolvedParams?.id || "").trim();
   const resolved = await resolveArticleByNewsParam(rawArticleParam);
+  
   let state = {
     status: resolved.status,
     articleId: resolved.articleId || rawArticleParam,
@@ -151,35 +117,15 @@ export default async function NoticiaDetailPage(props) {
     errorMessage: resolved.errorMessage || "",
   };
 
-  if (state.status === "not_found") {
+  if (state.status === "not_found" || state.status === "error") {
     return (
-      <section className="stack">
-        <div className="site-container">
-          <Link href="/noticias" className="inline-link mb-4 inline-block">
-            ← Voltar para notícias
-          </Link>
-          <article className="info-card warning-card">
-            <h1>Notícia não encontrada</h1>
-            <p>O artigo `{state.articleId}` não foi localizado na base atual.</p>
-          </article>
-        </div>
-      </section>
-    );
-  }
-
-  if (state.status === "error") {
-    return (
-      <section className="stack">
-        <div className="site-container">
-          <Link href="/noticias" className="inline-link mb-4 inline-block">
-            ← Voltar para notícias
-          </Link>
-          <article className="info-card warning-card">
-            <h1>Falha ao carregar notícia</h1>
-            <p>{state.errorMessage || "Erro inesperado."}</p>
-          </article>
-        </div>
-      </section>
+      <div className="site-container py-12">
+        <Link href="/noticias" className="inline-link mb-6 inline-block">← Voltar para notícias</Link>
+        <article className="info-card warning-card p-8">
+          <h1 className="text-2xl mb-4">{state.status === "not_found" ? "Notícia não encontrada" : "Falha ao carregar notícia"}</h1>
+          <p className="text-slate-400">{state.status === "not_found" ? `O artigo "${state.articleId}" não foi localizado.` : state.errorMessage}</p>
+        </article>
+      </div>
     );
   }
 
@@ -195,124 +141,177 @@ export default async function NoticiaDetailPage(props) {
   const badges = getArticleLifecycleBadges(article);
   const score = formatNumber(refined.score || 0);
   const canonicalPath = getArticleDetailPath(article);
+  const siteBaseUrl = String(process.env.NEXT_PUBLIC_SITE_URL || "https://omnizap.xyz").replace(
+    /\/+$/,
+    ""
+  );
+  const canonicalUrl = canonicalPath.startsWith("/")
+    ? `${siteBaseUrl}${canonicalPath}`
+    : siteBaseUrl;
+  const articleSchema = {
+    "@context": "https://schema.org",
+    "@type": "NewsArticle",
+    headline: title,
+    datePublished: publishedAt || null,
+    dateModified: lastSeenAt || publishedAt || null,
+    image: imageUrl ? [imageUrl] : undefined,
+    mainEntityOfPage: canonicalUrl,
+    url: canonicalUrl,
+    author: {
+      "@type": "Organization",
+      name: sourceName,
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "Anime Radar",
+    },
+    description: summary || undefined,
+  };
+  const entitySections = [
+    { type: "anime", label: "Anime" },
+    { type: "character", label: "Personagem" },
+    { type: "studio", label: "Estúdio" },
+    { type: "tag", label: "Tag" },
+  ]
+    .map((section) => {
+      const config = getSeoEntityConfigByType(section.type);
+      return {
+        ...section,
+        config,
+        items: getArticleEntitiesByType(article, section.type).slice(0, 8),
+      };
+    })
+    .filter((section) => section.config && section.items.length);
 
-  if (rawArticleParam && canonicalPath.startsWith("/noticias/")) {
-    const requestedPath = `/noticias/${rawArticleParam}`;
-    if (requestedPath !== canonicalPath) {
-      permanentRedirect(canonicalPath);
-    }
+  if (rawArticleParam && canonicalPath.startsWith("/noticias/") && `/noticias/${rawArticleParam}` !== canonicalPath) {
+    permanentRedirect(canonicalPath);
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      <Link href="/noticias" className="inline-link w-fit">
-        ← Voltar para notícias
-      </Link>
+    <div className="flex flex-col gap-6 md:gap-10">
+      <script type="application/ld+json" suppressHydrationWarning>
+        {JSON.stringify(articleSchema)}
+      </script>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        {/* Main Content */}
-        <div className="lg:col-span-2 flex flex-col gap-6">
-          <article className="hero-card !p-0 overflow-hidden">
-            {imageUrl && (
-              <div className="relative aspect-video w-full overflow-hidden border-b border-slate-100">
-                <img 
-                  src={imageUrl} 
-                  alt={title} 
-                  className="h-full w-full object-cover"
-                />
+      {/* Mobile Back Button */}
+      <div className="md:hidden">
+        <Link href="/noticias" className="btn btn-secondary !py-2 !px-4 !text-xs w-fit">
+          ← Voltar
+        </Link>
+      </div>
+
+      {/* Hero Section */}
+      <section className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-12">
+        <div className="flex flex-col gap-6 lg:w-2/3">
+          <header className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-xs font-black uppercase tracking-widest text-rose-500">{sourceName}</span>
+              <div className="h-1 w-1 rounded-full bg-slate-700" />
+              <span className="text-xs font-medium text-slate-400">{formatDateTime(publishedAt)}</span>
+            </div>
+            <h1 className="!text-3xl md:!text-5xl !leading-[1.15]">{title}</h1>
+            {badges.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-2">
+                {badges.map((badge) => (
+                  <span key={badge.key} className={`status-badge !text-[10px] ${badge.toneClass}`}>
+                    {badge.label}
+                  </span>
+                ))}
+              </div>
+            )}
+          </header>
+
+          {imageUrl && (
+            <div className="relative aspect-video w-full overflow-hidden rounded-3xl border border-slate-800 shadow-2xl">
+              <img src={imageUrl} alt={title} className="h-full w-full object-cover" />
+            </div>
+          )}
+
+          <div className="flex flex-col gap-6 bg-slate-900/50 p-6 md:p-10 rounded-3xl border border-slate-800">
+            <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+              <span className="h-5 w-1 bg-rose-500 rounded-full" />
+              Resumo da Notícia
+            </h2>
+            {summary ? (
+              <p className="text-base md:text-lg text-slate-300 leading-relaxed whitespace-pre-line">
+                {summary}
+              </p>
+            ) : (
+              <p className="text-slate-500 italic italic">Resumo indisponível para este artigo.</p>
+            )}
+
+            {entitySections.length > 0 && (
+              <div className="flex flex-col gap-3">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400">
+                  Entidades relacionadas
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {entitySections.map((section) =>
+                    section.items.map((item) => (
+                      <Link
+                        key={`${section.type}:${item.slug}`}
+                        href={`${section.config.routeBase}/${item.slug}`}
+                        className="status-badge border border-slate-700 bg-slate-800/80 text-slate-200 normal-case tracking-normal"
+                      >
+                        {section.label}: {item.name}
+                      </Link>
+                    ))
+                  )}
+                </div>
               </div>
             )}
             
-            <div className="p-6 md:p-8 space-y-6">
-              <div className="space-y-2">
-                <p className="eyebrow">{sourceName}</p>
-                <h1 className="!text-3xl md:!text-4xl">{title}</h1>
-              </div>
-
-              {badges.length ? (
-                <div className="badge-row">
-                  {badges.map((badge) => (
-                    <span key={badge.key} className={`status-badge ${badge.toneClass}`}>
-                      {badge.label}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-
-              <div className="prose prose-slate max-w-none">
-                <h2 className="text-xl font-bold mb-4">Resumo do Artigo</h2>
-                {summary ? (
-                  <p className="article-summary whitespace-pre-line text-base leading-relaxed">
-                    {summary}
-                  </p>
-                ) : (
-                  <p className="text-slate-400 italic">Resumo indisponível para este artigo.</p>
-                )}
-              </div>
-
-              <div className="pt-6 border-t border-slate-100 flex flex-wrap gap-3">
-                {sourceUrl && (
-                  <a
-                    href={sourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="btn btn-primary"
-                  >
-                    Ler na fonte original
-                  </a>
-                )}
-                <Link href="/noticias" className="btn btn-secondary">
-                  Voltar para a lista
-                </Link>
-              </div>
+            <div className="pt-6 border-t border-slate-800 flex flex-wrap gap-4">
+              {sourceUrl && (
+                <a href={sourceUrl} target="_blank" rel="noreferrer" className="btn btn-primary !px-8">
+                  Ler Fonte Original
+                </a>
+              )}
+              <Link href="/noticias" className="btn btn-secondary !px-8 hidden md:inline-flex">
+                Voltar para Lista
+              </Link>
             </div>
-          </article>
+          </div>
         </div>
 
-        {/* Sidebar Info */}
-        <aside className="flex flex-col gap-6">
-          <div className="info-card">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-6 border-b border-slate-50 pb-2">
-              Informações técnicas
-            </h3>
-            
-            <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-1">
-              <div className="flex flex-col gap-1 col-span-2 sm:col-span-1 lg:col-span-2 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Score de Relevância</span>
-                <span className="text-4xl font-black text-rose-500 tracking-tighter">{score}</span>
+        {/* Sidebar */}
+        <aside className="flex flex-col gap-6 lg:w-1/3 lg:sticky lg:top-24">
+          <div className="info-card flex flex-col gap-8">
+            <div className="flex flex-col gap-3">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Inteligência Radar</span>
+              <div className="bg-slate-950/50 p-6 rounded-2xl border border-slate-800 flex flex-col gap-1 items-center justify-center text-center">
+                <span className="text-xs font-bold text-slate-500 uppercase">Score de Relevância</span>
+                <span className="text-5xl font-black text-rose-500 tracking-tighter">{score}</span>
               </div>
-              
-              <div className="flex flex-col border-t border-slate-50 pt-3">
-                <span className="text-[10px] font-bold uppercase text-slate-400">Publicado</span>
-                <span className="text-xs font-semibold text-slate-700">{formatDateTime(publishedAt)}</span>
-              </div>
+            </div>
 
-              <div className="flex flex-col border-t border-slate-50 pt-3">
-                <span className="text-[10px] font-bold uppercase text-slate-400">Visto</span>
-                <span className="text-xs font-semibold text-slate-700">{formatDateTime(lastSeenAt)}</span>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1 p-3 bg-slate-900/30 rounded-xl border border-slate-800/50">
+                <span className="text-[9px] font-bold text-slate-500 uppercase">Visto em</span>
+                <span className="text-xs font-semibold text-slate-200">{formatDateTime(lastSeenAt)}</span>
               </div>
+              <div className="flex flex-col gap-1 p-3 bg-slate-900/30 rounded-xl border border-slate-800/50">
+                <span className="text-[9px] font-bold text-slate-500 uppercase">Categoria</span>
+                <span className="text-xs font-semibold text-slate-200 capitalize">{refined.bucket || "Geral"}</span>
+              </div>
+              <div className="flex flex-col gap-1 p-3 bg-slate-900/30 rounded-xl border border-slate-800/50 col-span-2">
+                <span className="text-[9px] font-bold text-slate-500 uppercase">Tipo de Conteúdo</span>
+                <span className="text-xs font-semibold text-slate-200 capitalize">{refined.contentType || "Notícia"}</span>
+              </div>
+            </div>
 
-              <div className="flex flex-col border-t border-slate-50 pt-3">
-                <span className="text-[10px] font-bold uppercase text-slate-400">Categoria</span>
-                <span className="text-xs font-semibold text-slate-700 capitalize">{refined.bucket || "Geral"}</span>
-              </div>
-
-              <div className="flex flex-col border-t border-slate-50 pt-3">
-                <span className="text-[10px] font-bold uppercase text-slate-400">Tipo</span>
-                <span className="text-xs font-semibold text-slate-700 capitalize">{refined.contentType || "Notícia"}</span>
-              </div>
+            <div className="p-4 bg-rose-500/5 border border-rose-500/10 rounded-2xl">
+              <p className="text-[11px] text-rose-400 leading-relaxed font-medium">
+                Este artigo foi processado e analisado automaticamente pela pipeline de dados do Anime Radar.
+              </p>
             </div>
           </div>
 
-          <div className="info-card bg-rose-50 border-rose-100">
-            <h3 className="text-sm font-bold text-rose-900 mb-2">Sobre este monitor</h3>
-            <p className="text-xs text-rose-700 leading-normal">
-              Este artigo foi processado automaticamente pelo OmniZap Anime Radar, 
-              analisando relevância e tendências em tempo real.
-            </p>
-          </div>
+          <Link href="/noticias" className="btn btn-secondary w-full md:hidden">
+            Voltar para Lista
+          </Link>
         </aside>
-      </div>
+      </section>
     </div>
   );
 }
