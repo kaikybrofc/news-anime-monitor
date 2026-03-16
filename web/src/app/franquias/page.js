@@ -10,6 +10,20 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
+function slugToDisplayName(slug = "") {
+  return String(slug || "")
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function getFranchiseDisplayName(item = {}) {
+  const explicitName = String(item?.name || "").trim();
+  if (explicitName) return explicitName;
+  return slugToDisplayName(item?.slug);
+}
+
 function buildRankingFromItems(items = []) {
   const safeItems = Array.isArray(items) ? items.slice() : [];
 
@@ -55,7 +69,7 @@ function RankingColumn({ title, items = [], metricKey, metricLabel }) {
           items.map((item) => (
             <Link key={`${title}-${item.slug}`} className="line-link" href={`/franquias/${item.slug}`}>
               <div className="flex items-center justify-between">
-                <strong>{item.name}</strong>
+                <strong>{getFranchiseDisplayName(item)}</strong>
                 <span className="text-rose-400 font-bold">{formatNumber(item[metricKey] || 0)}</span>
               </div>
               <span>{metricLabel}</span>
@@ -200,7 +214,7 @@ export default async function FranquiasPage(props) {
                   <div className="trend-badge !text-[9px]">Ativo</div>
                 </div>
                 <h2 className="text-lg font-bold text-slate-100 group-hover:text-rose-400 transition-colors truncate">
-                  {item.name}
+                  {getFranchiseDisplayName(item)}
                 </h2>
                 <div className="text-[10px] text-slate-500">
                   {formatNumber(item.mentions || 0)} menções · score {formatNumber(item.avgScore || 0)}

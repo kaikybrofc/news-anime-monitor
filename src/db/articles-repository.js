@@ -121,10 +121,21 @@ function toNumber(value, fallback = 0) {
   return parsed;
 }
 
+function slugToName(slug = "") {
+  return String(slug || "")
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 function parseFranchiseSummaryRow(row = {}) {
+  const slug = String(row.slug || "");
+  const explicitName = String(row.name || "").trim();
+
   return {
-    slug: String(row.slug || ""),
-    name: String(row.name || ""),
+    slug,
+    name: explicitName || slugToName(slug),
     mentions: toNumber(row.mentions, 0),
     sourceCount: toNumber(row.sourceCount, 0),
     avgScore: toNumber(row.avgScore, 0),
