@@ -157,13 +157,14 @@ cp .env.example .env
 
 ### API
 
-Obrigatoria:
-- `OPENAI_API_KEY`
+Obrigatorio:
+- Gemini CLI instalado/autenticado no servidor
 
 Principais opcionais:
 - `PORT` (padrao `3000`)
 - `NODE_ENV`
-- `OPENAI_MODEL`
+- `GEMINI_CLI_PATH` (padrao `gemini`)
+- `GEMINI_MODEL` (usa o padrao do CLI quando vazio)
 - `NEWS_SOURCE_IDS`
 - `MAX_ITEMS_PER_SOURCE`
 - `MAX_SITEMAPS_PER_SOURCE`
@@ -265,6 +266,7 @@ news-anime-monitor/
 ## Troubleshooting rapido
 
 - API nao sobe: valide `.env` e porta configurada.
+- Erro no Gemini CLI: confirme comando `gemini` disponivel e autenticado.
 - Frontend sem dados: configure `NEWS_MONITOR_API_URL` para a API correta.
 - MySQL nao conecta: confira `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`.
 - ANN com restricao: configure `ANIMENEWSNETWORK_COOKIE` (ou `ANN_COOKIE`) e mantenha fallback guest.

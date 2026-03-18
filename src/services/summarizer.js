@@ -1,94 +1,56 @@
 require("dotenv").config();
-const OpenAI = require("openai");
+const { spawn } = require("child_process");
 const cheerio = require("cheerio");
 const logger = require("../utils/logger.js");
 const { getWithRetry, toPositiveInt } = require("../utils/http.js");
 const { extractTitleFromHtml } = require("../utils/article-utils.js");
 
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5-nano-2025-08-07";
-const OPENAI_TIMEOUT_MS = toPositiveInt(process.env.OPENAI_TIMEOUT_MS, 20000);
-const OPENAI_MAX_ATTEMPTS = toPositiveInt(process.env.OPENAI_MAX_ATTEMPTS, 3);
-const OPENAI_RETRY_BASE_MS = toPositiveInt(
-  process.env.OPENAI_RETRY_BASE_MS,
+const GEMINI_CLI_PATH =
+  String(process.env.GEMINI_CLI_PATH || "gemini").trim() || "gemini";
+const GEMINI_MODEL = String(process.env.GEMINI_MODEL || "").trim();
+const GEMINI_TIMEOUT_MS = toPositiveInt(process.env.GEMINI_TIMEOUT_MS, 30000);
+const GEMINI_MAX_ATTEMPTS = toPositiveInt(process.env.GEMINI_MAX_ATTEMPTS, 3);
+const GEMINI_RETRY_BASE_MS = toPositiveInt(
+  process.env.GEMINI_RETRY_BASE_MS,
   1200
 );
 const SUMMARY_MAX_INPUT_CHARS = toPositiveInt(
   process.env.SUMMARY_MAX_INPUT_CHARS,
   12000
 );
-const SUMMARY_MAX_OUTPUT_TOKENS = toPositiveInt(
-  process.env.SUMMARY_MAX_OUTPUT_TOKENS,
-  360
-);
-const SUMMARY_RETRY_MAX_OUTPUT_TOKENS = toPositiveInt(
-  process.env.SUMMARY_RETRY_MAX_OUTPUT_TOKENS,
-  1200
-);
 const SUMMARY_LOG_TITLE_MAX_CHARS = toPositiveInt(
   process.env.SUMMARY_LOG_TITLE_MAX_CHARS,
   120
 );
 
-function normalizeReasoningEffort(value) {
-  const allowed = new Set(["minimal", "low", "medium", "high"]);
-  const normalized = String(value || "minimal").toLowerCase().trim();
-  return allowed.has(normalized) ? normalized : "minimal";
-}
-
-const OPENAI_REASONING_EFFORT = normalizeReasoningEffort(
-  process.env.OPENAI_REASONING_EFFORT
-);
-
-let openaiClient = null;
-
-function getOpenAIClient() {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("A variável de ambiente OPENAI_API_KEY não foi definida.");
-  }
-
-  if (!openaiClient) {
-    openaiClient = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      timeout: OPENAI_TIMEOUT_MS,
-      maxRetries: 0,
-    });
-  }
-
-  return openaiClient;
-}
-
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function shouldApplyReasoningConfig(modelName) {
-  return /^(gpt-5|o[1-9]|o3|o4)/i.test(String(modelName || ""));
-}
-
-function isRetryableOpenAIError(error) {
+function isRetryableGeminiError(error) {
   if (error?.code === "EMPTY_SUMMARY_RESPONSE") return true;
 
-  const status = error?.status || error?.response?.status;
-  const code = error?.code;
+  if (
+    [
+      "ETIMEDOUT",
+      "ECONNABORTED",
+      "ECONNRESET",
+      "ENOTFOUND",
+      "EAI_AGAIN",
+      "ERR_NETWORK",
+    ].includes(error?.code)
+  ) {
+    return true;
+  }
 
-  if (typeof status === "number") {
-    return (
-      status === 408 ||
-      status === 409 ||
-      status === 425 ||
-      status === 429 ||
-      status >= 500
+  if (error?.code === "GEMINI_CLI_EXIT_ERROR") {
+    const stderr = String(error?.stderr || "").toLowerCase();
+    return /rate.?limit|429|5\d\d|timeout|temporar|unavailable|network|internal/.test(
+      stderr
     );
   }
 
-  return [
-    "ECONNABORTED",
-    "ECONNRESET",
-    "ETIMEDOUT",
-    "ENOTFOUND",
-    "EAI_AGAIN",
-    "ERR_NETWORK",
-  ].includes(code);
+  return false;
 }
 
 function normalizeArticleText(text) {
@@ -152,114 +114,169 @@ ${articleText}
 </article>`;
 }
 
-function extractTextFromResponse(response) {
-  const direct = String(response?.output_text || "").trim();
-  if (direct) {
-    return direct;
-  }
-
-  const chunks = [];
-  const outputItems = Array.isArray(response?.output) ? response.output : [];
-
-  outputItems.forEach((item) => {
-    if (typeof item?.output_text === "string") {
-      const value = item.output_text.trim();
-      if (value) chunks.push(value);
-    }
-
-    const contentList = Array.isArray(item?.content) ? item.content : [];
-    contentList.forEach((content) => {
-      if (!content) return;
-      if (!["output_text", "text"].includes(content.type)) return;
-
-      if (typeof content.text === "string") {
-        const value = content.text.trim();
-        if (value) chunks.push(value);
-        return;
-      }
-
-      if (typeof content?.text?.value === "string") {
-        const value = content.text.value.trim();
-        if (value) chunks.push(value);
-      }
-    });
-  });
-
-  return chunks.join("\n").trim();
-}
-
-function createEmptySummaryError(response) {
+function createEmptySummaryError(details = {}) {
   const error = new Error("EMPTY_SUMMARY_RESPONSE");
   error.code = "EMPTY_SUMMARY_RESPONSE";
-  error.incompleteReason = response?.incomplete_details?.reason || null;
-  error.responseStatus = response?.status || null;
-  error.outputItemTypes = Array.isArray(response?.output)
-    ? response.output.map((item) => item?.type).filter(Boolean)
-    : [];
+  error.provider = "gemini-cli";
+  error.responseStatus = details.responseStatus || null;
   return error;
 }
 
-async function generateSummary(prompt) {
-  const client = getOpenAIClient();
+function runGeminiCliPrompt(prompt) {
+  return new Promise((resolve, reject) => {
+    const args = ["-p", "", "--output-format", "text"];
+    if (GEMINI_MODEL) {
+      args.push("--model", GEMINI_MODEL);
+    }
 
-  let lastError;
-  let maxOutputTokens = SUMMARY_MAX_OUTPUT_TOKENS;
+    const child = spawn(GEMINI_CLI_PATH, args, {
+      env: process.env,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
 
-  for (let attempt = 1; attempt <= OPENAI_MAX_ATTEMPTS; attempt += 1) {
-    try {
-      const requestPayload = {
-        model: OPENAI_MODEL,
-        input: prompt,
-        max_output_tokens: maxOutputTokens,
-      };
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    let timeoutTimer = null;
 
-      if (shouldApplyReasoningConfig(OPENAI_MODEL)) {
-        requestPayload.reasoning = { effort: OPENAI_REASONING_EFFORT };
+    const finishWithError = (error) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      reject(error);
+    };
+
+    const finishWithSuccess = (value) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      resolve(value);
+    };
+
+    timeoutTimer = setTimeout(() => {
+      const error = new Error(
+        `Gemini CLI excedeu o timeout de ${GEMINI_TIMEOUT_MS}ms.`
+      );
+      error.code = "ETIMEDOUT";
+      error.provider = "gemini-cli";
+
+      child.kill("SIGTERM");
+      setTimeout(() => {
+        if (child.exitCode === null) {
+          child.kill("SIGKILL");
+        }
+      }, 2500);
+
+      finishWithError(error);
+    }, GEMINI_TIMEOUT_MS);
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    child.on("error", (error) => {
+      const wrapped = new Error(
+        `Falha ao iniciar Gemini CLI em "${GEMINI_CLI_PATH}": ${error?.message || "erro desconhecido"}`
+      );
+      wrapped.code = error?.code || "GEMINI_CLI_START_ERROR";
+      wrapped.provider = "gemini-cli";
+      wrapped.originalError = error;
+      finishWithError(wrapped);
+    });
+
+    child.on("close", (exitCode, signal) => {
+      if (settled) return;
+
+      if (exitCode !== 0) {
+        const firstStderrLine = String(stderr || "")
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .find(Boolean);
+        const details = firstStderrLine ? `: ${firstStderrLine}` : "";
+        const error = new Error(
+          `Gemini CLI retornou erro (exit=${exitCode}${signal ? `, signal=${signal}` : ""})${details}`
+        );
+        error.code = "GEMINI_CLI_EXIT_ERROR";
+        error.provider = "gemini-cli";
+        error.exitCode = exitCode;
+        error.signal = signal || null;
+        error.stderr = stderr;
+        finishWithError(error);
+        return;
       }
 
-      const response = await client.responses.create(requestPayload);
-      const summary = extractTextFromResponse(response);
-
+      const summary = String(stdout || "").trim();
       if (!summary) {
-        throw createEmptySummaryError(response);
+        finishWithError(
+          createEmptySummaryError({
+            responseStatus: "stdout_empty",
+          })
+        );
+        return;
       }
 
-      return summary;
+      finishWithSuccess(summary);
+    });
+
+    child.stdin.on("error", (error) => {
+      const wrapped = new Error(
+        `Falha ao enviar prompt ao Gemini CLI: ${error?.message || "erro desconhecido"}`
+      );
+      wrapped.code = error?.code || "GEMINI_CLI_STDIN_ERROR";
+      wrapped.provider = "gemini-cli";
+      finishWithError(wrapped);
+    });
+
+    child.stdin.end(prompt);
+  });
+}
+
+async function generateSummary(prompt) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= GEMINI_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await runGeminiCliPrompt(prompt);
     } catch (error) {
       lastError = error;
-      const retryable = isRetryableOpenAIError(error);
-      const willRetry = retryable && attempt < OPENAI_MAX_ATTEMPTS;
+      const retryable = isRetryableGeminiError(error);
+      const willRetry = retryable && attempt < GEMINI_MAX_ATTEMPTS;
 
       if (!willRetry) break;
 
       if (error?.code === "EMPTY_SUMMARY_RESPONSE") {
-        if (
-          error?.incompleteReason === "max_output_tokens" ||
-          error?.responseStatus === "incomplete"
-        ) {
-          maxOutputTokens = Math.min(
-            Math.max(maxOutputTokens * 2, SUMMARY_MAX_OUTPUT_TOKENS + 120),
-            SUMMARY_RETRY_MAX_OUTPUT_TOKENS
-          );
-        }
-
-        logger.warn(
-          `[Resumo] IA retornou vazio (status=${error?.responseStatus || "unknown"}, reason=${error?.incompleteReason || "n/a"}, output=${(error?.outputItemTypes || []).join(",") || "none"}). Tentando novamente...`
-        );
+        logger.warn("[Resumo] Gemini CLI retornou vazio. Tentando novamente...");
       } else {
         const status =
-          error?.status || error?.response?.status || error?.code || "UNKNOWN";
+          error?.code ||
+          (typeof error?.exitCode === "number"
+            ? `EXIT_${error.exitCode}`
+            : "UNKNOWN");
         logger.warn(
-          `[Resumo] Falha na IA (${status}) tentativa ${attempt}/${OPENAI_MAX_ATTEMPTS}. Retentando...`
+          `[Resumo] Falha no Gemini CLI (${status}) tentativa ${attempt}/${GEMINI_MAX_ATTEMPTS}. Retentando...`
         );
       }
 
-      const delayMs = OPENAI_RETRY_BASE_MS * 2 ** (attempt - 1);
+      const delayMs = GEMINI_RETRY_BASE_MS * 2 ** (attempt - 1);
       await sleep(delayMs);
     }
   }
 
   throw lastError;
+}
+
+function getSummaryModelLabel() {
+  return GEMINI_MODEL || "padrão do Gemini CLI";
+}
+
+function assertSummaryConfiguration() {
+  if (!GEMINI_CLI_PATH) {
+    throw new Error("A variável GEMINI_CLI_PATH não foi definida.");
+  }
 }
 
 // Fila para garantir processamento sequencial das requisições à IA
@@ -290,6 +307,7 @@ async function summarizeHtmlInternal(htmlContent) {
 
     logger.info(`\n========== ENVIANDO PARA IA ==========`);
     logger.info(`Título: ${title}`);
+    logger.info(`Provedor: Gemini CLI | Modelo: ${getSummaryModelLabel()}`);
     logger.info(`======================================\n`);
 
     const summary = await generateSummary(buildPrompt(limitedText));
@@ -313,14 +331,16 @@ async function summarizeHtmlInternal(htmlContent) {
 }
 
 /**
- * Gera um resumo a partir de um conteúdo HTML usando a API da OpenAI.
+ * Gera um resumo a partir de um conteúdo HTML usando Gemini CLI.
  * @param {string} htmlContent - O conteúdo HTML da página da notícia.
  * @returns {Promise<string>} O resumo da notícia.
  */
 function summarizeHtml(htmlContent) {
-  if (!process.env.OPENAI_API_KEY) {
+  try {
+    assertSummaryConfiguration();
+  } catch (error) {
     return Promise.reject(
-      new Error("A variável de ambiente OPENAI_API_KEY não foi definida.")
+      new Error(error?.message || "Configuração de resumo inválida.")
     );
   }
 
