@@ -82,7 +82,10 @@ export async function fetchMonitor(pathname, query = {}) {
       const statusMessage = `Erro ${response.status} em ${baseUrl}${normalizedPath}.${details}`.trim();
       attemptErrors.push(statusMessage);
 
-      if (allowFallback && index < baseUrls.length - 1) {
+      const shouldRetryWithFallback =
+        allowFallback && index < baseUrls.length - 1 && response.status >= 500;
+
+      if (shouldRetryWithFallback) {
         continue;
       }
 

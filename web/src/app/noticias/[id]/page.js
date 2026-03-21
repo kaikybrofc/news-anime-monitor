@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { permanentRedirect } from "next/navigation";
+import { notFound as renderNotFound, permanentRedirect } from "next/navigation";
 import { fetchMonitor } from "@/lib/api";
 import { getArticleLifecycleBadges } from "@/lib/article-state";
 import {
@@ -77,7 +77,15 @@ export async function generateMetadata(props) {
   const rawArticleParam = String(resolvedParams?.id || "").trim();
   const resolved = await resolveArticleByNewsParam(rawArticleParam);
 
-  if (resolved.status !== "ready" || !resolved.item) return { title: "Notícia | Anime Radar" };
+  if (resolved.status !== "ready" || !resolved.item) {
+    return {
+      title: "Notícia | Anime Radar",
+      robots: {
+        index: false,
+        follow: true,
+      },
+    };
+  }
 
   const article = resolved.item;
   const title = getArticleTitle(article);
@@ -110,21 +118,30 @@ export default async function NoticiaDetailPage(props) {
   const resolvedParams = await resolvedProps?.params;
   const rawArticleParam = String(resolvedParams?.id || "").trim();
   const resolved = await resolveArticleByNewsParam(rawArticleParam);
-  
-  let state = {
+
+  const state = {
     status: resolved.status,
     articleId: resolved.articleId || rawArticleParam,
     item: resolved.item || null,
     errorMessage: resolved.errorMessage || "",
   };
 
-  if (state.status === "not_found" || state.status === "error") {
+  if (state.status === "not_found") {
+    renderNotFound();
+  }
+
+  if (state.status === "error") {
     return (
       <div className="site-container py-12">
         <Link href="/noticias" className="inline-link mb-6 inline-block">← Voltar para notícias</Link>
         <article className="info-card warning-card p-8">
-          <h1 className="text-2xl mb-4">{state.status === "not_found" ? "Notícia não encontrada" : "Falha ao carregar notícia"}</h1>
-          <p className="text-slate-400">{state.status === "not_found" ? `O artigo "${state.articleId}" não foi localizado.` : state.errorMessage}</p>
+          <h1 className="text-2xl mb-4">Falha ao carregar notícia</h1>
+          <p className="text-slate-400">
+            Não foi possível carregar este artigo agora. Tente novamente em instantes.
+          </p>
+          {process.env.NODE_ENV !== "production" && state.errorMessage ? (
+            <p className="text-xs text-slate-500 mt-3">{state.errorMessage}</p>
+          ) : null}
         </article>
       </div>
     );
