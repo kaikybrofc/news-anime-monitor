@@ -8,11 +8,17 @@ const { extractTitleFromHtml } = require("../utils/article-utils.js");
 const GEMINI_CLI_PATH =
   String(process.env.GEMINI_CLI_PATH || "gemini").trim() || "gemini";
 const GEMINI_MODEL = String(process.env.GEMINI_MODEL || "").trim();
-const GEMINI_TIMEOUT_MS = toPositiveInt(process.env.GEMINI_TIMEOUT_MS, 30000);
+const GEMINI_TIMEOUT_MS = toPositiveInt(process.env.GEMINI_TIMEOUT_MS, 90000);
 const GEMINI_MAX_ATTEMPTS = toPositiveInt(process.env.GEMINI_MAX_ATTEMPTS, 3);
 const GEMINI_RETRY_BASE_MS = toPositiveInt(
   process.env.GEMINI_RETRY_BASE_MS,
   1200
+);
+const GEMINI_APPROVAL_MODE =
+  String(process.env.GEMINI_APPROVAL_MODE || "plan").trim() || "plan";
+const GEMINI_DISABLE_EXTENSIONS = toBoolean(
+  process.env.GEMINI_DISABLE_EXTENSIONS,
+  true
 );
 const SUMMARY_MAX_INPUT_CHARS = toPositiveInt(
   process.env.SUMMARY_MAX_INPUT_CHARS,
@@ -25,6 +31,16 @@ const SUMMARY_LOG_TITLE_MAX_CHARS = toPositiveInt(
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function toBoolean(value, fallback = false) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+  if (!normalized) return fallback;
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  return fallback;
 }
 
 function isRetryableGeminiError(error) {
@@ -45,7 +61,7 @@ function isRetryableGeminiError(error) {
 
   if (error?.code === "GEMINI_CLI_EXIT_ERROR") {
     const stderr = String(error?.stderr || "").toLowerCase();
-    return /rate.?limit|429|5\d\d|timeout|temporar|unavailable|network|internal/.test(
+    return /rate.?limit|429|5\d\d|timeout|temporar|unavailable|network|internal|capacity|quota|exhaust/.test(
       stderr
     );
   }
@@ -124,14 +140,20 @@ function createEmptySummaryError(details = {}) {
 
 function runGeminiCliPrompt(prompt) {
   return new Promise((resolve, reject) => {
-    const args = ["-p", "", "--output-format", "text"];
+    const args = ["-p", String(prompt || ""), "--output-format", "text"];
+    if (GEMINI_DISABLE_EXTENSIONS) {
+      args.push("--extensions", "");
+    }
+    if (GEMINI_APPROVAL_MODE) {
+      args.push("--approval-mode", GEMINI_APPROVAL_MODE);
+    }
     if (GEMINI_MODEL) {
       args.push("--model", GEMINI_MODEL);
     }
 
     const child = spawn(GEMINI_CLI_PATH, args, {
       env: process.env,
-      stdio: ["pipe", "pipe", "pipe"],
+      stdio: ["ignore", "pipe", "pipe"],
     });
 
     let stdout = "";
@@ -222,16 +244,6 @@ function runGeminiCliPrompt(prompt) {
       finishWithSuccess(summary);
     });
 
-    child.stdin.on("error", (error) => {
-      const wrapped = new Error(
-        `Falha ao enviar prompt ao Gemini CLI: ${error?.message || "erro desconhecido"}`
-      );
-      wrapped.code = error?.code || "GEMINI_CLI_STDIN_ERROR";
-      wrapped.provider = "gemini-cli";
-      finishWithError(wrapped);
-    });
-
-    child.stdin.end(prompt);
   });
 }
 

@@ -165,6 +165,9 @@ Principais opcionais:
 - `NODE_ENV`
 - `GEMINI_CLI_PATH` (padrao `gemini`)
 - `GEMINI_MODEL` (usa o padrao do CLI quando vazio)
+- `GEMINI_TIMEOUT_MS` (padrao `90000`)
+- `GEMINI_APPROVAL_MODE` (padrao `plan`)
+- `GEMINI_DISABLE_EXTENSIONS` (padrao `true`)
 - `NEWS_SOURCE_IDS`
 - `MAX_ITEMS_PER_SOURCE`
 - `MAX_SITEMAPS_PER_SOURCE`
