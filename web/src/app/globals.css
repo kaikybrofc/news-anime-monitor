@@ -148,6 +148,8 @@
 
   .info-card {
     @apply relative h-full rounded-2xl border border-[#334155] bg-[#1e293b] p-6 shadow-sm transition-all hover:border-slate-500 hover:bg-[#232f46];
+    content-visibility: auto;
+    contain-intrinsic-size: 320px;
   }
 
   .warning-card {
@@ -200,6 +202,7 @@
   /* Article Card specific */
   .article-card {
     @apply flex flex-col gap-4 p-0 overflow-hidden;
+    contain: layout paint style;
   }
 
   .article-cover {

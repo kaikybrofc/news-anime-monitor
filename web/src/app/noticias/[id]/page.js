@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound as renderNotFound, permanentRedirect } from "next/navigation";
 import { fetchMonitor } from "@/lib/api";
 import { getArticleLifecycleBadges } from "@/lib/article-state";
@@ -531,11 +532,13 @@ export default async function NoticiaDetailPage(props) {
 
           {imageUrl && (
             <div className="relative aspect-video w-full overflow-hidden rounded-3xl border border-slate-800 shadow-2xl">
-              <img
+              <Image
                 src={imageUrl}
                 alt={title || "Imagem de destaque da notícia"}
+                fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1280px) 66vw, 800px"
                 className="h-full w-full object-cover"
-                fetchPriority="high"
+                priority
               />
             </div>
           )}
@@ -757,11 +760,13 @@ export default async function NoticiaDetailPage(props) {
                       <div className="flex gap-3">
                         {suggestedImage ? (
                           <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-slate-700">
-                            <img
+                            <Image
                               src={suggestedImage}
                               alt={suggestedTitle}
+                              width={80}
+                              height={56}
+                              sizes="80px"
                               className="h-full w-full object-cover"
-                              loading="lazy"
                             />
                           </div>
                         ) : (

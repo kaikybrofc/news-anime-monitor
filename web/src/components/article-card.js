@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { getArticleLifecycleBadges } from "@/lib/article-state";
 import {
   formatDateTime,
@@ -98,10 +99,12 @@ export function ArticleCard({ article }) {
     <article className="info-card article-card group">
       {imageUrl ? (
         <Link href={detailHref} className="article-cover" title="Abrir detalhes da notícia">
-          <img
+          <Image
             src={imageUrl}
             alt={title || "Imagem de capa da notícia"}
-            loading="lazy"
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+            className="object-cover"
           />
         </Link>
       ) : (
