@@ -95,7 +95,11 @@ function buildRestrictedArticle(candidate, permissionResult, seenAt) {
   });
 }
 
-async function processArticleCandidate(candidate, seenAt = new Date().toISOString()) {
+async function processArticleCandidate(
+  candidate,
+  seenAt = new Date().toISOString(),
+  options = {}
+) {
   const sourceTag = candidate.sourceName ? `[${candidate.sourceName}] ` : "";
   logger.info(`${sourceTag}Processando: ${candidate.name || candidate.url}`);
 
@@ -115,7 +119,9 @@ async function processArticleCandidate(candidate, seenAt = new Date().toISOStrin
   });
 
   const html = articlePageResponse.data;
-  const summary = await summarizeHtml(html);
+  const summary = await summarizeHtml(html, {
+    onAutoRetry: options.onSummaryRetry,
+  });
   const extractedImage = extractImageFromHtml(html);
   const image = candidate.image || extractedImage || "";
   const name = resolveArticleName(candidate, html);

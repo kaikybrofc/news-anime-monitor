@@ -13,6 +13,7 @@ function createSourceMetrics(source) {
     revisitedCount: 0,
     updatedCount: 0,
     parseErrorCount: 0,
+    summaryRetryCount: 0,
     emptyCategoryCount: 0,
     fetchRestrictedCount: 0,
     requiredScopeCategoryRejectCount: 0,
@@ -63,6 +64,7 @@ function createCycleMetrics() {
       revisitedCount: 0,
       updatedCount: 0,
       parseErrorCount: 0,
+      summaryRetryCount: 0,
       fetchRestrictedCount: 0,
       requiredScopeCategoryRejectCount: 0,
     },
@@ -96,6 +98,7 @@ function finishCycleMetrics(cycleMetrics) {
       acc.revisitedCount += run.revisitedCount;
       acc.updatedCount += run.updatedCount;
       acc.parseErrorCount += run.parseErrorCount;
+      acc.summaryRetryCount += run.summaryRetryCount;
       acc.fetchRestrictedCount += run.fetchRestrictedCount;
       acc.requiredScopeCategoryRejectCount += run.requiredScopeCategoryRejectCount;
       return acc;
@@ -109,6 +112,7 @@ function finishCycleMetrics(cycleMetrics) {
       revisitedCount: 0,
       updatedCount: 0,
       parseErrorCount: 0,
+      summaryRetryCount: 0,
       fetchRestrictedCount: 0,
       requiredScopeCategoryRejectCount: 0,
     }

@@ -28,6 +28,15 @@ const SUMMARY_LOG_TITLE_MAX_CHARS = toPositiveInt(
   process.env.SUMMARY_LOG_TITLE_MAX_CHARS,
   120
 );
+const SUMMARY_FAILURE_MAX_RETRIES = toPositiveInt(
+  process.env.SUMMARY_FAILURE_MAX_RETRIES,
+  2
+);
+const SUMMARY_FAILURE_RETRY_BASE_MS = toPositiveInt(
+  process.env.SUMMARY_FAILURE_RETRY_BASE_MS,
+  1500
+);
+const SUMMARY_GENERIC_ERROR_MESSAGE = "Ocorreu um erro durante o resumo.";
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -338,8 +347,40 @@ async function summarizeHtmlInternal(htmlContent) {
     }
 
     logger.error("[Resumo] Erro ao gerar resumo:", error.message || error);
-    return "Ocorreu um erro durante o resumo.";
+    return SUMMARY_GENERIC_ERROR_MESSAGE;
   }
+}
+
+async function summarizeHtmlWithAutoRetry(htmlContent, options = {}) {
+  const maxAttempts = Math.max(1, SUMMARY_FAILURE_MAX_RETRIES + 1);
+  let lastSummary = "";
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    lastSummary = await summarizeHtmlInternal(htmlContent);
+
+    if (lastSummary !== SUMMARY_GENERIC_ERROR_MESSAGE) {
+      return lastSummary;
+    }
+
+    if (attempt >= maxAttempts) {
+      break;
+    }
+
+    const delayMs = SUMMARY_FAILURE_RETRY_BASE_MS * 2 ** (attempt - 1);
+    logger.warn(
+      `[Resumo] Retentativa automática após falha geral (${attempt}/${maxAttempts - 1}). Nova tentativa em ${delayMs}ms...`
+    );
+    if (typeof options.onAutoRetry === "function") {
+      options.onAutoRetry({
+        retryAttempt: attempt,
+        retryMax: maxAttempts - 1,
+        delayMs,
+      });
+    }
+    await sleep(delayMs);
+  }
+
+  return lastSummary || SUMMARY_GENERIC_ERROR_MESSAGE;
 }
 
 /**
@@ -347,7 +388,7 @@ async function summarizeHtmlInternal(htmlContent) {
  * @param {string} htmlContent - O conteúdo HTML da página da notícia.
  * @returns {Promise<string>} O resumo da notícia.
  */
-function summarizeHtml(htmlContent) {
+function summarizeHtml(htmlContent, options = {}) {
   try {
     assertSummaryConfiguration();
   } catch (error) {
@@ -357,8 +398,8 @@ function summarizeHtml(htmlContent) {
   }
 
   iaQueue = iaQueue.then(
-    () => summarizeHtmlInternal(htmlContent),
-    () => summarizeHtmlInternal(htmlContent)
+    () => summarizeHtmlWithAutoRetry(htmlContent, options),
+    () => summarizeHtmlWithAutoRetry(htmlContent, options)
   );
 
   return iaQueue;

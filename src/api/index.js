@@ -2318,7 +2318,12 @@ async function checkPageForNews() {
 
     const newlyProcessed = await processWithConcurrency(
       candidatesToProcess,
-      (candidate) => processArticleCandidate(candidate, new Date().toISOString()),
+      (candidate) =>
+        processArticleCandidate(candidate, new Date().toISOString(), {
+          onSummaryRetry: () => {
+            sourceMetricsTracker.incrementSummaryRetry(candidate.sourceId, 1);
+          },
+        }),
       ARTICLE_PROCESS_CONCURRENCY
     );
 

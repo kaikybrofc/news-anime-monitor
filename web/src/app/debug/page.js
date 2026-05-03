@@ -297,6 +297,7 @@ export default async function DebugDashboardPage() {
                   <th className="px-2 py-2">Rejeitados</th>
                   <th className="px-2 py-2">Duplicados</th>
                   <th className="px-2 py-2">Erros parse</th>
+                  <th className="px-2 py-2">Retries resumo</th>
                   <th className="px-2 py-2">Duração</th>
                   <th className="px-2 py-2">Delta coleta</th>
                   <th className="px-2 py-2">Delta aceitos</th>
@@ -355,6 +356,9 @@ export default async function DebugDashboardPage() {
                           {formatNumber(current?.parseErrorCount || 0)}
                         </td>
                         <td className="px-2 py-3">
+                          {formatNumber(run?.summaryRetryCount || 0)}
+                        </td>
+                        <td className="px-2 py-3">
                           {formatMs(current?.durationMs || run?.durationMs || 0)}
                         </td>
                         <td className="px-2 py-3">
@@ -368,7 +372,7 @@ export default async function DebugDashboardPage() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={10} className="px-2 py-6 text-center text-slate-400">
+                    <td colSpan={11} className="px-2 py-6 text-center text-slate-400">
                       Sem dados de fonte disponíveis no momento.
                     </td>
                   </tr>
@@ -404,6 +408,10 @@ export default async function DebugDashboardPage() {
                 <div className="rounded-lg border border-slate-700 p-3">
                   <p className="text-xs uppercase tracking-wide text-slate-400">Atualizados</p>
                   <p className="mt-1 font-bold">{formatNumber(totals?.updatedCount || 0)}</p>
+                </div>
+                <div className="rounded-lg border border-slate-700 p-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-400">Retries resumo</p>
+                  <p className="mt-1 font-bold">{formatNumber(totals?.summaryRetryCount || 0)}</p>
                 </div>
               </div>
             </article>

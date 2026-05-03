@@ -37,6 +37,11 @@ function createSourceMetricsTracker(metricsList) {
         metrics.fetchRestrictedCount += count;
       });
     },
+    incrementSummaryRetry(sourceId, count = 1) {
+      updateSourceMetrics(sourceId, (metrics) => {
+        metrics.summaryRetryCount += count;
+      });
+    },
   };
 }
 
