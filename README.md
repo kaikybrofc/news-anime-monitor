@@ -1,6 +1,6 @@
 # News Anime Monitor
 
-![Version](https://img.shields.io/badge/version-1.0.3-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.4-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D20.18.1-brightgreen.svg)
 
@@ -26,6 +26,9 @@ O projeto possui duas camadas:
 - Persistência com MySQL (preferencial) e fallback JSON local.
 - Observabilidade por ciclo e por fonte em `/debug/sources`.
 - Frontend com páginas de notícias, tendências, fontes e franquias.
+- Workflow de deploy automatizado via GitHub Actions.
+- Healthcheck de SEO automatizado para páginas críticas.
+- Lint padronizado para API e frontend.
 
 ## Fontes suportadas
 
@@ -99,8 +102,8 @@ Filtros comuns em endpoints listados:
 
 App em `web/` com navegação:
 - `Home`
-- `Noticias`
-- `Tendencias`
+- `Notícias`
+- `Tendências`
 - `Franquias`
 - `Fontes`
 - `API`
@@ -152,6 +155,11 @@ cp .env.example .env
 - `npm run web:pm2:start` - sobe frontend no PM2 (`news-anime-web`).
 - `npm run web:pm2:restart` - reinicia frontend no PM2.
 - `npm run web:pm2:logs` - logs do frontend no PM2.
+- `npm run lint` - lint da API (`src/**/*.js`).
+- `npm run lint:fix` - lint da API com auto-fix.
+- `npm run web:lint` - lint do frontend (`web/`).
+- `npm run seo:check` - validação automatizada de SEO em produção.
+- `npm run web:deploy:safe` - build + restart + healthchecks de deploy.
 
 ## Variáveis de ambiente
 
@@ -247,6 +255,25 @@ server {
 }
 ```
 
+## Deploy automatizado (GitHub Actions)
+
+O projeto possui workflow em `.github/workflows/deploy.yml` com:
+1. validação (`npm ci`, lint API, lint web, build web, audit API);
+2. deploy remoto por SSH;
+3. execução do `npm run web:deploy:safe` no servidor.
+
+### Secrets necessários no GitHub
+
+- `DEPLOY_HOST`
+- `DEPLOY_USER`
+- `DEPLOY_PORT`
+- `DEPLOY_SSH_KEY`
+
+### Disparo
+
+- automático em push para `main`;
+- manual via `workflow_dispatch` no Actions.
+
 ## Estrutura de pastas
 
 ```txt
@@ -273,6 +300,8 @@ news-anime-monitor/
 - Frontend sem dados: configure `NEWS_MONITOR_API_URL` para a API correta.
 - MySQL não conecta: confira `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`.
 - ANN com restrição: configure `ANIMENEWSNETWORK_COOKIE` (ou `ANN_COOKIE`) e mantenha fallback guest.
+- Workflow falhou no deploy: valide os secrets `DEPLOY_*` e acesso SSH do host.
+- `npm run web:lint` com warnings de `<img>`: esperado no estado atual, não bloqueia build.
 
 ## Licença
 
