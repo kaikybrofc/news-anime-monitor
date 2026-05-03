@@ -128,3 +128,35 @@ export function summarizeText(value = "", maxLength = 220) {
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength - 1)}...`;
 }
+
+function stripMarkdown(value = "") {
+  return String(value || "")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1")
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, "$1")
+    .replace(/`{1,3}([^`]+)`{1,3}/g, "$1")
+    .replace(/^>\s+/gm, "")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^[-*+]\s+/gm, "")
+    .replace(/^\d+\.\s+/gm, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/_([^_]+)_/g, "$1")
+    .replace(/~~([^~]+)~~/g, "$1");
+}
+
+function stripEmoji(value = "") {
+  return String(value || "")
+    .replace(/\p{Extended_Pictographic}/gu, "")
+    .replace(/[\u{1F1E6}-\u{1F1FF}]/gu, "");
+}
+
+export function sanitizeSeoText(value = "") {
+  return stripEmoji(stripMarkdown(value))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function summarizeSeoText(value = "", maxLength = 220) {
+  return summarizeText(sanitizeSeoText(value), maxLength);
+}

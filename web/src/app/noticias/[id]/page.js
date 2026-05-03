@@ -12,6 +12,8 @@ import {
   getArticleUrl,
   isLikelyArticleId,
   summarizeText,
+  summarizeSeoText,
+  sanitizeSeoText,
 } from "@/lib/formatters";
 import { toAbsoluteSiteUrl } from "@/lib/site-url";
 import {
@@ -173,7 +175,7 @@ export async function generateMetadata(props) {
 
   const article = resolved.item;
   const title = getArticleTitle(article);
-  const description = summarizeText(article?.refined?.summary || "", 160);
+  const description = summarizeSeoText(article?.refined?.summary || "", 160);
   const canonicalPath = getArticleDetailPath(article);
   const imageUrl = getArticleImageUrl(article);
 
@@ -238,6 +240,7 @@ export default async function NoticiaDetailPage(props) {
   const sourceName = String(refined.sourceName || refined.sourceId || "fonte desconhecida");
   const imageUrl = getArticleImageUrl(article);
   const summary = String(refined.summary || "").trim();
+  const summaryForSeo = sanitizeSeoText(summary);
   const publishedAt = refined.publishedAt || article.publishedAt || article.timestamp;
   const lastSeenAt = refined.lastSeenAt || article.timestamp;
   const badges = getArticleLifecycleBadges(article);
@@ -261,7 +264,7 @@ export default async function NoticiaDetailPage(props) {
       "@type": "Organization",
       name: "Anime Radar",
     },
-    description: summary || undefined,
+    description: summaryForSeo || undefined,
     articleSection: refined.contentType || "news",
     isAccessibleForFree: true,
     inLanguage: "pt-BR",
@@ -281,6 +284,22 @@ export default async function NoticiaDetailPage(props) {
       };
     })
     .filter((section) => section.config && section.items.length);
+  let suggestedNews = [];
+  try {
+    const sourceId = String(refined.sourceId || "").trim();
+    if (sourceId) {
+      const suggestionsPayload = await fetchMonitor("/articles", {
+        source: sourceId,
+        limit: 8,
+        offset: 0,
+      });
+      suggestedNews = (suggestionsPayload?.items || [])
+        .filter((item) => String(item?.id || "") !== String(article?.id || ""))
+        .slice(0, 3);
+    }
+  } catch {
+    suggestedNews = [];
+  }
 
   if (rawArticleParam && canonicalPath.startsWith("/noticias/") && `/noticias/${rawArticleParam}` !== canonicalPath) {
     permanentRedirect(canonicalPath);
@@ -403,6 +422,66 @@ export default async function NoticiaDetailPage(props) {
               <p className="text-[11px] text-rose-400 leading-relaxed font-medium">
                 Este artigo foi processado e analisado automaticamente pela pipeline de dados do Anime Radar.
               </p>
+            </div>
+          </div>
+
+          <div className="info-card border-sky-500/20 bg-sky-500/5">
+            <h3 className="text-xs font-black uppercase tracking-[0.18em] text-sky-300">
+              Sugestões para você
+            </h3>
+            <p className="mt-2 text-xs text-slate-400">
+              Mais notícias da mesma fonte para continuar a leitura.
+            </p>
+            <div className="mt-4 flex flex-col gap-3">
+              {suggestedNews.length ? (
+                suggestedNews.map((item) => {
+                  const suggestedTitle = getArticleTitle(item);
+                  const suggestedPath = getArticleDetailPath(item);
+                  const suggestedSummary = summarizeText(
+                    item?.refined?.summary || "",
+                    90
+                  );
+                  const suggestedImage = getArticleImageUrl(item);
+                  return (
+                    <Link
+                      key={String(item?.id || suggestedPath)}
+                      href={suggestedPath}
+                      className="rounded-xl border border-slate-700 bg-slate-900/50 p-3 transition hover:border-sky-400/40 hover:bg-slate-900"
+                    >
+                      <div className="flex gap-3">
+                        {suggestedImage ? (
+                          <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-slate-700">
+                            <img
+                              src={suggestedImage}
+                              alt={suggestedTitle}
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                          </div>
+                        ) : (
+                          <div className="h-14 w-20 shrink-0 rounded-lg border border-slate-700 bg-slate-800/70 text-[10px] text-slate-500 flex items-center justify-center">
+                            Sem imagem
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-100 line-clamp-2">
+                            {renderInlineMarkdown(suggestedTitle)}
+                          </p>
+                          {suggestedSummary ? (
+                            <p className="mt-1 text-xs text-slate-400 line-clamp-2">
+                              {renderInlineMarkdown(suggestedSummary)}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })
+              ) : (
+                <p className="text-xs text-slate-500">
+                  Sem sugestões no momento.
+                </p>
+              )}
             </div>
           </div>
 
