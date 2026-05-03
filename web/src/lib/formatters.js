@@ -129,6 +129,21 @@ export function summarizeText(value = "", maxLength = 220) {
   return `${text.slice(0, maxLength - 1)}...`;
 }
 
+export function summarizeTextBySentence(value = "", maxLength = 220) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  if (text.length <= maxLength) return text;
+
+  const sliced = text.slice(0, maxLength);
+  const breakpoints = [sliced.lastIndexOf("."), sliced.lastIndexOf("!"), sliced.lastIndexOf("?")];
+  const best = Math.max(...breakpoints);
+  if (best >= Math.floor(maxLength * 0.55)) {
+    return sliced.slice(0, best + 1).trim();
+  }
+
+  return `${text.slice(0, maxLength - 1).trim()}...`;
+}
+
 function stripMarkdown(value = "") {
   return String(value || "")
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1")
@@ -148,15 +163,17 @@ function stripMarkdown(value = "") {
 function stripEmoji(value = "") {
   return String(value || "")
     .replace(/\p{Extended_Pictographic}/gu, "")
-    .replace(/[\u{1F1E6}-\u{1F1FF}]/gu, "");
+    .replace(/[\u{1F1E6}-\u{1F1FF}]/gu, "")
+    .replace(/[\uFE0F\u200D]/g, "");
 }
 
 export function sanitizeSeoText(value = "") {
   return stripEmoji(stripMarkdown(value))
     .replace(/\s+/g, " ")
+    .replace(/^aqui est[áa] o resumo da not[íi]cia:\s*/i, "")
     .trim();
 }
 
 export function summarizeSeoText(value = "", maxLength = 220) {
-  return summarizeText(sanitizeSeoText(value), maxLength);
+  return summarizeTextBySentence(sanitizeSeoText(value), maxLength);
 }

@@ -98,7 +98,11 @@ export function ArticleCard({ article }) {
     <article className="info-card article-card group">
       {imageUrl ? (
         <Link href={detailHref} className="article-cover" title="Abrir detalhes da notícia">
-          <img src={imageUrl} alt={title} loading="lazy" />
+          <img
+            src={imageUrl}
+            alt={title || "Imagem de capa da notícia"}
+            loading="lazy"
+          />
         </Link>
       ) : (
         <div className="article-cover flex items-center justify-center bg-slate-100 text-slate-400">

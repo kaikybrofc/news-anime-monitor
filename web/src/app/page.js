@@ -8,7 +8,10 @@ import { toAbsoluteSiteUrl } from "@/lib/site-url";
 export const metadata = {
   title: "Anime Radar | Inteligência em Notícias",
   description:
-    "Radar de notícias de anime com cobertura em tempo real, tendências por franquia e inteligência editorial por fonte.",
+    "Acompanhe notícias de anime em tempo real com contexto editorial, tendências por franquia e leitura guiada para fãs em 2026.",
+  alternates: {
+    canonical: "/",
+  },
 };
 
 export const dynamic = "force-dynamic";
@@ -58,11 +61,18 @@ export default async function HomePage() {
       })),
     },
   };
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Anime Radar",
+    url: toAbsoluteSiteUrl("/"),
+    logo: toAbsoluteSiteUrl("/brand/logo-64.png"),
+  };
 
   return (
     <div className="flex flex-col gap-16 md:gap-24">
       <script type="application/ld+json" suppressHydrationWarning>
-        {JSON.stringify([websiteSchema, collectionSchema])}
+        {JSON.stringify([websiteSchema, collectionSchema, organizationSchema])}
       </script>
 
       {/* Hero Section */}
@@ -73,7 +83,7 @@ export default async function HomePage() {
         <div className="flex flex-col gap-6 max-w-3xl">
           <span className="eyebrow animate-fade-in-up">Sistema de Monitoramento 24/7</span>
           <h1 className="!text-4xl md:!text-7xl font-black !leading-[1.1] tracking-tighter animate-fade-in-up delay-100">
-            Inteligência de <span className="text-rose-500">Notícias Anime</span> em tempo real.
+            Anime Radar: <span className="text-rose-500">Notícias de Anime</span> em tempo real.
           </h1>
           <p className="text-lg md:text-xl text-slate-400 max-w-2xl animate-fade-in-up delay-200">
             Acompanhe lançamentos, trailers e rumores processados por nossa pipeline. 

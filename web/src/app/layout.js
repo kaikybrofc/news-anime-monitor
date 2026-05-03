@@ -54,6 +54,10 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="pt-BR">
+      <head>
+        <link rel="preconnect" href="https://animenew.com.br" crossOrigin="" />
+        <link rel="preconnect" href="https://www.animenewsnetwork.com" crossOrigin="" />
+      </head>
       <body className={`${headingFont.variable} ${bodyFont.variable}`}>
         <SiteHeader />
         <main className="site-container main-content">{children}</main>

@@ -6,13 +6,34 @@ import { clampInt, fetchMonitor, readQueryInt, readQueryString } from "@/lib/api
 import { getArticleDetailPath, getArticleTitle } from "@/lib/formatters";
 import { toAbsoluteSiteUrl } from "@/lib/site-url";
 
-export const metadata = {
-  title: "Notícias | Anime Radar",
-  description: "Acompanhe as notícias de anime monitoradas em tempo real.",
-  alternates: {
-    canonical: "/noticias",
-  },
-};
+export async function generateMetadata(props) {
+  const resolvedProps = await props;
+  const searchParams = await resolvedProps?.searchParams;
+  const offset = clampInt(readQueryInt(searchParams, "offset", 0), 0, 100000, 0);
+  const limit = clampInt(readQueryInt(searchParams, "limit", 20), 1, 50, 20);
+  const q = readQueryString(searchParams, "q");
+  const source = readQueryString(searchParams, "source");
+  const bucket = readQueryString(searchParams, "bucket");
+
+  const canonicalQuery = new URLSearchParams();
+  if (offset > 0) canonicalQuery.set("offset", String(offset));
+  if (limit !== 20) canonicalQuery.set("limit", String(limit));
+  if (q) canonicalQuery.set("q", q);
+  if (source) canonicalQuery.set("source", source);
+  if (bucket) canonicalQuery.set("bucket", bucket);
+
+  const canonicalPath = canonicalQuery.size
+    ? `/noticias?${canonicalQuery.toString()}`
+    : "/noticias";
+
+  return {
+    title: offset > 0 ? `Notícias (Página ${Math.floor(offset / limit) + 1}) | Anime Radar` : "Notícias | Anime Radar",
+    description: "Acompanhe as notícias de anime monitoradas em tempo real.",
+    alternates: {
+      canonical: canonicalPath,
+    },
+  };
+}
 
 export const dynamic = "force-dynamic";
 

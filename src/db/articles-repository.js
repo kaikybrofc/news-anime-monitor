@@ -122,10 +122,21 @@ function toNumber(value, fallback = 0) {
 }
 
 function slugToName(slug = "") {
+  const acronymSet = new Set(["tv", "ova", "ona", "ii", "iii", "iv", "v", "vi", "ps5", "pc"]);
   return String(slug || "")
+    .replace(/[^a-z0-9-]/gi, "-")
+    .replace(/-+/g, "-")
     .split("-")
     .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .map((part) => {
+      const token = String(part || "").trim().toLowerCase();
+      if (!token) return "";
+      if (acronymSet.has(token)) return token.toUpperCase();
+      if (token === "captulo") return "Capítulo";
+      if (token === "noticias") return "Notícias";
+      return token.charAt(0).toUpperCase() + token.slice(1);
+    })
+    .filter(Boolean)
     .join(" ");
 }
 
