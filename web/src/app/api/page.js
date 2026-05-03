@@ -3,7 +3,7 @@ import Link from "next/link";
 export const metadata = {
   title: "API | OmniZap Anime Radar",
   description:
-    "Documentacao oficial da API do monitor de noticias de anime com endpoints, filtros e exemplos reais.",
+    "Documentação oficial da API do monitor de notícias de anime com endpoints, filtros e exemplos reais.",
 };
 
 const API_BASE_PROD = "https://omnizap.xyz/monitor-api";
@@ -13,7 +13,7 @@ const endpoints = [
   {
     method: "GET",
     path: "/",
-    desc: "Inventario bruto atual em memoria (debug rapido).",
+    desc: "Inventário bruto atual em memória (debug rápido).",
   },
   {
     method: "GET",
@@ -33,7 +33,7 @@ const endpoints = [
   {
     method: "GET",
     path: "/trends",
-    desc: "Tendencias por janela temporal (franquias, topicos e fontes).",
+    desc: "Tendências por janela temporal (franquias, tópicos e fontes).",
   },
   {
     method: "GET",
@@ -43,7 +43,7 @@ const endpoints = [
   {
     method: "GET",
     path: "/sources/:sourceId",
-    desc: "Detalhe de uma fonte com paginação e distribuicoes.",
+    desc: "Detalhe de uma fonte com paginação e distribuições.",
   },
   {
     method: "GET",
@@ -53,41 +53,41 @@ const endpoints = [
   {
     method: "GET",
     path: "/franchises/:slug",
-    desc: "Detalhe de franquia com artigos, distribuicao por fonte e tipo.",
+    desc: "Detalhe de franquia com artigos, distribuição por fonte e tipo.",
   },
   {
     method: "GET",
     path: "/seo/entities",
-    desc: "Agregacoes SEO por entidade (anime, personagem, estudio, tag).",
+    desc: "Agregações SEO por entidade (anime, personagem, estúdio, tag).",
   },
   {
     method: "GET",
     path: "/seo/:type/:slug",
-    desc: "Detalhe de uma entidade SEO especifica.",
+    desc: "Detalhe de uma entidade SEO específica.",
   },
   {
     method: "GET",
     path: "/debug/sources",
-    desc: "Metricas tecnicas do ultimo ciclo por fonte e inventario.",
+    desc: "Métricas técnicas do último ciclo por fonte e inventário.",
   },
 ];
 
 const queryParams = [
-  { key: "limit", desc: "Quantidade por pagina (padrao da API e maximo configuravel)." },
+  { key: "limit", desc: "Quantidade por página (padrão da API e máximo configurável)." },
   { key: "offset", desc: "Deslocamento para paginação." },
-  { key: "q", desc: "Busca textual (titulo, resumo, entidades e campos relacionados)." },
+  { key: "q", desc: "Busca textual (título, resumo, entidades e campos relacionados)." },
   { key: "source | sourceId", desc: "Filtra por ID da fonte (ex.: animenewsnetwork)." },
   { key: "bucket", desc: "Filtra por bucket: feed, home ou sitemap." },
-  { key: "contentType", desc: "Filtra por tipo de conteudo (news, brief, unknown)." },
+  { key: "contentType", desc: "Filtra por tipo de conteúdo (news, brief, unknown)." },
   { key: "lastSeenEvent", desc: "Filtra por evento de ciclo: new, revisited, updated, fetch_restricted." },
   { key: "from / to", desc: "Faixa temporal em formato de data ISO." },
   { key: "windowHours", desc: "Janela em horas para /trends, /sources e /franchises." },
-  { key: "top", desc: "Top N de agregados para rankings e tendencias." },
+  { key: "top", desc: "Top N de agregados para rankings e tendências." },
 ];
 
 const portalPages = [
-  { label: "Noticias", href: "/noticias", desc: "Feed editorial paginado." },
-  { label: "Tendencias", href: "/tendencias", desc: "Radar de destaque por janela." },
+  { label: "Notícias", href: "/noticias", desc: "Feed editorial paginado." },
+  { label: "Tendências", href: "/tendencias", desc: "Radar de destaque por janela." },
   { label: "Franquias", href: "/franquias", desc: "Hub por franquia detectada." },
   { label: "Fontes", href: "/fontes", desc: "Cobertura por source monitorada." },
 ];
@@ -98,11 +98,11 @@ export default function ApiPage() {
       <section className="flex flex-col gap-4">
         <div className="flex items-center gap-3">
           <div className="h-8 w-1 rounded-full bg-rose-500" />
-          <h1 className="!text-4xl">Documentacao da API</h1>
+          <h1 className="!text-4xl">Documentação da API</h1>
         </div>
         <p className="lead max-w-3xl text-slate-300">
-          Esta pagina reflete os endpoints reais do monitor. O frontend usa os mesmos contratos para
-          listar noticias, tendencias, franquias e fontes.
+          Esta página reflete os endpoints reais do monitor. O frontend usa os mesmos contratos para
+          listar notícias, tendências, franquias e fontes.
         </p>
       </section>
 
@@ -112,7 +112,7 @@ export default function ApiPage() {
             <h2 className="mb-3 text-xl font-bold text-slate-100">Base URL</h2>
             <div className="flex flex-col gap-2 text-sm text-slate-300">
               <p>
-                Producao (Nginx): <code>{API_BASE_PROD}</code>
+                Produção (Nginx): <code>{API_BASE_PROD}</code>
               </p>
               <p>
                 Local (API direta): <code>{API_BASE_LOCAL}</code>
@@ -121,7 +121,7 @@ export default function ApiPage() {
           </article>
 
           <article className="info-card !p-8 border-slate-800 bg-slate-900/40">
-            <h2 className="text-xl font-bold text-slate-100 mb-6">Endpoints disponiveis</h2>
+            <h2 className="text-xl font-bold text-slate-100 mb-6">Endpoints disponíveis</h2>
             <div className="flex flex-col gap-4">
               {endpoints.map((endpoint) => (
                 <div
@@ -143,7 +143,7 @@ export default function ApiPage() {
           </article>
 
           <article className="info-card !p-8">
-            <h2 className="text-xl font-bold text-slate-100 mb-6">Filtros e parametros</h2>
+            <h2 className="text-xl font-bold text-slate-100 mb-6">Filtros e parâmetros</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {queryParams.map((param) => (
                 <div key={param.key} className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
@@ -157,13 +157,13 @@ export default function ApiPage() {
           <article className="info-card !p-8">
             <h2 className="text-xl font-bold text-slate-100 mb-6">Exemplos reais (cURL)</h2>
             <div className="bg-slate-950 rounded-2xl p-6 font-mono text-sm overflow-x-auto border border-slate-800 shadow-2xl text-slate-300">
-              <pre>{`# 1) Noticias mais recentes
+              <pre>{`# 1) Notícias mais recentes
 curl -X GET "${API_BASE_PROD}/articles?limit=12&offset=0"
 
 # 2) Busca por termo + filtro de fonte
 curl -X GET "${API_BASE_PROD}/articles?q=one%20piece&source=animenewsnetwork&limit=20"
 
-# 3) Tendencias das ultimas 72 horas
+# 3) Tendências das últimas 72 horas
 curl -X GET "${API_BASE_PROD}/trends?windowHours=72&top=10"
 
 # 4) Detalhe por slug SEO
@@ -175,7 +175,7 @@ curl -X GET "${API_BASE_PROD}/articles/slug/japanese-animation-tv-ranking-march-
         <aside className="flex flex-col gap-6">
           <article className="info-card flex flex-col gap-6">
             <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 border-b border-slate-800 pb-2">
-              Informacoes tecnicas
+              Informações técnicas
             </h3>
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1">
@@ -183,8 +183,8 @@ curl -X GET "${API_BASE_PROD}/articles/slug/japanese-animation-tv-ranking-march-
                 <span className="text-sm font-semibold text-slate-200">JSON (UTF-8)</span>
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Autenticacao</span>
-                <span className="text-sm font-semibold text-slate-200">Publica (sem token)</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Autenticação</span>
+                <span className="text-sm font-semibold text-slate-200">Pública (sem token)</span>
               </div>
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-bold text-slate-500 uppercase">Status/Debug</span>
@@ -194,7 +194,7 @@ curl -X GET "${API_BASE_PROD}/articles/slug/japanese-animation-tv-ranking-march-
           </article>
 
           <article className="info-card bg-sky-500/5 border-sky-500/20">
-            <h3 className="text-sm font-bold text-sky-400 mb-2">Paginas do portal</h3>
+            <h3 className="text-sm font-bold text-sky-400 mb-2">Páginas do portal</h3>
             <p className="text-xs text-slate-400 leading-normal mb-4">
               Rotas corretas do frontend que consomem esta API:
             </p>
