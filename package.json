@@ -1,6 +1,6 @@
 {
   "name": "news-anime-monitor",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Monitor de noticias de anime com pipeline inteligente, API REST e frontend Next.js.",
   "main": "src/api/index.js",
   "scripts": {
@@ -17,7 +17,15 @@
     "web:pm2:restart": "pm2 restart news-anime-web",
     "web:pm2:logs": "pm2 logs news-anime-web --lines 200",
     "seo:check": "node src/scripts/seo-healthcheck.js",
-    "web:deploy:safe": "bash scripts/deploy-web-safe.sh"
+    "web:deploy:safe": "bash scripts/deploy-web-safe.sh",
+    "lint": "eslint \"src/**/*.js\"",
+    "lint:fix": "eslint \"src/**/*.js\" --fix",
+    "web:lint": "npm --prefix web run lint"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "eslint": "^9.39.1",
+    "globals": "^16.4.0"
   },
   "dependencies": {
     "axios": "^1.13.5",

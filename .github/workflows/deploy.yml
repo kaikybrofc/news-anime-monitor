@@ -27,8 +27,14 @@ jobs:
       - name: Install API deps
         run: npm ci
 
+      - name: Lint API
+        run: npm run lint
+
       - name: Install Web deps
         run: npm --prefix web ci
+
+      - name: Lint Web
+        run: npm --prefix web run lint
 
       - name: Build Web
         run: npm --prefix web run build

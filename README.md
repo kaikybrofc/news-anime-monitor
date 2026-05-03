@@ -5,41 +5,41 @@
 ![Node](https://img.shields.io/badge/node-%3E%3D20.18.1-brightgreen.svg)
 
 > [!WARNING]
-> Este projeto nao tem intencao de atacar, sobrecarregar ou prejudicar qualquer site.
-> As requisicoes sao feitas de forma nao agressiva, com limites, retries e boas praticas.
-> O uso e destinado a estudo, aprendizado e monitoramento tecnico.
+> Este projeto não tem intenção de atacar, sobrecarregar ou prejudicar qualquer site.
+> As requisições são feitas de forma não agressiva, com limites, retries e boas práticas.
+> O uso é destinado a estudo, aprendizado e monitoramento técnico.
 
-`News Anime Monitor` e um monitor de noticias de anime com pipeline modular de ingestao, filtros por fonte, enriquecimento semantico, dedupe em camadas, score de relevancia, historico de aparicao e API REST.
+`News Anime Monitor` é um monitor de notícias de anime com pipeline modular de ingestão, filtros por fonte, enriquecimento semântico, dedupe em camadas, score de relevância, histórico de aparição e API REST.
 
 O projeto possui duas camadas:
 - `API monitor` (Node.js + Express) para coleta/processamento e endpoints.
-- `Frontend` (Next.js em `web/`) para portal editorial e navegacao.
+- `Frontend` (Next.js em `web/`) para portal editorial e navegação.
 
 ## Funcionalidades
 
-- Monitoramento continuo com ciclo configuravel.
+- Monitoramento contínuo com ciclo configurável.
 - Suporte real a buckets `feed`, `home` e `sitemap` por fonte.
 - Regras por fonte em `SOURCE_DEFINITIONS` (autoridade de coleta/filtro).
 - Respeito a `robots.txt` com modo de descoberta e fetch restrito.
 - Enriquecimento de artigo com campos de pipeline (`bucket`, `sourceType`, `contentType`, `canonicalUrl`, `score`, `timesSeen`, etc).
-- Dedupe por `canonicalUrl`, `titleNormalized`, `contentHash` e reconciliacao com storage.
-- Persistencia com MySQL (preferencial) e fallback JSON local.
+- Dedupe por `canonicalUrl`, `titleNormalized`, `contentHash` e reconciliação com storage.
+- Persistência com MySQL (preferencial) e fallback JSON local.
 - Observabilidade por ciclo e por fonte em `/debug/sources`.
-- Frontend com paginas de noticias, tendencias, fontes e franquias.
+- Frontend com páginas de notícias, tendências, fontes e franquias.
 
 ## Fontes suportadas
 
-As fontes ativas no projeto sao:
+As fontes ativas no projeto são:
 - `animenew`
 - `animecorner`
 - `animenewsnetwork`
 
-Cada fonte preserva regras proprias de:
+Cada fonte preserva regras próprias de:
 - `collectionPriority`
 - `enableSitemap`
 - `excludedPathPrefixes`
-- `allowedPathPrefixes` (quando aplicavel)
-- `requiredFeedCategories` (quando aplicavel)
+- `allowedPathPrefixes` (quando aplicável)
+- `requiredFeedCategories` (quando aplicável)
 - `homeLinkSelectors`
 - `requestHeaders`/cookies (ANN)
 - `mergeBuckets`
@@ -49,13 +49,13 @@ Cada fonte preserva regras proprias de:
 
 Fluxo principal:
 1. Coleta bruta por fonte e bucket.
-2. Normalizacao de URL/campos.
+2. Normalização de URL/campos.
 3. Filtro por regras reais da fonte.
-4. Enriquecimento semantico.
-5. Dedupe/reconciliacao.
-6. Decisao de aceitacao/rejeicao.
-7. Persistencia.
-8. Metricas e exposicao via API.
+4. Enriquecimento semântico.
+5. Dedupe/reconciliação.
+6. Decisão de aceitação/rejeição.
+7. Persistência.
+8. Métricas e exposição via API.
 
 Modulos principais:
 - `src/pipeline/ingestion.js`
@@ -69,17 +69,17 @@ Modulos principais:
 
 ## Persistencia
 
-- MySQL e usado quando `DB_HOST`, `DB_USER` e `DB_NAME` estao definidos.
-- A tabela `articles` e criada automaticamente quando necessario.
-- Se MySQL nao estiver configurado, o sistema usa cache local em:
+- MySQL é usado quando `DB_HOST`, `DB_USER` e `DB_NAME` estão definidos.
+- A tabela `articles` é criada automaticamente quando necessário.
+- Se MySQL não estiver configurado, o sistema usa cache local em:
   - `src/data/processed_articles.json`
 
 ## API REST
 
-Base local padrao: `http://127.0.0.1:3000`
+Base local padrão: `http://127.0.0.1:3000`
 
 Endpoints principais:
-- `GET /` - inventario bruto atual em memoria.
+- `GET /` - inventário bruto atual em memória.
 - `GET /articles` - lista paginada com filtros.
 - `GET /articles/:id` - detalhe por id.
 - `GET /articles/slug/:slug` - detalhe por slug SEO.
@@ -90,14 +90,14 @@ Endpoints principais:
 - `GET /sources/:sourceId` - detalhe de uma fonte.
 - `GET /seo/entities` - agregados por entidades SEO.
 - `GET /seo/:type/:slug` - detalhe de entidade (`anime`, `character`, `studio`, `tag`).
-- `GET /debug/sources` - metricas internas do monitor.
+- `GET /debug/sources` - métricas internas do monitor.
 
 Filtros comuns em endpoints listados:
 - `limit`, `offset`, `q`, `source`, `bucket`, `contentType`, `lastSeenEvent`, `from`, `to`.
 
 ## Frontend (Next.js)
 
-App em `web/` com navegacao:
+App em `web/` com navegação:
 - `Home`
 - `Noticias`
 - `Tendencias`
@@ -116,20 +116,20 @@ Rotas editoriais principais:
 - `/fontes`
 - `/fontes/[sourceId]`
 
-## Instalacao
+## Instalação
 
-1. Clone o repositorio:
+1. Clone o repositório:
 ```bash
 git clone https://github.com/kaikybrofc/news-anime-monitor.git
 cd news-anime-monitor
 ```
 
-2. Instale dependencias da API:
+2. Instale dependências da API:
 ```bash
 npm install
 ```
 
-3. Instale dependencias do frontend:
+3. Instale dependências do frontend:
 ```bash
 npm --prefix web install
 ```
@@ -153,21 +153,21 @@ cp .env.example .env
 - `npm run web:pm2:restart` - reinicia frontend no PM2.
 - `npm run web:pm2:logs` - logs do frontend no PM2.
 
-## Variaveis de ambiente
+## Variáveis de ambiente
 
 ### API
 
-Obrigatorio:
+Obrigatório:
 - Gemini CLI instalado/autenticado no servidor
 
 Principais opcionais:
-- `PORT` (padrao `3000`)
+- `PORT` (padrão `3000`)
 - `NODE_ENV`
-- `GEMINI_CLI_PATH` (padrao `gemini`)
-- `GEMINI_MODEL` (usa o padrao do CLI quando vazio)
-- `GEMINI_TIMEOUT_MS` (padrao `90000`)
-- `GEMINI_APPROVAL_MODE` (padrao `plan`)
-- `GEMINI_DISABLE_EXTENSIONS` (padrao `true`)
+- `GEMINI_CLI_PATH` (padrão `gemini`)
+- `GEMINI_MODEL` (usa o padrão do CLI quando vazio)
+- `GEMINI_TIMEOUT_MS` (padrão `90000`)
+- `GEMINI_APPROVAL_MODE` (padrão `plan`)
+- `GEMINI_DISABLE_EXTENSIONS` (padrão `true`)
 - `NEWS_SOURCE_IDS`
 - `MAX_ITEMS_PER_SOURCE`
 - `MAX_SITEMAPS_PER_SOURCE`
@@ -198,7 +198,7 @@ Fallbacks aceitos no frontend:
 - `MONITOR_API_URL`
 - `API_BASE_URL`
 
-Se nada for definido, o frontend usa `http://127.0.0.1:3001` por padrao.
+Se nada for definido, o frontend usa `http://127.0.0.1:3001` por padrão.
 
 ## Deploy com PM2 + Nginx (exemplo)
 
@@ -266,14 +266,14 @@ news-anime-monitor/
 └── README.md
 ```
 
-## Troubleshooting rapido
+## Troubleshooting rápido
 
-- API nao sobe: valide `.env` e porta configurada.
-- Erro no Gemini CLI: confirme comando `gemini` disponivel e autenticado.
+- API não sobe: valide `.env` e porta configurada.
+- Erro no Gemini CLI: confirme comando `gemini` disponível e autenticado.
 - Frontend sem dados: configure `NEWS_MONITOR_API_URL` para a API correta.
-- MySQL nao conecta: confira `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`.
-- ANN com restricao: configure `ANIMENEWSNETWORK_COOKIE` (ou `ANN_COOKIE`) e mantenha fallback guest.
+- MySQL não conecta: confira `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`.
+- ANN com restrição: configure `ANIMENEWSNETWORK_COOKIE` (ou `ANN_COOKIE`) e mantenha fallback guest.
 
-## Licenca
+## Licença
 
-Projeto sob licenca MIT. Veja `LICENSE`.
+Projeto sob licença MIT. Veja `LICENSE`.
