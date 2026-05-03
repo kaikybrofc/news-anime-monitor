@@ -6,10 +6,15 @@ import { useEffect, useRef } from "react";
 import { MainNav } from "@/components/main-nav";
 
 export function SiteHeader() {
+  const HIDE_DISTANCE = 72;
+  const SHOW_DISTANCE = 44;
+  const MIN_TOGGLE_INTERVAL_MS = 220;
   const headerRef = useRef(null);
   const hiddenRef = useRef(false);
   const lastScrollYRef = useRef(0);
-  const upStepsRef = useRef(0);
+  const lastDirectionRef = useRef(0);
+  const scrollAccumulatorRef = useRef(0);
+  const lastToggleAtRef = useRef(0);
   const tickingRef = useRef(false);
 
   useEffect(() => {
@@ -19,21 +24,37 @@ export function SiteHeader() {
       const delta = currentY - previousY;
       lastScrollYRef.current = currentY;
 
-      if (Math.abs(delta) < 8) return false;
+      if (Math.abs(delta) < 4) return hiddenRef.current;
 
       if (currentY <= 20) {
-        upStepsRef.current = 0;
+        scrollAccumulatorRef.current = 0;
+        lastDirectionRef.current = 0;
         return false;
       }
 
-      if (delta > 0) {
-        upStepsRef.current = 0;
+      const direction = delta > 0 ? 1 : -1;
+      if (direction !== lastDirectionRef.current) {
+        lastDirectionRef.current = direction;
+        scrollAccumulatorRef.current = Math.abs(delta);
+      } else {
+        scrollAccumulatorRef.current += Math.abs(delta);
+      }
+
+      const now = Date.now();
+      const elapsedSinceToggle = now - lastToggleAtRef.current;
+      if (elapsedSinceToggle < MIN_TOGGLE_INTERVAL_MS) {
+        return hiddenRef.current;
+      }
+
+      if (!hiddenRef.current && direction > 0 && scrollAccumulatorRef.current >= HIDE_DISTANCE) {
+        scrollAccumulatorRef.current = 0;
+        lastToggleAtRef.current = now;
         return true;
       }
 
-      upStepsRef.current += 1;
-      if (upStepsRef.current >= 2) {
-        upStepsRef.current = 0;
+      if (hiddenRef.current && direction < 0 && scrollAccumulatorRef.current >= SHOW_DISTANCE) {
+        scrollAccumulatorRef.current = 0;
+        lastToggleAtRef.current = now;
         return false;
       }
 
