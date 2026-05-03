@@ -107,6 +107,136 @@ function renderMarkdownSummary(summary = "") {
   );
 }
 
+function dedupeSuggestions(items = [], currentId = "") {
+  const seen = new Set();
+  const out = [];
+  for (const item of items) {
+    const id = String(item?.id || "").trim();
+    const path = getArticleDetailPath(item);
+    const key = id || path;
+    if (!key || seen.has(key) || id === String(currentId || "")) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
+function isRankingArticle(title = "", summary = "") {
+  const text = `${String(title || "")} ${String(summary || "")}`.toLowerCase();
+  return (
+    /\btop\s*\d+\b/.test(text) ||
+    /\branking\b/.test(text) ||
+    /\bmais bem avaliados\b/.test(text) ||
+    /\bmelhores\b/.test(text) ||
+    /\blista\b/.test(text)
+  );
+}
+
+function buildRankingRows({
+  title = "",
+  entitySections = [],
+  suggestedNews = [],
+  max = 50,
+}) {
+  const rows = [];
+  const seen = new Set();
+
+  for (const section of entitySections) {
+    for (const item of section.items || []) {
+      const name = String(item?.name || "").trim();
+      const key = name.toLowerCase();
+      if (!name || seen.has(key)) continue;
+      seen.add(key);
+      rows.push({ name, source: `Entidade (${section.label})` });
+      if (rows.length >= max) return rows;
+    }
+  }
+
+  for (const item of suggestedNews) {
+    const name = String(getArticleTitle(item) || "").trim();
+    const key = name.toLowerCase();
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    rows.push({ name, source: "Notícia relacionada" });
+    if (rows.length >= max) return rows;
+  }
+
+  const baseTitle = String(title || "").replace(/\b(os|as|de|do|da|dos|das|mais|bem|avaliados|melhores)\b/gi, " ");
+  const tokens = baseTitle
+    .split(/[^a-zA-Z0-9À-ÿ]+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3);
+
+  for (const token of tokens) {
+    const key = token.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push({ name: token.charAt(0).toUpperCase() + token.slice(1), source: "Tema do ranking" });
+    if (rows.length >= max) break;
+  }
+
+  return rows;
+}
+
+function extractYear(text = "") {
+  const match = String(text || "").match(/\b(19|20)\d{2}\b/);
+  return match ? match[0] : "";
+}
+
+function extractMonthYear(text = "") {
+  const match = String(text || "").match(
+    /\b(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s+de\s+((?:19|20)\d{2})\b/i
+  );
+  return match ? `${match[1]} de ${match[2]}` : "";
+}
+
+function buildClickableMetaDescription({ title = "", summary = "", publishedAt = "" }) {
+  const cleanSummary = sanitizeSeoText(summary);
+  const cleanTitle = sanitizeSeoText(title);
+  const year = extractYear(cleanSummary) || String(new Date(publishedAt || Date.now()).getUTCFullYear());
+  const monthYear = extractMonthYear(cleanSummary);
+  const timeHint = monthYear || year;
+
+  if (!cleanSummary) {
+    return `Entenda o que mudou em ${cleanTitle} e por que essa notícia importa para fãs de anime em ${timeHint}.`;
+  }
+
+  const lead = summarizeSeoText(cleanSummary, 120);
+  return summarizeSeoText(
+    `${lead} Veja os dados-chave, a linha do tempo e o impacto para fãs em ${timeHint}.`,
+    160
+  );
+}
+
+function buildFactBlocks({ title = "", summary = "", sourceName = "", publishedAt = "", score = "" }) {
+  const cleanSummary = sanitizeSeoText(summary);
+  const monthYear = extractMonthYear(cleanSummary);
+  const year = extractYear(cleanSummary);
+  const publishLabel = formatDateTime(publishedAt);
+  const firstSentence =
+    cleanSummary.split(/(?<=[.!?])\s+/).find((chunk) => String(chunk || "").trim().length >= 40) ||
+    cleanSummary;
+
+  return {
+    keyFacts: [
+      `Tema central: ${title || "Atualização do cenário de anime"}.`,
+      `Fonte monitorada: ${sourceName || "Fonte editorial"}.`,
+      `Publicação acompanhada em: ${publishLabel}.`,
+      score ? `Score de relevância no radar: ${score}.` : "",
+    ].filter(Boolean),
+    timeline: [
+      monthYear ? `Período citado no conteúdo: ${monthYear}.` : "",
+      year ? `Referências temporais apontam eventos em ${year}.` : "",
+      `A notícia entrou no monitor em ${publishLabel}, com atualização contínua de contexto.`,
+    ].filter(Boolean),
+    fanImpact: [
+      firstSentence || "A atualização reforça interesse da comunidade.",
+      "Para fãs, o impacto está em acompanhar lançamentos, anúncios e mudanças de calendário com antecedência.",
+      "Para quem busca contexto rápido, os blocos desta página priorizam leitura escaneável e decisões de watchlist.",
+    ].filter(Boolean),
+  };
+}
+
 async function loadArticleById(articleId = "") {
   const parsedId = String(articleId || "").trim();
   if (!parsedId) return null;
@@ -175,7 +305,11 @@ export async function generateMetadata(props) {
 
   const article = resolved.item;
   const title = getArticleTitle(article);
-  const description = summarizeSeoText(article?.refined?.summary || "", 160);
+  const description = buildClickableMetaDescription({
+    title,
+    summary: article?.refined?.summary || "",
+    publishedAt: article?.refined?.publishedAt || article?.publishedAt || article?.timestamp,
+  });
   const canonicalPath = getArticleDetailPath(article);
   const imageUrl = getArticleImageUrl(article);
 
@@ -247,6 +381,13 @@ export default async function NoticiaDetailPage(props) {
   const score = formatNumber(refined.score || 0);
   const canonicalPath = getArticleDetailPath(article);
   const canonicalUrl = toAbsoluteSiteUrl(canonicalPath);
+  const factBlocks = buildFactBlocks({
+    title,
+    summary,
+    sourceName,
+    publishedAt,
+    score,
+  });
   const articleSchema = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
@@ -258,13 +399,18 @@ export default async function NoticiaDetailPage(props) {
     url: canonicalUrl,
     author: {
       "@type": "Organization",
-      name: sourceName,
+      name: "Anime Radar",
     },
     publisher: {
       "@type": "Organization",
       name: "Anime Radar",
+      logo: {
+        "@type": "ImageObject",
+        url: toAbsoluteSiteUrl("/brand/logo-64.png"),
+      },
     },
     description: summaryForSeo || undefined,
+    isBasedOn: sourceUrl || undefined,
     articleSection: refined.contentType || "news",
     isAccessibleForFree: true,
     inLanguage: "pt-BR",
@@ -284,22 +430,63 @@ export default async function NoticiaDetailPage(props) {
       };
     })
     .filter((section) => section.config && section.items.length);
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Home",
+        item: toAbsoluteSiteUrl("/"),
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Notícias",
+        item: toAbsoluteSiteUrl("/noticias"),
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: title,
+        item: canonicalUrl,
+      },
+    ],
+  };
   let suggestedNews = [];
   try {
     const sourceId = String(refined.sourceId || "").trim();
+    const topTag = String(
+      getArticleEntitiesByType(article, "tag")?.[0]?.slug || ""
+    ).trim();
+
+    const merged = [];
     if (sourceId) {
       const suggestionsPayload = await fetchMonitor("/articles", {
         source: sourceId,
-        limit: 8,
+        limit: 6,
         offset: 0,
       });
-      suggestedNews = (suggestionsPayload?.items || [])
-        .filter((item) => String(item?.id || "") !== String(article?.id || ""))
-        .slice(0, 3);
+      merged.push(...(suggestionsPayload?.items || []));
     }
+    if (topTag) {
+      const tagPayload = await fetchMonitor("/articles", {
+        q: topTag,
+        limit: 6,
+        offset: 0,
+      });
+      merged.push(...(tagPayload?.items || []));
+    }
+    suggestedNews = dedupeSuggestions(merged, article?.id).slice(0, 5);
   } catch {
     suggestedNews = [];
   }
+  const rankingTemplateEnabled = isRankingArticle(title, summary);
+  const rankingRows = rankingTemplateEnabled
+    ? buildRankingRows({ title, entitySections, suggestedNews, max: 50 })
+    : [];
+  const topHighlights = rankingRows.slice(0, 10);
 
   if (rawArticleParam && canonicalPath.startsWith("/noticias/") && `/noticias/${rawArticleParam}` !== canonicalPath) {
     permanentRedirect(canonicalPath);
@@ -309,6 +496,9 @@ export default async function NoticiaDetailPage(props) {
     <div className="flex flex-col gap-6 md:gap-10">
       <script type="application/ld+json" suppressHydrationWarning>
         {JSON.stringify(articleSchema)}
+      </script>
+      <script type="application/ld+json" suppressHydrationWarning>
+        {JSON.stringify(breadcrumbSchema)}
       </script>
 
       {/* Mobile Back Button */}
@@ -341,7 +531,12 @@ export default async function NoticiaDetailPage(props) {
 
           {imageUrl && (
             <div className="relative aspect-video w-full overflow-hidden rounded-3xl border border-slate-800 shadow-2xl">
-              <img src={imageUrl} alt={title} className="h-full w-full object-cover" />
+              <img
+                src={imageUrl}
+                alt={title || "Imagem de destaque da notícia"}
+                className="h-full w-full object-cover"
+                fetchPriority="high"
+              />
             </div>
           )}
 
@@ -357,6 +552,66 @@ export default async function NoticiaDetailPage(props) {
             ) : (
               <p className="text-slate-500 italic italic">Resumo indisponível para este artigo.</p>
             )}
+
+            <div className="flex flex-col gap-3">
+              <h2 className="text-lg font-bold text-slate-100">
+                Contexto e impacto da notícia
+              </h2>
+              <p className="text-slate-300">
+                Esta cobertura integra nosso monitor contínuo de{" "}
+                <Link href="/noticias" className="inline-link">
+                  notícias de anime
+                </Link>{" "}
+                com foco em lançamentos, franquias e temas em alta. Para ampliar a leitura,
+                acesse também as{" "}
+                <Link href="/tendencias" className="inline-link">
+                  tendências do mercado otaku
+                </Link>{" "}
+                e os hubs de{" "}
+                <Link href="/anime" className="inline-link">
+                  animes mais buscados
+                </Link>
+                .
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <h2 className="text-lg font-bold text-slate-100">Dados-chave</h2>
+              <ul className="list-disc pl-6 space-y-1 text-slate-300">
+                {factBlocks.keyFacts.map((item, index) => (
+                  <li key={`fact-key-${index}`}>{item}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <h2 className="text-lg font-bold text-slate-100">Linha do tempo</h2>
+              <ul className="list-disc pl-6 space-y-1 text-slate-300">
+                {factBlocks.timeline.map((item, index) => (
+                  <li key={`fact-time-${index}`}>{item}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <h2 className="text-lg font-bold text-slate-100">O que muda para fãs</h2>
+              <ul className="list-disc pl-6 space-y-1 text-slate-300">
+                {factBlocks.fanImpact.map((item, index) => (
+                  <li key={`fact-fans-${index}`}>{item}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <h2 className="text-lg font-bold text-slate-100">
+                Termos relacionados para busca
+              </h2>
+              <p className="text-slate-300">
+                Este conteúdo também atende buscas como <strong>ranking de animes 2026</strong>,{" "}
+                <strong>melhores animes do MyAnimeList</strong> e <strong>top animes populares</strong>,
+                conectando esta notícia a outros conteúdos relevantes dentro do Anime Radar.
+              </p>
+            </div>
 
             {entitySections.length > 0 && (
               <div className="flex flex-col gap-3">
@@ -374,6 +629,57 @@ export default async function NoticiaDetailPage(props) {
                         {section.label}: {item.name}
                       </Link>
                     ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {rankingTemplateEnabled && (
+              <div className="flex flex-col gap-5">
+                <div className="flex flex-col gap-3">
+                  <h2 className="text-lg font-bold text-slate-100">
+                    Top 10 destaques do ranking
+                  </h2>
+                  <p className="text-slate-300">
+                    Recorte rápido para quem busca <strong>ranking de animes 2026</strong>,{" "}
+                    <strong>melhores animes no MyAnimeList</strong> e termos similares.
+                  </p>
+                  {topHighlights.length ? (
+                    <ol className="list-decimal pl-6 space-y-1 text-slate-200">
+                      {topHighlights.map((row, index) => (
+                        <li key={`rank-top-${index}`}>
+                          <span>{row.name}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className="text-slate-500">Sem dados suficientes para gerar o top 10.</p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <h2 className="text-lg font-bold text-slate-100">
+                    Lista completa do ranking (até 50 itens)
+                  </h2>
+                  <p className="text-slate-300">
+                    Estrutura editorial para leitura escaneável. Esta lista é atualizada de forma contínua
+                    conforme novas menções e sinais de relevância entram no monitor.
+                  </p>
+                  {rankingRows.length ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {rankingRows.map((row, index) => (
+                        <div
+                          key={`rank-row-${index}`}
+                          className="rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2 text-sm text-slate-200"
+                        >
+                          <span className="font-semibold text-rose-300">{index + 1}.</span>{" "}
+                          <span>{row.name}</span>
+                          <span className="ml-2 text-[11px] text-slate-500">({row.source})</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-slate-500">Sem dados suficientes para montar a lista completa.</p>
                   )}
                 </div>
               </div>
@@ -420,7 +726,7 @@ export default async function NoticiaDetailPage(props) {
 
             <div className="p-4 bg-rose-500/5 border border-rose-500/10 rounded-2xl">
               <p className="text-[11px] text-rose-400 leading-relaxed font-medium">
-                Este artigo foi processado e analisado automaticamente pela pipeline de dados do Anime Radar.
+                Curadoria do Anime Radar com apoio de automação para acelerar cobertura, organizar entidades e destacar temas de maior relevância.
               </p>
             </div>
           </div>
