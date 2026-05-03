@@ -1,0 +1,61 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install API deps
+        run: npm ci
+
+      - name: Install Web deps
+        run: npm --prefix web ci
+
+      - name: Build Web
+        run: npm --prefix web run build
+
+      - name: Security Audit (API)
+        run: npm audit --audit-level=high
+
+  deploy:
+    name: Deploy to Server
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd /root/news-anime-monitor
+            git fetch origin main
+            git checkout main
+            git reset --hard origin/main
+            npm ci
+            npm --prefix web ci
+            npm run web:deploy:safe
