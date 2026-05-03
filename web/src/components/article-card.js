@@ -10,12 +10,84 @@ import {
   summarizeText,
 } from "@/lib/formatters";
 
+function renderInlineMarkdown(text = "") {
+  const source = String(text || "");
+  if (!source) return source;
+
+  const parts = [];
+  const pattern = /\*\*(.+?)\*\*|\*(.+?)\*/g;
+  let cursor = 0;
+  let match;
+  let index = 0;
+
+  while ((match = pattern.exec(source)) !== null) {
+    const start = match.index;
+    const end = pattern.lastIndex;
+
+    if (start > cursor) {
+      parts.push(
+        <span key={`md-text-${index}`}>{source.slice(cursor, start)}</span>
+      );
+      index += 1;
+    }
+
+    if (match[1]) {
+      parts.push(<strong key={`md-bold-${index}`}>{match[1]}</strong>);
+      index += 1;
+    } else if (match[2]) {
+      parts.push(<em key={`md-italic-${index}`}>{match[2]}</em>);
+      index += 1;
+    }
+
+    cursor = end;
+  }
+
+  if (cursor < source.length) {
+    parts.push(<span key={`md-tail-${index}`}>{source.slice(cursor)}</span>);
+  }
+
+  return parts.length ? parts : source;
+}
+
+function renderSummaryMarkdown(summary = "") {
+  const text = String(summary || "").trim();
+  if (!text) return null;
+
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const hasList = lines.some((line) => /^[-*]\s+/.test(line));
+  if (!hasList) {
+    return renderInlineMarkdown(text.replace(/\n+/g, " "));
+  }
+
+  const items = lines
+    .filter((line) => /^[-*]\s+/.test(line))
+    .map((line) => line.replace(/^[-*]\s+/, "").trim())
+    .filter(Boolean);
+
+  if (!items.length) {
+    return renderInlineMarkdown(text.replace(/\n+/g, " "));
+  }
+
+  return (
+    <ul className="list-disc pl-5 space-y-1">
+      {items.map((item, index) => (
+        <li key={`md-li-${index}`}>{renderInlineMarkdown(item)}</li>
+      ))}
+    </ul>
+  );
+}
+
 export function ArticleCard({ article }) {
   const refined = article?.refined || {};
   const title = getArticleTitle(article);
   const url = getArticleUrl(article);
   const imageUrl = getArticleImageUrl(article);
-  const summary = summarizeText(refined.summary || "", 100);
+  const rawSummary = String(refined.summary || "").trim();
+  const summaryForClamp = summarizeText(rawSummary, 220);
   const lifecycleBadges = getArticleLifecycleBadges(article);
   const sourceName = String(refined.sourceName || refined.sourceId || "fonte desconhecida");
   const publishedAt = refined.publishedAt || article.publishedAt || article.timestamp;
@@ -53,9 +125,9 @@ export function ArticleCard({ article }) {
           </Link>
         </div>
 
-        {summary ? (
+        {summaryForClamp ? (
           <p className="article-summary text-sm text-slate-500 line-clamp-3 leading-relaxed">
-            {summary}
+            {renderSummaryMarkdown(summaryForClamp)}
           </p>
         ) : null}
 

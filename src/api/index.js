@@ -16,6 +16,9 @@ const {
   processWithConcurrency,
 } = require("../services/article-processor.js");
 const {
+  SUMMARY_GENERIC_ERROR_MESSAGE,
+} = require("../services/summarizer.js");
+const {
   createSourceMetricsTracker,
   applyTopicTrendScores,
   buildInventoryMetrics,
@@ -496,6 +499,55 @@ function normalizeSearchText(value) {
   return normalizeToAscii(String(value || "")).toLowerCase().trim();
 }
 
+function normalizeSummaryText(value) {
+  return String(value || "").trim();
+}
+
+function isSummaryErrorText(value) {
+  const summary = normalizeSummaryText(value);
+  if (!summary) return false;
+  return summary.toLowerCase() === SUMMARY_GENERIC_ERROR_MESSAGE.toLowerCase();
+}
+
+function hasVisibleSummary(article) {
+  const summary = normalizeSummaryText(article?.refined?.summary);
+  if (!summary) return false;
+  return !isSummaryErrorText(summary);
+}
+
+function buildReprocessCandidateFromArticle(article) {
+  const refined = article?.refined || {};
+  const url = String(refined.url || "").trim();
+  const canonicalUrl = String(refined.canonicalUrl || url).trim();
+  if (!url) return null;
+  if (!isSummaryErrorText(refined.summary)) return null;
+
+  return {
+    name: refined.name || article?.name || canonicalUrl,
+    url,
+    canonicalUrl,
+    domain: refined.domain || "",
+    pathname: refined.pathname || "",
+    sourceId: refined.sourceId || "",
+    sourceName: refined.sourceName || "",
+    sourceType: refined.sourceType || "unknown",
+    bucket: refined.bucket || "unknown",
+    categories: Array.isArray(refined.categories) ? refined.categories.slice(0, 30) : [],
+    categoriesNormalized: Array.isArray(refined.categoriesNormalized)
+      ? refined.categoriesNormalized.slice(0, 30)
+      : [],
+    titleNormalized: refined.titleNormalized || refined.name || "",
+    publishedAt: refined.publishedAt || article?.publishedAt || article?.timestamp || "",
+    firstSeenAt: refined.firstSeenAt || article?.timestamp || "",
+    image: refined.image || "",
+    sourceConfig: SOURCE_DEFINITIONS[refined.sourceId] || null,
+    ingestionMeta: {
+      ...(refined.ingestionMeta || {}),
+      reprocessSummary: true,
+    },
+  };
+}
+
 function articleMatchesTextQuery(article, queryText = "") {
   const normalizedQuery = normalizeSearchText(queryText);
   if (!normalizedQuery) {
@@ -635,6 +687,10 @@ function normalizeOffset(value) {
 function filterArticlesInMemory(articles, filters) {
   return articles.filter((article) => {
     const refined = article?.refined || {};
+
+    if (!hasVisibleSummary(article)) {
+      return false;
+    }
 
     if (filters.q && !articleMatchesTextQuery(article, filters.q)) {
       return false;
@@ -1594,6 +1650,7 @@ app.get("/articles/slug/:slug", async (req, res) => {
     const allArticles = await loadAllArticlesForContract();
     const matches = allArticles
       .filter((article) => {
+        if (!hasVisibleSummary(article)) return false;
         const refined = article?.refined || {};
         const candidateSlug = normalizeQueryText(
           refined.newsSlug || buildArticleNewsSlug(article)
@@ -1644,7 +1701,7 @@ app.get("/articles/:id", async (req, res) => {
 
     if (USE_MYSQL) {
       const found = await loadArticleById(articleId);
-      if (!found) {
+      if (!found || !hasVisibleSummary(found)) {
         return res.status(404).json({
           error: "Artigo não encontrado.",
         });
@@ -1656,7 +1713,7 @@ app.get("/articles/:id", async (req, res) => {
     }
 
     const found = processedArticles.find((article) => article.id === articleId);
-    if (!found) {
+    if (!found || !hasVisibleSummary(found)) {
       return res.status(404).json({
         error: "Artigo não encontrado.",
       });
@@ -2230,7 +2287,12 @@ async function checkPageForNews() {
 
     const sourceMetricsTracker = createSourceMetricsTracker(cycleMetrics.sourceRuns);
 
-    if (!collectedCandidates.length) {
+    const pendingReprocessCandidates = processedArticles
+      .map((article) => buildReprocessCandidateFromArticle(article))
+      .filter(Boolean)
+      .sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
+
+    if (!collectedCandidates.length && !pendingReprocessCandidates.length) {
       logger.warn("Nenhuma notícia encontrada em nenhuma fonte.");
       return;
     }
@@ -2291,7 +2353,7 @@ async function checkPageForNews() {
       newCandidates.push(candidate);
     }
 
-    if (!newCandidates.length) {
+    if (!newCandidates.length && !pendingReprocessCandidates.length) {
       if (touchedExisting) {
         rebuildKnownArticleUrls();
         await saveArticlesToStorage();
@@ -2301,11 +2363,40 @@ async function checkPageForNews() {
       return;
     }
 
-    const candidatesToProcess = newCandidates.slice(0, MAX_NEW_ARTICLES_PER_CYCLE);
+    const maxCandidatesByCycle = MAX_NEW_ARTICLES_PER_CYCLE;
+    const priorityReprocess = pendingReprocessCandidates.slice(
+      0,
+      maxCandidatesByCycle
+    );
+    const remainingCapacity = Math.max(
+      0,
+      maxCandidatesByCycle - priorityReprocess.length
+    );
+    const newCandidatesToProcess = newCandidates.slice(0, remainingCapacity);
+    const candidatesToProcess = [];
+    const queuedUrls = new Set();
+    [...priorityReprocess, ...newCandidatesToProcess].forEach((candidate) => {
+      const key = String(candidate?.canonicalUrl || candidate?.url || "").trim();
+      if (!key || queuedUrls.has(key)) return;
+      queuedUrls.add(key);
+      candidatesToProcess.push(candidate);
+    });
 
-    if (newCandidates.length > candidatesToProcess.length) {
+    if (newCandidates.length > newCandidatesToProcess.length) {
       logger.warn(
-        `[Monitor] ${newCandidates.length} notícia(s) nova(s) encontradas. Processando ${candidatesToProcess.length} neste ciclo para controlar custo.`
+        `[Monitor] ${newCandidates.length} notícia(s) nova(s) encontradas. Processando ${newCandidatesToProcess.length} neste ciclo para controlar custo.`
+      );
+    }
+
+    if (pendingReprocessCandidates.length > priorityReprocess.length) {
+      logger.warn(
+        `[Monitor] ${pendingReprocessCandidates.length} notícia(s) pendente(s) para reprocessar resumo. Priorizando ${priorityReprocess.length} neste ciclo.`
+      );
+    }
+
+    if (priorityReprocess.length) {
+      logger.info(
+        `[Monitor] Reprocessamento prioritário de resumo: ${priorityReprocess.length} item(ns) antes de novas notícias.`
       );
     }
 

@@ -422,4 +422,8 @@ async function summarizeUrl(url, options = {}) {
   return summarizeHtml(response.data);
 }
 
-module.exports = { summarizeHtml, summarizeUrl };
+module.exports = {
+  summarizeHtml,
+  summarizeUrl,
+  SUMMARY_GENERIC_ERROR_MESSAGE,
+};

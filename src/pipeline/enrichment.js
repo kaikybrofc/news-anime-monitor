@@ -397,10 +397,13 @@ function bumpArticleSeen(existingArticle, candidate, reason, seenAt) {
   const candidateContentVersionHash =
     computedCandidateContentVersionHash ||
     String(candidate?.contentVersionHash || "");
+  const currentSummary = normalizeText(base.refined.summary || "");
+  const summaryChanged = Boolean(candidateSummary) && candidateSummary !== currentSummary;
   const contentChanged =
     shouldDetectRevision &&
-    candidateContentVersionHash &&
-    candidateContentVersionHash !== existingContentVersionHash;
+    ((candidateContentVersionHash &&
+      candidateContentVersionHash !== existingContentVersionHash) ||
+      summaryChanged);
 
   const mergedCategories = mergeUniqueStrings(
     base.refined.categories,

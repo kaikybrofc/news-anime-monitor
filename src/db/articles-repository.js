@@ -317,6 +317,19 @@ async function queryArticles(params = {}) {
 
   const where = [];
   const values = [];
+  const summaryError = String(
+    params.summaryErrorMessage || "Ocorreu um erro durante o resumo."
+  )
+    .trim()
+    .toLowerCase();
+
+  where.push(
+    "TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(refined_json, '$.summary')), '')) <> ''"
+  );
+  where.push(
+    "LOWER(TRIM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(refined_json, '$.summary')), ''))) <> ?"
+  );
+  values.push(summaryError);
 
   if (sourceId) {
     where.push("source_id = ?");

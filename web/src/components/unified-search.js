@@ -22,6 +22,45 @@ function getTypeTone(type = "") {
   return "bg-emerald-950/30 border border-emerald-700/40 text-emerald-300";
 }
 
+function renderInlineMarkdown(text = "") {
+  const source = String(text || "");
+  if (!source) return source;
+
+  const parts = [];
+  const pattern = /\*\*(.+?)\*\*|\*(.+?)\*/g;
+  let cursor = 0;
+  let match;
+  let index = 0;
+
+  while ((match = pattern.exec(source)) !== null) {
+    const start = match.index;
+    const end = pattern.lastIndex;
+
+    if (start > cursor) {
+      parts.push(
+        <span key={`md-text-${index}`}>{source.slice(cursor, start)}</span>
+      );
+      index += 1;
+    }
+
+    if (match[1]) {
+      parts.push(<strong key={`md-bold-${index}`}>{match[1]}</strong>);
+      index += 1;
+    } else if (match[2]) {
+      parts.push(<em key={`md-italic-${index}`}>{match[2]}</em>);
+      index += 1;
+    }
+
+    cursor = end;
+  }
+
+  if (cursor < source.length) {
+    parts.push(<span key={`md-tail-${index}`}>{source.slice(cursor)}</span>);
+  }
+
+  return parts.length ? parts : source;
+}
+
 export function UnifiedSearch({
   initialQuery = "",
   placeholder = "Buscar notícia, franquia ou fonte...",
@@ -251,12 +290,12 @@ export function UnifiedSearch({
                           {TYPE_LABEL[item.type] || "Resultado"}
                         </span>
                         <span className="line-clamp-1 text-sm font-semibold text-slate-100">
-                          {item.title}
+                          {renderInlineMarkdown(item.title)}
                         </span>
                       </div>
                       {item.subtitle ? (
                         <span className="line-clamp-1 text-xs text-slate-400">
-                          {item.subtitle}
+                          {renderInlineMarkdown(item.subtitle)}
                         </span>
                       ) : null}
                     </button>
