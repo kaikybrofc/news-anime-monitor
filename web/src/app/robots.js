@@ -8,6 +8,14 @@ function getSiteUrl() {
   return stripTrailingSlash(process.env.NEXT_PUBLIC_SITE_URL || DEFAULT_SITE_URL);
 }
 
+function getHost(siteUrl) {
+  try {
+    return new URL(siteUrl).hostname;
+  } catch {
+    return String(siteUrl || "").replace(/^https?:\/\//i, "");
+  }
+}
+
 export default function robots() {
   const siteUrl = getSiteUrl();
 
@@ -20,6 +28,6 @@ export default function robots() {
       },
     ],
     sitemap: `${siteUrl}/sitemap.xml`,
-    host: siteUrl,
+    host: getHost(siteUrl),
   };
 }

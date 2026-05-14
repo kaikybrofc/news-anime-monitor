@@ -2,6 +2,7 @@ import { fetchMonitor as fetchMonitorApi } from "@/lib/api";
 
 const DEFAULT_SITE_URL = "https://omnizap.xyz";
 const PAGE_LIMIT = 200;
+const DEFAULT_LASTMOD_ISO = process.env.SITEMAP_DEFAULT_LASTMOD || "";
 
 function stripTrailingSlash(value = "") {
   return String(value || "").replace(/\/+$/, "");
@@ -9,6 +10,13 @@ function stripTrailingSlash(value = "") {
 
 function getSiteUrl() {
   return stripTrailingSlash(process.env.NEXT_PUBLIC_SITE_URL || DEFAULT_SITE_URL);
+}
+
+function normalizeIsoDate(value) {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toISOString();
 }
 
 async function fetchAllArticlePaths() {
@@ -29,7 +37,7 @@ async function fetchAllArticlePaths() {
       if (!newsSlug) continue;
       paths.push({
         path: `/noticias/${newsSlug}`,
-        lastModified: refined.lastSeenAt || item.timestamp || new Date().toISOString(),
+        lastModified: normalizeIsoDate(refined.lastSeenAt || item.timestamp),
       });
     }
 
@@ -52,29 +60,29 @@ async function fetchEntityPaths(type, routeBase) {
   return items
     .map((item) => ({
       path: `${routeBase}/${item.slug}`,
-      lastModified: item.lastSeenAt || new Date().toISOString(),
+      lastModified: normalizeIsoDate(item.lastSeenAt),
     }))
     .filter((item) => item.path && item.path.includes("/"));
 }
 
 export default async function sitemap() {
   const siteUrl = getSiteUrl();
-  const nowIso = new Date().toISOString();
+  const fallbackIso = normalizeIsoDate(DEFAULT_LASTMOD_ISO);
   const entries = [
-    { path: "/", lastModified: nowIso },
-    { path: "/noticias", lastModified: nowIso },
-    { path: "/tendencias", lastModified: nowIso },
-    { path: "/franquias", lastModified: nowIso },
-    { path: "/fontes", lastModified: nowIso },
-    { path: "/anime", lastModified: nowIso },
-    { path: "/personagem", lastModified: nowIso },
-    { path: "/estudio", lastModified: nowIso },
-    { path: "/tag", lastModified: nowIso },
-    { path: "/api", lastModified: nowIso },
-    { path: "/sobre", lastModified: nowIso },
-    { path: "/privacidade", lastModified: nowIso },
-    { path: "/termos", lastModified: nowIso },
-    { path: "/contato", lastModified: nowIso },
+    { path: "/", lastModified: fallbackIso },
+    { path: "/noticias", lastModified: fallbackIso },
+    { path: "/tendencias", lastModified: fallbackIso },
+    { path: "/franquias", lastModified: fallbackIso },
+    { path: "/fontes", lastModified: fallbackIso },
+    { path: "/anime", lastModified: fallbackIso },
+    { path: "/personagem", lastModified: fallbackIso },
+    { path: "/estudio", lastModified: fallbackIso },
+    { path: "/tag", lastModified: fallbackIso },
+    { path: "/api", lastModified: fallbackIso },
+    { path: "/sobre", lastModified: fallbackIso },
+    { path: "/privacidade", lastModified: fallbackIso },
+    { path: "/termos", lastModified: fallbackIso },
+    { path: "/contato", lastModified: fallbackIso },
   ];
 
   try {
@@ -95,13 +103,20 @@ export default async function sitemap() {
   const deduped = new Map();
   for (const entry of entries) {
     if (!entry?.path) continue;
-    deduped.set(entry.path, entry.lastModified || nowIso);
+    deduped.set(entry.path, normalizeIsoDate(entry.lastModified));
   }
 
-  return Array.from(deduped.entries()).map(([path, lastModified]) => ({
-    url: `${siteUrl}${path}`,
-    lastModified,
-    changeFrequency: path.startsWith("/noticias/") ? "hourly" : "daily",
-    priority: path === "/" ? 1 : 0.7,
-  }));
+  return Array.from(deduped.entries()).map(([path, lastModified]) => {
+    const item = {
+      url: `${siteUrl}${path}`,
+      changeFrequency: path.startsWith("/noticias/") ? "hourly" : "daily",
+      priority: path === "/" ? 1 : 0.7,
+    };
+
+    if (lastModified) {
+      item.lastModified = lastModified;
+    }
+
+    return item;
+  });
 }
