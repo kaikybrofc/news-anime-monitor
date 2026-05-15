@@ -10,6 +10,7 @@
 > O uso é destinado a estudo, aprendizado e monitoramento técnico.
 
 `News Anime Monitor` é um monitor de notícias de anime com pipeline modular de ingestão, filtros por fonte, enriquecimento semântico, dedupe em camadas, score de relevância, histórico de aparição e API REST.
+Além da coleta, o projeto atua como um radar editorial inteligente para classificar relevância, tendência e persistência de tópicos.
 
 O projeto possui duas camadas:
 - `API monitor` (Node.js + Express) para coleta/processamento e endpoints.
@@ -26,7 +27,8 @@ O projeto possui duas camadas:
 - Persistência com MySQL (preferencial) e fallback JSON local.
 - Observabilidade por ciclo e por fonte em `/debug/sources`.
 - Frontend com páginas de notícias, tendências, fontes e franquias.
-- Workflow de deploy automatizado via GitHub Actions.
+- Sumário editorial orientado a contexto e neutralidade (Gemini CLI).
+- Score composto com sinais de qualidade, importância, tendência e velocidade (`velocityScore`).
 - Healthcheck de SEO automatizado para páginas críticas.
 - Lint padronizado para API e frontend.
 
@@ -36,6 +38,14 @@ As fontes ativas no projeto são:
 - `animenew`
 - `animecorner`
 - `animenewsnetwork`
+- `crunchyrollnews`
+- `myanimelist`
+- `anitrendz`
+- `otakuusa`
+- `animeherald`
+- `animeuknews`
+- `otakunews`
+- `siliconera`
 
 Cada fonte preserva regras próprias de:
 - `collectionPriority`
@@ -255,24 +265,10 @@ server {
 }
 ```
 
-## Deploy automatizado (GitHub Actions)
+## CI (GitHub Actions)
 
-O projeto possui workflow em `.github/workflows/deploy.yml` com:
-1. validação (`npm ci`, lint API, lint web, build web, audit API);
-2. deploy remoto por SSH;
-3. execução do `npm run web:deploy:safe` no servidor.
-
-### Secrets necessários no GitHub
-
-- `DEPLOY_HOST`
-- `DEPLOY_USER`
-- `DEPLOY_PORT`
-- `DEPLOY_SSH_KEY`
-
-### Disparo
-
-- automático em push para `main`;
-- manual via `workflow_dispatch` no Actions.
+Atualmente o repositório mantém workflow de revisão de dependências (`dependency-review.yml`).
+O deploy em VPS via GitHub Actions foi removido e o fluxo recomendado é deploy manual/operacional via PM2 + Nginx.
 
 ## Estrutura de pastas
 
@@ -300,7 +296,7 @@ news-anime-monitor/
 - Frontend sem dados: configure `NEWS_MONITOR_API_URL` para a API correta.
 - MySQL não conecta: confira `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`.
 - ANN com restrição: configure `ANIMENEWSNETWORK_COOKIE` (ou `ANN_COOKIE`) e mantenha fallback guest.
-- Workflow falhou no deploy: valide os secrets `DEPLOY_*` e acesso SSH do host.
+- Deploy: use os scripts PM2 locais e valide logs após restart.
 - `npm run web:lint` com warnings de `<img>`: esperado no estado atual, não bloqueia build.
 
 ## Licença
