@@ -2,6 +2,7 @@ const { hasDbConfig, getPool, pingDatabase } = require("./mysql.js");
 
 const CANDIDATE_TABLE = "candidate_sources";
 const VALIDATED_TABLE = "validated_candidates";
+const KEYWORD_DISCOVERY_TABLE = "keyword_discovery_jobs";
 
 function quoteIdentifier(name) {
   return `\`${String(name || "").replace(/`/g, "``")}\``;
@@ -46,6 +47,24 @@ async function ensureCandidateValidationTables() {
       PRIMARY KEY (id),
       UNIQUE KEY uniq_domain (domain),
       KEY idx_last_seen (last_seen_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS ${quoteIdentifier(KEYWORD_DISCOVERY_TABLE)} (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      query_text VARCHAR(255) NOT NULL,
+      language VARCHAR(16) NOT NULL DEFAULT 'en',
+      search_engine VARCHAR(32) NOT NULL DEFAULT 'brave',
+      domains_found INT NOT NULL DEFAULT 0,
+      new_candidates INT NOT NULL DEFAULT 0,
+      results_json JSON NOT NULL,
+      ran_at DATETIME(3) NOT NULL,
+      created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+      updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+      PRIMARY KEY (id),
+      KEY idx_query_ran_at (query_text, ran_at),
+      KEY idx_ran_at (ran_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
 
@@ -114,6 +133,32 @@ async function saveDiscoveredCandidates(candidates = [], discoveredAt = new Date
   );
 }
 
+async function saveKeywordDiscoveryJobs(jobs = [], ranAt = new Date().toISOString()) {
+  if (!Array.isArray(jobs) || !jobs.length) return;
+  const db = getPool();
+
+  const rows = jobs
+    .map((job) => [
+      String(job.query || ""),
+      String(job.language || "en"),
+      String(job.searchEngine || "brave"),
+      Math.max(0, Math.floor(toNumber(job.domainsFound, 0))),
+      Math.max(0, Math.floor(toNumber(job.newCandidates, 0))),
+      JSON.stringify(Array.isArray(job.results) ? job.results : []),
+      toSqlDate(job.lastRunAt || ranAt),
+    ])
+    .filter((row) => row[0]);
+
+  if (!rows.length) return;
+
+  await db.query(
+    `INSERT INTO ${quoteIdentifier(KEYWORD_DISCOVERY_TABLE)} (
+      query_text, language, search_engine, domains_found, new_candidates, results_json, ran_at
+    ) VALUES ?`,
+    [rows]
+  );
+}
+
 async function saveValidatedCandidates(items = [], validatedAt = new Date().toISOString()) {
   if (!Array.isArray(items) || !items.length) return;
   const db = getPool();
@@ -174,4 +219,5 @@ module.exports = {
   ensureCandidateValidationTables,
   saveDiscoveredCandidates,
   saveValidatedCandidates,
+  saveKeywordDiscoveryJobs,
 };

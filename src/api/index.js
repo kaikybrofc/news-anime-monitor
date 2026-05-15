@@ -32,6 +32,7 @@ const {
   discoverSourceCandidates,
 } = require("../services/source-discovery.js");
 const { validateCandidates } = require("../services/candidate-validation.js");
+const { runKeywordDiscovery } = require("../services/keyword-discovery.js");
 
 const { collectItemsFromSource } = require("../pipeline/ingestion.js");
 const { normalizeCollectedItems } = require("../pipeline/normalization.js");
@@ -71,6 +72,7 @@ const {
 const {
   ensureCandidateValidationTables,
   saveDiscoveredCandidates,
+  saveKeywordDiscoveryJobs,
   saveValidatedCandidates,
 } = require("../db/candidate-sources-repository.js");
 const { hasDbConfig } = require("../db/mysql.js");
@@ -80,6 +82,17 @@ function parseCommaSeparatedList(value = "") {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function buildKnownDomainsSet() {
+  const set = new Set();
+  Object.values(SOURCE_DEFINITIONS).forEach((source) => {
+    (source?.domains || []).forEach((domain) => {
+      const normalized = String(domain || "").trim().toLowerCase().replace(/^www\./, "");
+      if (normalized) set.add(normalized);
+    });
+  });
+  return set;
 }
 
 function toPositiveNumber(value, fallback) {
@@ -2409,6 +2422,74 @@ app.get(
       );
       return res.status(500).json({
         error: "Falha na validação de candidatos.",
+      });
+    }
+  }
+);
+
+app.get(
+  "/debug/source-candidates/active-discovery",
+  debugRateLimiter,
+  requireDebugAccess,
+  async (req, res) => {
+    try {
+      const topRaw = Number(req.query.top);
+      const thresholdRaw = Number(req.query.threshold);
+      const top = Number.isFinite(topRaw) ? Math.max(1, Math.floor(topRaw)) : 80;
+      const threshold = Number.isFinite(thresholdRaw)
+        ? Math.max(1, Math.min(100, Math.floor(thresholdRaw)))
+        : 75;
+      const allArticles = await loadAllArticlesForContract();
+
+      const keywordDiscovery = await runKeywordDiscovery({
+        articles: allArticles.slice(0, 40),
+        knownDomains: buildKnownDomainsSet(),
+        topPerQuery: Math.min(20, top),
+      });
+
+      const discovered = keywordDiscovery.candidates.slice(0, top);
+      const validated = await validateCandidates(discovered, {
+        approvalThreshold: threshold,
+      });
+
+      if (USE_MYSQL) {
+        if (keywordDiscovery.jobs.length) {
+          await saveKeywordDiscoveryJobs(keywordDiscovery.jobs);
+        }
+        if (discovered.length) {
+          await saveDiscoveredCandidates(discovered);
+        }
+        if (validated.length) {
+          await saveValidatedCandidates(validated);
+        }
+      }
+
+      return res.json({
+        generatedAt: new Date().toISOString(),
+        discoveryMode: "keyword_search",
+        jobs: {
+          total: keywordDiscovery.jobs.length,
+          succeeded: keywordDiscovery.jobs.filter((job) => job.ok).length,
+          failed: keywordDiscovery.jobs.filter((job) => !job.ok).length,
+          items: keywordDiscovery.jobs,
+        },
+        candidates: {
+          total: discovered.length,
+        },
+        validation: {
+          total: validated.length,
+          threshold,
+          approved: validated.filter((item) => item.status === "validated").length,
+        },
+        items: validated,
+      });
+    } catch (error) {
+      logger.error(
+        "[API:/debug/source-candidates/active-discovery] Falha na descoberta ativa:",
+        error
+      );
+      return res.status(500).json({
+        error: "Falha na descoberta ativa de candidatos.",
       });
     }
   }
