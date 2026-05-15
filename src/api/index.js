@@ -28,6 +28,9 @@ const {
 const {
   createObservabilityTracker,
 } = require("../services/observability-alerts.js");
+const {
+  discoverSourceCandidates,
+} = require("../services/source-discovery.js");
 
 const { collectItemsFromSource } = require("../pipeline/ingestion.js");
 const { normalizeCollectedItems } = require("../pipeline/normalization.js");
@@ -113,7 +116,7 @@ const HOST = process.env.HOST || "127.0.0.1";
 const USE_MYSQL = hasDbConfig();
 const CORS_ALLOWED_ORIGINS = parseCommaSeparatedList(
   process.env.CORS_ALLOWED_ORIGINS ||
-    "https://omnizap.xyz,https://www.omnizap.xyz,http://localhost:3010,http://127.0.0.1:3010"
+    "https://animeradar.shop,https://www.animeradar.shop,https://omnizap.xyz,https://www.omnizap.xyz,http://localhost:3010,http://127.0.0.1:3010"
 );
 const RATE_LIMIT_WINDOW_MS = toPositiveInt(
   process.env.RATE_LIMIT_WINDOW_MS,
@@ -2245,6 +2248,47 @@ app.get("/debug/sources", debugRateLimiter, requireDebugAccess, (_req, res) => {
 app.get("/debug/alerts", debugRateLimiter, requireDebugAccess, (_req, res) => {
   res.json(observabilityTracker.getSnapshot());
 });
+
+app.get(
+  "/debug/source-candidates",
+  debugRateLimiter,
+  requireDebugAccess,
+  async (req, res) => {
+    try {
+      const minConfidenceRaw = Number(req.query.minConfidence);
+      const topRaw = Number(req.query.top);
+      const minConfidence = Number.isFinite(minConfidenceRaw)
+        ? Math.max(0, Math.min(1, minConfidenceRaw))
+        : 0.35;
+      const top = Number.isFinite(topRaw) ? Math.max(1, Math.floor(topRaw)) : 100;
+      const allArticles = await loadAllArticlesForContract();
+
+      const items = discoverSourceCandidates(allArticles, SOURCE_DEFINITIONS, {
+        minConfidence,
+        top,
+      });
+
+      return res.json({
+        generatedAt: new Date().toISOString(),
+        totalArticlesScanned: allArticles.length,
+        candidates: items.length,
+        filters: {
+          minConfidence,
+          top,
+        },
+        items,
+      });
+    } catch (error) {
+      logger.error(
+        "[API:/debug/source-candidates] Falha ao descobrir domínios candidatos:",
+        error
+      );
+      return res.status(500).json({
+        error: "Falha ao descobrir domínios candidatos.",
+      });
+    }
+  }
+);
 
 async function checkPageForNews() {
   if (isCheckingNews) {

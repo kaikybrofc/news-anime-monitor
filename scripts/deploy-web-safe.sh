@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WEB_DIR="$ROOT_DIR/web"
-DOMAIN_URL="${DEPLOY_DOMAIN_URL:-https://omnizap.xyz}"
+DOMAIN_URL="${DEPLOY_DOMAIN_URL:-https://animeradar.shop}"
 LOCAL_URL="${DEPLOY_LOCAL_URL:-http://127.0.0.1:3010}"
 
 echo "[deploy] build do frontend"

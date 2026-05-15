@@ -1,6 +1,6 @@
 import { fetchMonitor as fetchMonitorApi } from "@/lib/api";
 
-const DEFAULT_SITE_URL = "https://omnizap.xyz";
+const DEFAULT_SITE_URL = "https://animeradar.shop";
 const PAGE_LIMIT = 200;
 const DEFAULT_LASTMOD_ISO = process.env.SITEMAP_DEFAULT_LASTMOD || "";
 

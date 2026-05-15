@@ -47,7 +47,7 @@ export default async function DebugLoginPage({ searchParams }) {
         ) : null}
         {isNotConfigured ? (
           <p className="text-sm text-rose-400">
-            Senha não configurada. Defina <code>DEBUG_DASHBOARD_PASSWORD</code> no <code>.env</code>.
+            Acesso temporariamente indisponível. Credencial de debug não configurada.
           </p>
         ) : null}
 

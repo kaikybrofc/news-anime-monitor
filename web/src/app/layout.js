@@ -17,9 +17,9 @@ const bodyFont = Inter({
 
 function resolveMetadataBase() {
   try {
-    return new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://omnizap.xyz");
+    return new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://animeradar.shop");
   } catch {
-    return new URL("https://omnizap.xyz");
+    return new URL("https://animeradar.shop");
   }
 }
 

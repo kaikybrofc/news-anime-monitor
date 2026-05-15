@@ -9,7 +9,7 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-const API_BASE_PROD = "https://omnizap.xyz/monitor-api";
+const API_BASE_PROD = "https://animeradar.shop/monitor-api";
 const API_BASE_LOCAL = "http://127.0.0.1:3000";
 
 const queryParams = [

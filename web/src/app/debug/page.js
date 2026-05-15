@@ -58,6 +58,16 @@ function severityTone(severity = "") {
     : "text-amber-300 border-amber-700/50 bg-amber-950/30";
 }
 
+function sanitizeDebugMessage(message = "") {
+  const text = String(message || "").trim();
+  if (!text) return "";
+  const redacted = text
+    .replace(/debug[_-]?(dashboard|sources|api)?[_-]?(password|secret|token)/gi, "[oculto]")
+    .replace(/x-debug-token/gi, "[oculto]")
+    .replace(/[A-Fa-f0-9]{32,}/g, "[oculto]");
+  return redacted;
+}
+
 export default async function DebugDashboardPage() {
   const authenticated = await isDebugSessionAuthenticated();
   if (!authenticated) {
@@ -74,7 +84,7 @@ export default async function DebugDashboardPage() {
       fetchDebugMonitor("/debug/alerts"),
     ]);
   } catch (error) {
-    errorMessage = error.message;
+    errorMessage = sanitizeDebugMessage(error.message);
   }
 
   const observability =

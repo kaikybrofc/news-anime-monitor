@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const TARGET = process.env.SEO_TARGET || "https://omnizap.xyz";
+const TARGET = process.env.SEO_TARGET || "https://animeradar.shop";
 const NEWS_PATH = process.env.SEO_NEWS_PATH || "/noticias";
 
 async function fetchText(url) {

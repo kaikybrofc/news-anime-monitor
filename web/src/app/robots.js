@@ -1,4 +1,4 @@
-const DEFAULT_SITE_URL = "https://omnizap.xyz";
+const DEFAULT_SITE_URL = "https://animeradar.shop";
 
 function stripTrailingSlash(value = "") {
   return String(value || "").replace(/\/+$/, "");

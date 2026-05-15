@@ -13,7 +13,7 @@ function normalizeBaseUrl(value = "") {
 export function getSiteBaseUrl() {
   const normalized = normalizeBaseUrl(process.env.NEXT_PUBLIC_SITE_URL);
   if (normalized) return normalized;
-  return "https://omnizap.xyz";
+  return "https://animeradar.shop";
 }
 
 export function toAbsoluteSiteUrl(pathname = "/") {
