@@ -4,7 +4,29 @@ import { Pagination } from "@/components/pagination";
 import { clampInt, fetchMonitor, readQueryInt, readQueryString } from "@/lib/api";
 import { formatNumber } from "@/lib/formatters";
 
-const VALID_SOURCE_IDS = new Set(["animenew", "animecorner", "animenewsnetwork"]);
+const VALID_SOURCE_IDS = new Set([
+  "animenew",
+  "animecorner",
+  "animenewsnetwork",
+  "crunchyrollnews",
+  "myanimelist",
+  "anitrendz",
+  "otakuusa",
+  "animeherald",
+  "animeuknews",
+  "otakunews",
+  "siliconera",
+  "gematsu",
+  "nintendolife",
+  "pcgamer",
+  "eurogamer",
+  "rockpapershotgun",
+  "igngames",
+  "gamespot",
+  "aftermath",
+  "kakuchopurei",
+  "kongbakpao",
+]);
 
 export async function generateMetadata(props) {
   const resolvedProps = await props;
