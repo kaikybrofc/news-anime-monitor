@@ -31,10 +31,12 @@ const {
 const {
   discoverSourceCandidates,
 } = require("../services/source-discovery.js");
+const { validateCandidates } = require("../services/candidate-validation.js");
 
 const { collectItemsFromSource } = require("../pipeline/ingestion.js");
 const { normalizeCollectedItems } = require("../pipeline/normalization.js");
 const { filterItemsBySource } = require("../pipeline/filtering.js");
+const { normalizeArticleUrl } = require("../utils/url-normalization.js");
 const {
   dedupeCandidates,
   buildExistingArticleIndex,
@@ -62,6 +64,15 @@ const {
   queryTrendSnapshot,
   saveAllArticlesSnapshot,
 } = require("../db/articles-repository.js");
+const {
+  ensureExtractorItemsTable,
+  saveExtractedItemsSnapshot,
+} = require("../db/extractor-items-repository.js");
+const {
+  ensureCandidateValidationTables,
+  saveDiscoveredCandidates,
+  saveValidatedCandidates,
+} = require("../db/candidate-sources-repository.js");
 const { hasDbConfig } = require("../db/mysql.js");
 
 function parseCommaSeparatedList(value = "") {
@@ -1538,6 +1549,8 @@ async function loadArticlesFromStorage() {
 
     if (USE_MYSQL) {
       await ensureDatabaseAndTable();
+      await ensureExtractorItemsTable();
+      await ensureCandidateValidationTables();
       const dbArticles = await loadAllArticles();
 
       if (dbArticles.length) {
@@ -1618,6 +1631,45 @@ async function saveArticlesToStorage() {
 
 app.get("/", (_req, res) => {
   res.json(processedArticles);
+});
+
+app.get("/domain", (req, res) => {
+  const rawUrl = String(req.query.url || "").trim();
+  const baseUrl = String(req.query.baseUrl || "").trim();
+
+  if (!rawUrl) {
+    return res.status(400).json({
+      ok: false,
+      error: "Parâmetro url é obrigatório.",
+    });
+  }
+
+  const normalized = normalizeArticleUrl(rawUrl, {
+    baseUrl: baseUrl || undefined,
+  });
+
+  if (!normalized) {
+    return res.status(400).json({
+      ok: false,
+      error: "URL inválida ou protocolo não suportado.",
+      input: {
+        url: rawUrl,
+        baseUrl: baseUrl || null,
+      },
+    });
+  }
+
+  return res.json({
+    ok: true,
+    input: {
+      url: rawUrl,
+      baseUrl: baseUrl || null,
+    },
+    domain: normalized.hostname,
+    normalizedUrl: normalized.url,
+    origin: normalized.origin,
+    pathname: normalized.pathname,
+  });
 });
 
 app.get("/articles", async (req, res) => {
@@ -2268,6 +2320,10 @@ app.get(
         top,
       });
 
+      if (USE_MYSQL && items.length) {
+        await saveDiscoveredCandidates(items);
+      }
+
       return res.json({
         generatedAt: new Date().toISOString(),
         totalArticlesScanned: allArticles.length,
@@ -2285,6 +2341,74 @@ app.get(
       );
       return res.status(500).json({
         error: "Falha ao descobrir domínios candidatos.",
+      });
+    }
+  }
+);
+
+app.get(
+  "/debug/source-candidates/validate",
+  debugRateLimiter,
+  requireDebugAccess,
+  async (req, res) => {
+    try {
+      const minConfidenceRaw = Number(req.query.minConfidence);
+      const topRaw = Number(req.query.top);
+      const thresholdRaw = Number(req.query.threshold);
+      const minConfidence = Number.isFinite(minConfidenceRaw)
+        ? Math.max(0, Math.min(1, minConfidenceRaw))
+        : 0.35;
+      const top = Number.isFinite(topRaw) ? Math.max(1, Math.floor(topRaw)) : 30;
+      const threshold = Number.isFinite(thresholdRaw)
+        ? Math.max(1, Math.min(100, Math.floor(thresholdRaw)))
+        : 75;
+      const allArticles = await loadAllArticlesForContract();
+
+      const discovered = discoverSourceCandidates(allArticles, SOURCE_DEFINITIONS, {
+        minConfidence,
+        top,
+      });
+      const validated = await validateCandidates(discovered, {
+        approvalThreshold: threshold,
+      });
+
+      if (USE_MYSQL) {
+        if (discovered.length) await saveDiscoveredCandidates(discovered);
+        if (validated.length) await saveValidatedCandidates(validated);
+      }
+
+      const approved = validated.filter((item) => item.status === "validated");
+      const rejected = validated.length - approved.length;
+
+      return res.json({
+        generatedAt: new Date().toISOString(),
+        totalArticlesScanned: allArticles.length,
+        discovery: {
+          candidates: discovered.length,
+          minConfidence,
+          top,
+        },
+        validation: {
+          total: validated.length,
+          threshold,
+          approved: approved.length,
+          rejected,
+        },
+        sandboxReady: approved.map((item) => ({
+          domain: item.domain,
+          validationScore: item.validationScore,
+          sandboxStatus: item.sandboxStatus,
+          sandboxDays: item.sandboxDays,
+        })),
+        items: validated,
+      });
+    } catch (error) {
+      logger.error(
+        "[API:/debug/source-candidates/validate] Falha na validação de candidatos:",
+        error
+      );
+      return res.status(500).json({
+        error: "Falha na validação de candidatos.",
       });
     }
   }
@@ -2308,6 +2432,8 @@ async function checkPageForNews() {
 
   try {
     logger.info("Verificando as fontes de notícias...");
+    const extractionRunId = crypto.randomBytes(12).toString("hex");
+    const extractionSeenAt = new Date().toISOString();
 
     const collectedCandidates = [];
 
@@ -2322,6 +2448,23 @@ async function checkPageForNews() {
           maxSitemapsPerSource: MAX_SITEMAPS_PER_SOURCE,
           metrics: sourceMetrics,
         });
+
+        if (USE_MYSQL && rawItems.length) {
+          try {
+            await saveExtractedItemsSnapshot(rawItems, {
+              runId: extractionRunId,
+              extractedAt: extractionSeenAt,
+              sourceId: source.id,
+              sourceName: source.name,
+            });
+          } catch (error) {
+            logger.warn(
+              `[Fonte:${source.name}] Falha ao persistir dados do extrator: ${
+                error?.message || error
+              }`
+            );
+          }
+        }
 
         const normalizedItems = normalizeCollectedItems(rawItems, source);
         const { accepted } = filterItemsBySource(
