@@ -7,7 +7,7 @@ export function SiteFooter() {
     <footer className="site-footer">
       <div className="site-container footer-inner">
         <div className="flex flex-col gap-2">
-          <p className="font-bold text-[#0f172a]">OmniZap Anime Radar</p>
+          <p className="font-bold">OmniZap Anime Radar</p>
           <p className="max-w-xs text-xs">
             Monitor de notícias e tendências de anime com inteligência de pipeline.
           </p>

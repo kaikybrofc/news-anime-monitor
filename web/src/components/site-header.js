@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useRef } from "react";
 import { MainNav } from "@/components/main-nav";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function SiteHeader() {
   const HIDE_DISTANCE = 72;
@@ -98,7 +99,10 @@ export function SiteHeader() {
             <span>Anime Radar</span>
           </Link>
         </div>
-        <MainNav />
+        <div className="flex items-center gap-2 self-stretch md:self-auto">
+          <MainNav />
+          <ThemeToggle />
+        </div>
       </div>
     </header>
   );

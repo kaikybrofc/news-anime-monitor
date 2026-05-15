@@ -55,6 +55,11 @@ export default function RootLayout({ children }) {
   return (
     <html lang="pt-BR">
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var key='anime-radar-theme';var saved=localStorage.getItem(key);var theme=(saved==='light'||saved==='dark')?saved:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',theme);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`,
+          }}
+        />
         <link rel="preconnect" href="https://animenew.com.br" crossOrigin="" />
         <link rel="preconnect" href="https://www.animenewsnetwork.com" crossOrigin="" />
       </head>

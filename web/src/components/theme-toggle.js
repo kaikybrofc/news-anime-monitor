@@ -1,0 +1,50 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+const STORAGE_KEY = "anime-radar-theme";
+
+function getPreferredTheme() {
+  if (typeof window === "undefined") return "dark";
+  const saved = window.localStorage.getItem(STORAGE_KEY);
+  if (saved === "light" || saved === "dark") return saved;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
+
+function applyTheme(theme) {
+  if (typeof document === "undefined") return;
+  document.documentElement.setAttribute("data-theme", theme);
+}
+
+export function ThemeToggle() {
+  const [theme, setTheme] = useState("dark");
+
+  useEffect(() => {
+    const initial = getPreferredTheme();
+    setTheme(initial);
+    applyTheme(initial);
+  }, []);
+
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    applyTheme(next);
+    window.localStorage.setItem(STORAGE_KEY, next);
+  }
+
+  const isDark = theme === "dark";
+
+  return (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      className="theme-toggle"
+      aria-label={isDark ? "Ativar tema claro" : "Ativar tema escuro"}
+      title={isDark ? "Ativar tema claro" : "Ativar tema escuro"}
+    >
+      <span aria-hidden>{isDark ? "☀️" : "🌙"}</span>
+    </button>
+  );
+}
