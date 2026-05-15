@@ -138,7 +138,113 @@ async function saveExtractedItemsSnapshot(items = [], options = {}) {
   }
 }
 
+function toNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return parsed;
+}
+
+async function queryExtractorSummary(params = {}) {
+  await pingDatabase();
+  const db = getPool();
+
+  const windowHours = Math.max(1, Math.floor(toNumber(params.windowHours, 24)));
+  const topSources = Math.max(1, Math.floor(toNumber(params.topSources, 12)));
+  const topRuns = Math.max(1, Math.floor(toNumber(params.topRuns, 8)));
+
+  const [totalsRows] = await db.query(
+    `
+      SELECT
+        COUNT(*) AS totalItems,
+        COUNT(DISTINCT run_id) AS totalRuns,
+        COUNT(DISTINCT source_id) AS totalSources,
+        SUM(CASE WHEN fetch_restricted = 1 THEN 1 ELSE 0 END) AS fetchRestrictedCount,
+        DATE_FORMAT(MAX(extracted_at), '%Y-%m-%dT%H:%i:%s.%fZ') AS latestExtractedAt
+      FROM ${quoteIdentifier(TABLE_NAME)}
+      WHERE extracted_at >= DATE_SUB(UTC_TIMESTAMP(3), INTERVAL ? HOUR)
+    `,
+    [windowHours]
+  );
+
+  const [bucketRows] = await db.query(
+    `
+      SELECT bucket, COUNT(*) AS count
+      FROM ${quoteIdentifier(TABLE_NAME)}
+      WHERE extracted_at >= DATE_SUB(UTC_TIMESTAMP(3), INTERVAL ? HOUR)
+      GROUP BY bucket
+      ORDER BY count DESC
+    `,
+    [windowHours]
+  );
+
+  const [sourceRows] = await db.query(
+    `
+      SELECT
+        source_id AS sourceId,
+        COALESCE(NULLIF(source_name, ''), source_id) AS sourceName,
+        COUNT(*) AS count,
+        SUM(CASE WHEN fetch_restricted = 1 THEN 1 ELSE 0 END) AS fetchRestrictedCount,
+        DATE_FORMAT(MAX(extracted_at), '%Y-%m-%dT%H:%i:%s.%fZ') AS latestExtractedAt
+      FROM ${quoteIdentifier(TABLE_NAME)}
+      WHERE extracted_at >= DATE_SUB(UTC_TIMESTAMP(3), INTERVAL ? HOUR)
+      GROUP BY source_id, sourceName
+      ORDER BY count DESC
+      LIMIT ?
+    `,
+    [windowHours, topSources]
+  );
+
+  const [runRows] = await db.query(
+    `
+      SELECT
+        run_id AS runId,
+        COUNT(*) AS count,
+        COUNT(DISTINCT source_id) AS sourceCount,
+        SUM(CASE WHEN fetch_restricted = 1 THEN 1 ELSE 0 END) AS fetchRestrictedCount,
+        DATE_FORMAT(MAX(extracted_at), '%Y-%m-%dT%H:%i:%s.%fZ') AS extractedAt
+      FROM ${quoteIdentifier(TABLE_NAME)}
+      WHERE extracted_at >= DATE_SUB(UTC_TIMESTAMP(3), INTERVAL ? HOUR)
+      GROUP BY run_id
+      ORDER BY MAX(extracted_at) DESC
+      LIMIT ?
+    `,
+    [windowHours, topRuns]
+  );
+
+  const totals = totalsRows?.[0] || {};
+
+  return {
+    windowHours,
+    totals: {
+      totalItems: toNumber(totals.totalItems, 0),
+      totalRuns: toNumber(totals.totalRuns, 0),
+      totalSources: toNumber(totals.totalSources, 0),
+      fetchRestrictedCount: toNumber(totals.fetchRestrictedCount, 0),
+      latestExtractedAt: String(totals.latestExtractedAt || ""),
+    },
+    byBucket: bucketRows.map((row) => ({
+      bucket: String(row.bucket || "unknown"),
+      count: toNumber(row.count, 0),
+    })),
+    bySource: sourceRows.map((row) => ({
+      sourceId: String(row.sourceId || ""),
+      sourceName: String(row.sourceName || row.sourceId || ""),
+      count: toNumber(row.count, 0),
+      fetchRestrictedCount: toNumber(row.fetchRestrictedCount, 0),
+      latestExtractedAt: String(row.latestExtractedAt || ""),
+    })),
+    recentRuns: runRows.map((row) => ({
+      runId: String(row.runId || ""),
+      count: toNumber(row.count, 0),
+      sourceCount: toNumber(row.sourceCount, 0),
+      fetchRestrictedCount: toNumber(row.fetchRestrictedCount, 0),
+      extractedAt: String(row.extractedAt || ""),
+    })),
+  };
+}
+
 module.exports = {
   ensureExtractorItemsTable,
   saveExtractedItemsSnapshot,
+  queryExtractorSummary,
 };

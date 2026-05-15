@@ -68,6 +68,7 @@ const {
 const {
   ensureExtractorItemsTable,
   saveExtractedItemsSnapshot,
+  queryExtractorSummary,
 } = require("../db/extractor-items-repository.js");
 const {
   ensureCandidateValidationTables,
@@ -2294,7 +2295,63 @@ app.get("/seo/:type/:slug", async (req, res) => {
   }
 });
 
-app.get("/debug/sources", debugRateLimiter, requireDebugAccess, (_req, res) => {
+app.get("/debug/sources", debugRateLimiter, requireDebugAccess, async (_req, res) => {
+  let extractor = {
+    databaseSummary: null,
+    lastCycle: null,
+  };
+
+  const sourceRuns = Array.isArray(lastSourceMetrics) ? lastSourceMetrics : [];
+  const cycleTotals = sourceRuns.reduce(
+    (acc, run) => {
+      acc.fetchedCount += Number(run?.fetchedCount || 0);
+      acc.fetchRestrictedCount += Number(run?.fetchRestrictedCount || 0);
+      Object.entries(run?.byBucket || {}).forEach(([bucket, count]) => {
+        acc.byBucket[bucket] = (acc.byBucket[bucket] || 0) + Number(count || 0);
+      });
+      return acc;
+    },
+    {
+      fetchedCount: 0,
+      fetchRestrictedCount: 0,
+      byBucket: {},
+    }
+  );
+
+  const cycleSourceRows = sourceRuns
+    .map((run) => ({
+      sourceId: String(run?.source || ""),
+      sourceName: String(run?.sourceName || run?.source || ""),
+      fetchedCount: Number(run?.fetchedCount || 0),
+      fetchRestrictedCount: Number(run?.fetchRestrictedCount || 0),
+      byBucket: run?.byBucket || {},
+    }))
+    .sort((a, b) => b.fetchedCount - a.fetchedCount)
+    .slice(0, 20);
+
+  extractor.lastCycle = {
+    fetchedCount: cycleTotals.fetchedCount,
+    fetchRestrictedCount: cycleTotals.fetchRestrictedCount,
+    byBucket: cycleTotals.byBucket,
+    bySource: cycleSourceRows,
+  };
+
+  if (USE_MYSQL) {
+    try {
+      extractor.databaseSummary = await queryExtractorSummary({
+        windowHours: 24,
+        topSources: 15,
+        topRuns: 10,
+      });
+    } catch (error) {
+      logger.warn(
+        `[API:/debug/sources] Falha ao carregar resumo do extrator no banco: ${
+          error?.message || error
+        }`
+      );
+    }
+  }
+
   res.json({
     isCheckingNews,
     isShuttingDown,
@@ -2306,6 +2363,7 @@ app.get("/debug/sources", debugRateLimiter, requireDebugAccess, (_req, res) => {
     inventory: buildInventoryMetrics(processedArticles),
     lastCycle: lastCycleMetrics,
     sourceRuns: lastSourceMetrics,
+    extractor,
     observability: observabilityTracker.getSnapshot(),
   });
 });

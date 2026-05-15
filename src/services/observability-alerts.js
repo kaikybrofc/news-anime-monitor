@@ -136,6 +136,7 @@ function evaluateSourceAlerts(run, baseline, thresholds = {}, source = {}) {
   } = thresholds;
 
   const suppressZeroFetchAlert = Boolean(source?.suppressZeroFetchAlert);
+  const suppressParseErrorAlert = Boolean(source?.suppressParseErrorAlert);
 
   if (run.fetchedCount === 0 && !suppressZeroFetchAlert) {
     alerts.push(
@@ -166,7 +167,10 @@ function evaluateSourceAlerts(run, baseline, thresholds = {}, source = {}) {
     );
   }
 
-  if (run.parseErrorRate >= parseErrorCriticalRate || run.parseErrorCount >= 5) {
+  if (
+    !suppressParseErrorAlert &&
+    (run.parseErrorRate >= parseErrorCriticalRate || run.parseErrorCount >= 5)
+  ) {
     alerts.push(
       buildAlert({
         severity: "critical",
@@ -178,7 +182,10 @@ function evaluateSourceAlerts(run, baseline, thresholds = {}, source = {}) {
         baseline,
       })
     );
-  } else if (run.parseErrorRate >= parseErrorWarningRate || run.parseErrorCount > 0) {
+  } else if (
+    !suppressParseErrorAlert &&
+    (run.parseErrorRate >= parseErrorWarningRate || run.parseErrorCount > 0)
+  ) {
     alerts.push(
       buildAlert({
         severity: "warning",

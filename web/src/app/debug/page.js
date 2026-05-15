@@ -132,6 +132,9 @@ export default async function DebugDashboardPage() {
   const inventory = sourcesPayload?.inventory || {};
   const lastCycle = sourcesPayload?.lastCycle || {};
   const totals = lastCycle?.totals || {};
+  const extractor = sourcesPayload?.extractor || {};
+  const extractorCycle = extractor?.lastCycle || {};
+  const extractorDbSummary = extractor?.databaseSummary || null;
 
   return (
     <div className="flex flex-col gap-10">
@@ -444,6 +447,104 @@ export default async function DebugDashboardPage() {
                     Sem dados de bucket no ciclo atual.
                   </p>
                 )}
+              </div>
+            </article>
+          </section>
+
+          <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+            <article className="info-card">
+              <h2 className="text-lg">Extrator (Ciclo Atual)</h2>
+              <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-lg border border-slate-700 p-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-400">Coletados</p>
+                  <p className="mt-1 font-bold">
+                    {formatNumber(extractorCycle?.fetchedCount || 0)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-700 p-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-400">Restritos</p>
+                  <p className="mt-1 font-bold">
+                    {formatNumber(extractorCycle?.fetchRestrictedCount || 0)}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 flex flex-col gap-2 text-sm">
+                {Object.entries(extractorCycle?.byBucket || {}).length ? (
+                  Object.entries(extractorCycle?.byBucket || {}).map(([bucket, count]) => (
+                    <div
+                      key={bucket}
+                      className="flex items-center justify-between rounded-lg border border-slate-700 p-2"
+                    >
+                      <span className="uppercase text-slate-400">{bucket}</span>
+                      <strong>{formatNumber(count)}</strong>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-slate-400">Sem buckets do extrator neste ciclo.</p>
+                )}
+              </div>
+            </article>
+
+            <article className="info-card">
+              <h2 className="text-lg">Extrator (24h / Banco)</h2>
+              {extractorDbSummary ? (
+                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-lg border border-slate-700 p-3">
+                    <p className="text-xs uppercase tracking-wide text-slate-400">Itens</p>
+                    <p className="mt-1 font-bold">
+                      {formatNumber(extractorDbSummary?.totals?.totalItems || 0)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-slate-700 p-3">
+                    <p className="text-xs uppercase tracking-wide text-slate-400">Runs</p>
+                    <p className="mt-1 font-bold">
+                      {formatNumber(extractorDbSummary?.totals?.totalRuns || 0)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-slate-700 p-3">
+                    <p className="text-xs uppercase tracking-wide text-slate-400">Fontes</p>
+                    <p className="mt-1 font-bold">
+                      {formatNumber(extractorDbSummary?.totals?.totalSources || 0)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-slate-700 p-3">
+                    <p className="text-xs uppercase tracking-wide text-slate-400">Restritos</p>
+                    <p className="mt-1 font-bold">
+                      {formatNumber(extractorDbSummary?.totals?.fetchRestrictedCount || 0)}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-slate-400">
+                  Resumo do extrator no banco indisponível no momento.
+                </p>
+              )}
+            </article>
+
+            <article className="info-card xl:col-span-1">
+              <h2 className="text-lg">Top Fontes (Extrator)</h2>
+              <div className="mt-4 flex max-h-72 flex-col gap-2 overflow-auto pr-1 text-sm">
+                {(extractorDbSummary?.bySource || extractorCycle?.bySource || [])
+                  .slice(0, 10)
+                  .map((row, index) => (
+                    <div
+                      key={`${row?.sourceId || "source"}-${index}`}
+                      className="rounded-lg border border-slate-700 p-2"
+                    >
+                      <p className="font-semibold text-slate-100">
+                        {String(row?.sourceName || row?.sourceId || "fonte")}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {String(row?.sourceId || "-")}
+                      </p>
+                      <p className="mt-1 text-xs">
+                        Coletados: {formatNumber(row?.count ?? row?.fetchedCount ?? 0)}
+                      </p>
+                    </div>
+                  ))}
+                {!((extractorDbSummary?.bySource || extractorCycle?.bySource || []).length) ? (
+                  <p className="text-slate-400">Sem dados de fontes do extrator.</p>
+                ) : null}
               </div>
             </article>
           </section>

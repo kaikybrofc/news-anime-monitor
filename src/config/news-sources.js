@@ -206,6 +206,8 @@ const SOURCE_DEFINITIONS = {
     collectionPriority: ["feed", "home", "sitemap"],
     daysBack: 30,
     enableSitemap: false,
+    suppressZeroFetchAlert: true,
+    suppressParseErrorAlert: true,
     domains: ["animeherald.com"],
     excludedPathPrefixes: DEFAULT_WORDPRESS_EXCLUDED_PREFIXES,
     homeLinkSelectors: [
