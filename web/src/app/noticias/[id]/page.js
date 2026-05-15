@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { notFound as renderNotFound, permanentRedirect } from "next/navigation";
+import { SafeImage } from "@/components/safe-image";
 import { fetchMonitor } from "@/lib/api";
 import { getArticleLifecycleBadges } from "@/lib/article-state";
 import {
@@ -532,13 +533,14 @@ export default async function NoticiaDetailPage(props) {
 
           {imageUrl && (
             <div className="relative aspect-video w-full overflow-hidden rounded-3xl border border-slate-800 shadow-2xl">
-              <Image
+              <SafeImage
                 src={imageUrl}
                 alt={title || "Imagem de destaque da notícia"}
                 fill
                 sizes="(max-width: 768px) 100vw, (max-width: 1280px) 66vw, 800px"
                 className="h-full w-full object-cover"
                 priority
+                fallbackClassName="h-full w-full"
               />
             </div>
           )}
@@ -770,8 +772,14 @@ export default async function NoticiaDetailPage(props) {
                             />
                           </div>
                         ) : (
-                          <div className="h-14 w-20 shrink-0 rounded-lg border border-slate-700 bg-slate-800/70 text-[10px] text-slate-500 flex items-center justify-center">
-                            Sem imagem
+                          <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-slate-700 bg-slate-800/70">
+                            <Image
+                              src="/brand/logo-64.png"
+                              alt="Logo Anime Radar"
+                              fill
+                              sizes="80px"
+                              className="object-cover"
+                            />
                           </div>
                         )}
                         <div className="min-w-0">

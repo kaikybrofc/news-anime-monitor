@@ -141,7 +141,78 @@ async function isReachableImageUrl(url, sourceConfig) {
 
     if (response.status >= 400) return false;
     const contentType = String(response.headers?.["content-type"] || "").toLowerCase();
-    return contentType.startsWith("image/");
+    if (!contentType.startsWith("image/")) return false;
+    return hasValidImageSignature(url, headers);
+  } catch {
+    return false;
+  }
+}
+
+function hasKnownImageMagicHeader(buffer) {
+  if (!buffer || buffer.length < 12) return false;
+
+  const isPng =
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47;
+  if (isPng) return true;
+
+  const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  if (isJpeg) return true;
+
+  const isGif =
+    buffer[0] === 0x47 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x38;
+  if (isGif) return true;
+
+  const isWebp =
+    buffer[0] === 0x52 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x46 &&
+    buffer[8] === 0x57 &&
+    buffer[9] === 0x45 &&
+    buffer[10] === 0x42 &&
+    buffer[11] === 0x50;
+  if (isWebp) return true;
+
+  const isAvif =
+    buffer[4] === 0x66 &&
+    buffer[5] === 0x74 &&
+    buffer[6] === 0x79 &&
+    buffer[7] === 0x70 &&
+    buffer.includes(0x61) &&
+    buffer.includes(0x76) &&
+    buffer.includes(0x69) &&
+    buffer.includes(0x66);
+  if (isAvif) return true;
+
+  const asText = buffer.toString("utf8").trim().toLowerCase();
+  if (asText.startsWith("<svg")) return true;
+
+  return false;
+}
+
+async function hasValidImageSignature(url, headers) {
+  try {
+    const response = await axios.get(url, {
+      timeout: 9000,
+      maxRedirects: 5,
+      headers: {
+        ...headers,
+        Range: "bytes=0-4095",
+      },
+      responseType: "arraybuffer",
+      validateStatus: () => true,
+    });
+
+    if (response.status >= 400) return false;
+    const bytes = Buffer.from(response.data || []);
+    if (!bytes.length) return false;
+    return hasKnownImageMagicHeader(bytes);
   } catch {
     return false;
   }

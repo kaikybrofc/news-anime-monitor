@@ -1,6 +1,6 @@
 import Link from "next/link";
-import Image from "next/image";
 import { getArticleLifecycleBadges } from "@/lib/article-state";
+import { SafeImage } from "@/components/safe-image";
 import {
   formatDateTime,
   formatNumber,
@@ -99,17 +99,24 @@ export function ArticleCard({ article }) {
     <article className="info-card article-card group">
       {imageUrl ? (
         <Link href={detailHref} className="article-cover" title="Abrir detalhes da notícia">
-          <Image
+          <SafeImage
             src={imageUrl}
             alt={title || "Imagem de capa da notícia"}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
             className="object-cover"
+            fallbackClassName="article-cover"
           />
         </Link>
       ) : (
-        <div className="article-cover flex items-center justify-center bg-slate-100 text-slate-400">
-          <span className="text-xs">Sem imagem</span>
+        <div className="article-cover relative overflow-hidden bg-slate-100">
+          <Image
+            src="/brand/logo-64.png"
+            alt="Logo Anime Radar"
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+            className="object-cover"
+          />
         </div>
       )}
 
