@@ -152,6 +152,7 @@ function applyTopicTrendScores(
     refined.qualityScore = scores.qualityScore;
     refined.importanceScore = scores.importanceScore;
     refined.trendScore = scores.trendScore;
+    refined.velocityScore = scores.velocityScore;
   }
 
   return {

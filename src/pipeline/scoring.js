@@ -24,6 +24,7 @@ function calculateArticleScores(article = {}) {
   let qualityScore = 0;
   let importanceScore = 0;
   let trendScore = 0;
+  let velocityScore = 0;
 
   if (article.bucket === "feed") qualityScore += 30;
   if (article.bucket === "sitemap") qualityScore += 20;
@@ -70,17 +71,34 @@ function calculateArticleScores(article = {}) {
     trendScore += Math.min(30, topicTrend);
   }
 
+  const timesSeen = Number(article.timesSeen || 0);
+  if (Number.isFinite(timesSeen) && timesSeen > 1) {
+    velocityScore += Math.min(12, (timesSeen - 1) * 2);
+  }
+
+  const firstSeenTs = Date.parse(String(article.firstSeenAt || ""));
+  const lastSeenTs = Date.parse(String(article.lastSeenAt || ""));
+  if (!Number.isNaN(firstSeenTs) && !Number.isNaN(lastSeenTs) && lastSeenTs >= firstSeenTs) {
+    const ageHours = (lastSeenTs - firstSeenTs) / (1000 * 60 * 60);
+    if (ageHours <= 24) velocityScore += 6;
+    else if (ageHours <= 48) velocityScore += 4;
+    else if (ageHours <= 72) velocityScore += 2;
+  }
+
+  velocityScore = Math.max(0, Math.min(20, velocityScore));
+
   if (article.fetchRestricted) {
     qualityScore -= 10;
   }
 
-  const score = qualityScore + importanceScore + trendScore;
+  const score = qualityScore + importanceScore + trendScore + velocityScore;
 
   return {
     score,
     qualityScore,
     importanceScore,
     trendScore,
+    velocityScore,
   };
 }
 

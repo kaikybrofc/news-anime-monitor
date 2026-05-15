@@ -159,6 +159,9 @@ function ensureRefinedDefaults(refined = {}, nowIso = new Date().toISOString()) 
     trendScore: Number.isFinite(refined.trendScore)
       ? Number(refined.trendScore)
       : 0,
+    velocityScore: Number.isFinite(refined.velocityScore)
+      ? Number(refined.velocityScore)
+      : 0,
     revisionCount: toPositiveInt(refined.revisionCount, 1),
     lastContentChangeAt: toIsoOrEmpty(refined.lastContentChangeAt) || firstSeenAt,
     lastSeenEvent: String(refined.lastSeenEvent || "new"),
@@ -225,6 +228,9 @@ function ensureRefinedDefaults(refined = {}, nowIso = new Date().toISOString()) 
   }
   if (!Number.isFinite(refined.trendScore)) {
     normalizedRefined.trendScore = scores.trendScore;
+  }
+  if (!Number.isFinite(refined.velocityScore)) {
+    normalizedRefined.velocityScore = scores.velocityScore;
   }
 
   return normalizedRefined;
@@ -322,6 +328,7 @@ function buildProcessedArticle({
   baseRefined.qualityScore = scores.qualityScore;
   baseRefined.importanceScore = scores.importanceScore;
   baseRefined.trendScore = scores.trendScore;
+  baseRefined.velocityScore = scores.velocityScore;
 
   const decisionEntry = buildDecisionEntry({
     at: seenAt,
@@ -516,6 +523,7 @@ function bumpArticleSeen(existingArticle, candidate, reason, seenAt) {
   base.refined.qualityScore = scores.qualityScore;
   base.refined.importanceScore = scores.importanceScore;
   base.refined.trendScore = scores.trendScore;
+  base.refined.velocityScore = scores.velocityScore;
   if (!base.timestamp || Number.isNaN(Date.parse(String(base.timestamp)))) {
     base.timestamp = base.refined.firstSeenAt || nowIso;
   }

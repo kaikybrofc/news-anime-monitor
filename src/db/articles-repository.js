@@ -58,9 +58,20 @@ function serializeArticle(article) {
 
 function parseArticleRow(row) {
   let refined = {};
+  const rawRefined = row?.refined_json;
 
   try {
-    refined = JSON.parse(row.refined_json || "{}");
+    if (!rawRefined) {
+      refined = {};
+    } else if (typeof rawRefined === "string") {
+      refined = JSON.parse(rawRefined);
+    } else if (Buffer.isBuffer(rawRefined)) {
+      refined = JSON.parse(rawRefined.toString("utf8"));
+    } else if (typeof rawRefined === "object") {
+      refined = { ...rawRefined };
+    } else {
+      refined = {};
+    }
   } catch {
     refined = {};
   }
