@@ -119,7 +119,7 @@ function buildAlert({
   };
 }
 
-function evaluateSourceAlerts(run, baseline, thresholds = {}) {
+function evaluateSourceAlerts(run, baseline, thresholds = {}, source = {}) {
   const alerts = [];
   const {
     minBaselineSamples = 3,
@@ -135,7 +135,9 @@ function evaluateSourceAlerts(run, baseline, thresholds = {}) {
     durationSpikeMinMs = 2000,
   } = thresholds;
 
-  if (run.fetchedCount === 0) {
+  const suppressZeroFetchAlert = Boolean(source?.suppressZeroFetchAlert);
+
+  if (run.fetchedCount === 0 && !suppressZeroFetchAlert) {
     alerts.push(
       buildAlert({
         severity: "critical",
@@ -150,7 +152,7 @@ function evaluateSourceAlerts(run, baseline, thresholds = {}) {
     return alerts;
   }
 
-  if (run.acceptedCount === 0) {
+  if (run.fetchedCount > 0 && run.acceptedCount === 0) {
     alerts.push(
       buildAlert({
         severity: "warning",
@@ -375,7 +377,7 @@ function createObservabilityTracker(sources = [], options = {}) {
         Math.max(0, sourceHistory.length - baselineWindow)
       );
       const baseline = buildBaseline(baselineSample);
-      const alerts = evaluateSourceAlerts(currentRun, baseline, thresholds);
+      const alerts = evaluateSourceAlerts(currentRun, baseline, thresholds, source);
       const status = deriveSourceStatus(alerts);
 
       const fetchedDeltaPct = baseline.fetchedAvg

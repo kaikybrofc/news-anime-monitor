@@ -113,6 +113,7 @@ async function collectItemsFromSource(source, options = {}) {
   const sourceTag = `[Fonte:${source.name}]`;
   const sourceHeaders = source.requestHeaders;
   const maxItemsForSource = toPositiveInt(source.maxItems, maxItemsPerSource);
+  const sourceDaysBack = toPositiveInt(source.daysBack, daysBack);
 
   let sitemapItems = [];
   if (source.enableSitemap && source.sitemapIndexUrl) {
@@ -163,7 +164,7 @@ async function collectItemsFromSource(source, options = {}) {
           if (sitemapItems.length >= maxItemsForSource) break;
         }
 
-        sitemapItems = filterByDays(sitemapItems, daysBack);
+        sitemapItems = filterByDays(sitemapItems, sourceDaysBack);
       } catch (_error) {
         if (metrics) metrics.parseErrorCount += 1;
         logger.warn(`${sourceTag} Não foi possível acessar o sitemap.`);
@@ -187,7 +188,7 @@ async function collectItemsFromSource(source, options = {}) {
         });
 
         feedItems = extractArticlesFromFeed(feedResponse.data, source);
-        feedItems = filterByDays(feedItems, daysBack);
+        feedItems = filterByDays(feedItems, sourceDaysBack);
       } catch (_error) {
         if (metrics) metrics.parseErrorCount += 1;
         logger.warn(`${sourceTag} Não foi possível acessar o feed.`);

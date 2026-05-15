@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const fs = require("fs");
 const path = require("path");
 const { summarizeUrl } = require("../services/summarizer.js");
@@ -126,6 +128,7 @@ async function filterItemsByRobots(items, source, context) {
 async function collectItemsFromSource(source) {
   const sourceTag = `[Fonte:${source.name}]`;
   const sourceHeaders = source.requestHeaders;
+  const sourceDaysBack = toPositiveInt(source.daysBack, DAYS_BACK);
 
   // 1) Sitemap
   let sitemapItems = [];
@@ -180,7 +183,7 @@ async function collectItemsFromSource(source) {
           if (sitemapItems.length >= MAX_ITEMS_PER_SOURCE) break;
         }
 
-        sitemapItems = filterByDays(sitemapItems, DAYS_BACK);
+        sitemapItems = filterByDays(sitemapItems, sourceDaysBack);
       } catch (_error) {
         logger.warn(`${sourceTag} Não foi possível acessar o sitemap.`);
       }
@@ -204,7 +207,7 @@ async function collectItemsFromSource(source) {
         });
 
         feedItems = extractArticlesFromFeed(feedResponse.data, source);
-        feedItems = filterByDays(feedItems, DAYS_BACK);
+        feedItems = filterByDays(feedItems, sourceDaysBack);
       } catch (_error) {
         logger.warn(`${sourceTag} Não foi possível acessar o feed.`);
       }
