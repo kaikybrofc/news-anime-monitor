@@ -539,6 +539,53 @@ function isSummaryErrorText(value) {
   return summary.toLowerCase() === SUMMARY_GENERIC_ERROR_MESSAGE.toLowerCase();
 }
 
+function isSummaryCorruptedText(value) {
+  const summary = normalizeSummaryText(value);
+  if (!summary) return false;
+  const lowered = summary.toLowerCase();
+
+  return (
+    /<img\b/.test(summary) ||
+    lowered.includes("srcset=") ||
+    lowered.includes("self.__next_f.push([") ||
+    lowered.includes("ann.layout.body_start();")
+  );
+}
+
+function getSummaryReprocessProfile(value) {
+  const summary = normalizeSummaryText(value);
+
+  if (!summary) {
+    return {
+      needsReprocess: true,
+      priority: 3,
+      reason: "missing_summary",
+    };
+  }
+
+  if (isSummaryErrorText(summary)) {
+    return {
+      needsReprocess: true,
+      priority: 2,
+      reason: "summary_error",
+    };
+  }
+
+  if (isSummaryCorruptedText(summary)) {
+    return {
+      needsReprocess: true,
+      priority: 1,
+      reason: "summary_corrupted",
+    };
+  }
+
+  return {
+    needsReprocess: false,
+    priority: 0,
+    reason: "",
+  };
+}
+
 function hasVisibleSummary(article) {
   const summary = normalizeSummaryText(article?.refined?.summary);
   if (!summary) return false;
@@ -549,8 +596,11 @@ function buildReprocessCandidateFromArticle(article) {
   const refined = article?.refined || {};
   const url = String(refined.url || "").trim();
   const canonicalUrl = String(refined.canonicalUrl || url).trim();
+  const reprocessProfile = getSummaryReprocessProfile(refined.summary);
   if (!url) return null;
-  if (!isSummaryErrorText(refined.summary)) return null;
+  if (!reprocessProfile.needsReprocess) {
+    return null;
+  }
 
   return {
     name: refined.name || article?.name || canonicalUrl,
@@ -571,9 +621,12 @@ function buildReprocessCandidateFromArticle(article) {
     firstSeenAt: refined.firstSeenAt || article?.timestamp || "",
     image: refined.image || "",
     sourceConfig: SOURCE_DEFINITIONS[refined.sourceId] || null,
+    reprocessPriority: reprocessProfile.priority,
+    reprocessReason: reprocessProfile.reason,
     ingestionMeta: {
       ...(refined.ingestionMeta || {}),
       reprocessSummary: true,
+      reprocessSummaryReason: reprocessProfile.reason,
     },
   };
 }
@@ -2629,7 +2682,12 @@ async function checkPageForNews() {
     const pendingReprocessCandidates = processedArticles
       .map((article) => buildReprocessCandidateFromArticle(article))
       .filter(Boolean)
-      .sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
+      .sort((a, b) => {
+        const priorityDiff =
+          Number(b?.reprocessPriority || 0) - Number(a?.reprocessPriority || 0);
+        if (priorityDiff !== 0) return priorityDiff;
+        return getItemTimestamp(b) - getItemTimestamp(a);
+      });
 
     if (!collectedCandidates.length && !pendingReprocessCandidates.length) {
       logger.warn("Nenhuma notícia encontrada em nenhuma fonte.");
@@ -2734,8 +2792,17 @@ async function checkPageForNews() {
     }
 
     if (priorityReprocess.length) {
+      const byReason = priorityReprocess.reduce((acc, item) => {
+        const reason = String(item?.reprocessReason || "unknown");
+        acc[reason] = (acc[reason] || 0) + 1;
+        return acc;
+      }, {});
       logger.info(
-        `[Monitor] Reprocessamento prioritário de resumo: ${priorityReprocess.length} item(ns) antes de novas notícias.`
+        `[Monitor] Reprocessamento prioritário de resumo: ${priorityReprocess.length} item(ns) antes de novas notícias. Distribuição: ${Object.entries(
+          byReason
+        )
+          .map(([reason, count]) => `${reason}=${count}`)
+          .join(", ")}`
       );
     }
 

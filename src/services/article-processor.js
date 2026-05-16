@@ -333,6 +333,8 @@ async function processArticleCandidate(
   const html = articlePageResponse.data;
   const summary = await summarizeHtml(html, {
     onAutoRetry: options.onSummaryRetry,
+    sourceConfig: candidate.sourceConfig,
+    articleUrl: candidate.url,
   });
   const name = resolveArticleName(candidate, html);
   const image = await resolveArticleImage({ ...candidate, name }, html);

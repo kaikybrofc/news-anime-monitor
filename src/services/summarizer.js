@@ -36,6 +36,10 @@ const SUMMARY_FAILURE_RETRY_BASE_MS = toPositiveInt(
   process.env.SUMMARY_FAILURE_RETRY_BASE_MS,
   1500
 );
+const SUMMARY_RAW_FALLBACK_MAX_CHARS = toPositiveInt(
+  process.env.SUMMARY_RAW_FALLBACK_MAX_CHARS,
+  2200
+);
 const SUMMARY_GENERIC_ERROR_MESSAGE = "Ocorreu um erro durante o resumo.";
 
 function sleep(ms) {
@@ -78,30 +82,131 @@ function isRetryableGeminiError(error) {
   return false;
 }
 
+function isGeminiQuotaOrLimitError(error) {
+  if (!error) return false;
+
+  if (error?.code === "GEMINI_CLI_EXIT_ERROR") {
+    const stderr = String(error?.stderr || "").toLowerCase();
+    return /rate.?limit|quota|resource.?exhausted|429|too many requests|limit exceeded|insufficient_quota/.test(
+      stderr
+    );
+  }
+
+  return false;
+}
+
+function isGeminiUnavailableError(error) {
+  if (!error) return false;
+
+  if (error?.code === "GEMINI_CLI_START_ERROR") return true;
+  if (error?.code === "ENOENT") return true;
+  if (error?.originalError?.code === "ENOENT") return true;
+
+  const message = String(error?.message || "").toLowerCase();
+  return message.includes("spawn gemini enoent");
+}
+
 function normalizeArticleText(text) {
-  return text
+  return String(text || "")
+    .replace(/<[^>\n]{1,400}>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .replace(/[^\S\r\n]{2,}/g, " ")
     .trim();
 }
 
-function extractArticleText(htmlContent) {
-  const $ = cheerio.load(htmlContent);
-
-  const candidates = [
-    $(".inner-post-entry.entry-content").text(),
-    $(".inner-post-entry").text(),
-    $(".entry-content").text(),
-    $("article").text(),
-    $("main").text(),
-    $("body").text(),
+function cleanArticleDom($) {
+  const noiseSelectors = [
+    "script",
+    "style",
+    "noscript",
+    "template",
+    "iframe",
+    "svg",
+    "canvas",
+    "form",
+    "nav",
+    "footer",
+    "header",
+    "aside",
+    ".advert",
+    ".ads",
+    ".ad",
+    ".social",
+    ".share",
+    ".sharing",
+    ".related",
+    ".recommended",
+    ".comments",
+    ".comment",
+    ".newsletter",
+    ".subscribe",
+    ".breadcrumbs",
+    ".breadcrumb",
+    ".author-box",
+    ".post-tags",
+    ".tag-list",
   ];
 
-  const articleText = candidates.find(
-    (value) => value && value.trim().length > 0
-  );
-  return articleText ? normalizeArticleText(articleText) : "";
+  noiseSelectors.forEach((selector) => {
+    $(selector).remove();
+  });
+}
+
+function resolveArticleSelectors(options = {}) {
+  const sourceSelectors = Array.isArray(options?.sourceConfig?.articleContentSelectors)
+    ? options.sourceConfig.articleContentSelectors
+    : [];
+
+  const domain = String(options?.sourceConfig?.domains?.[0] || "")
+    .trim()
+    .toLowerCase();
+
+  const domainSpecificSelectors = {
+    "animenew.com.br": [
+      ".inner-post-entry.entry-content",
+      ".inner-post-entry",
+      ".entry-content",
+    ],
+    "animenewsnetwork.com": [".meat", ".news", "article"],
+    "nintendolife.com": [".article_body", "article .content", "article"],
+    "pcgamer.com": [".article-body", ".article-content", "article"],
+    "ign.com": [".article-page", ".article-content", "article"],
+  };
+
+  return [
+    ...sourceSelectors,
+    ...(domainSpecificSelectors[domain] || []),
+    ".inner-post-entry.entry-content",
+    ".inner-post-entry",
+    ".entry-content",
+    "article [itemprop='articleBody']",
+    ".article-content",
+    ".post-content",
+    "article",
+    "main",
+    "body",
+  ];
+}
+
+function extractArticleText(htmlContent, options = {}) {
+  const $ = cheerio.load(htmlContent);
+  cleanArticleDom($);
+
+  const selectors = resolveArticleSelectors(options);
+  const candidates = selectors.map((selector) => $(selector).text());
+
+  const articleText = candidates
+    .map((value) => normalizeArticleText(value))
+    .find((value) => value && value.length > 120);
+
+  return articleText || "";
 }
 
 function truncateText(text, maxChars) {
@@ -120,6 +225,12 @@ function buildFallbackSummary(articleText) {
 
   const clipped = truncateText(fallbackBody, 650);
   return `Resumo automático (fallback): ${clipped}`;
+}
+
+function buildRawTextFallback(articleText) {
+  const normalized = normalizeArticleText(articleText || "");
+  if (!normalized) return "Conteúdo indisponível para fallback.";
+  return truncateText(normalized, SUMMARY_RAW_FALLBACK_MAX_CHARS);
 }
 
 function buildPrompt(articleText) {
@@ -315,11 +426,11 @@ function assertSummaryConfiguration() {
 // Fila para garantir processamento sequencial das requisições à IA
 let iaQueue = Promise.resolve();
 
-async function summarizeHtmlInternal(htmlContent) {
+async function summarizeHtmlInternal(htmlContent, options = {}) {
   let limitedText = "";
 
   try {
-    const articleText = extractArticleText(htmlContent);
+    const articleText = extractArticleText(htmlContent, options);
 
     if (!articleText) {
       logger.warn("[Resumo] Não foi possível extrair o texto do artigo para resumir.");
@@ -352,6 +463,22 @@ async function summarizeHtmlInternal(htmlContent) {
 
     return summary;
   } catch (error) {
+    if (isGeminiUnavailableError(error)) {
+      const rawFallback = buildRawTextFallback(limitedText);
+      logger.warn(
+        "[Resumo] Gemini CLI indisponível no servidor. Usando texto original do artigo sem resumir."
+      );
+      return rawFallback;
+    }
+
+    if (isGeminiQuotaOrLimitError(error)) {
+      const rawFallback = buildRawTextFallback(limitedText);
+      logger.warn(
+        "[Resumo] Limite/cota do Gemini detectado. Usando texto original do artigo sem resumir."
+      );
+      return rawFallback;
+    }
+
     if (error?.code === "EMPTY_SUMMARY_RESPONSE") {
       const fallback = buildFallbackSummary(limitedText);
       logger.warn("[Resumo] IA retornou vazio após tentativas. Usando fallback local.");
@@ -368,7 +495,7 @@ async function summarizeHtmlWithAutoRetry(htmlContent, options = {}) {
   let lastSummary = "";
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    lastSummary = await summarizeHtmlInternal(htmlContent);
+    lastSummary = await summarizeHtmlInternal(htmlContent, options);
 
     if (lastSummary !== SUMMARY_GENERIC_ERROR_MESSAGE) {
       return lastSummary;
