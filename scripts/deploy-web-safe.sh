@@ -11,8 +11,12 @@ cd "$WEB_DIR"
 rm -rf .next
 npm run build
 
-echo "[deploy] restart pm2 web"
-pm2 restart news-anime-web
+echo "[deploy] start/restart pm2 web"
+if pm2 describe news-anime-web >/dev/null 2>&1; then
+  pm2 restart news-anime-web
+else
+  pm2 start npm --name news-anime-web --cwd "$WEB_DIR" -- start
+fi
 
 echo "[deploy] aguardando boot"
 sleep 2
@@ -33,4 +37,3 @@ cd "$ROOT_DIR"
 node src/scripts/seo-healthcheck.js
 
 echo "[deploy] concluído"
-
