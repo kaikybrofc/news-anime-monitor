@@ -1,4 +1,5 @@
 const { hasDbConfig, getPool, pingDatabase } = require("./mysql.js");
+const crypto = require("crypto");
 
 const TABLE_NAME = "extractor_items";
 
@@ -17,6 +18,93 @@ function toSqlDate(value) {
 
 function normalizeBooleanFlag(value) {
   return value ? 1 : 0;
+}
+
+function toInt(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.floor(parsed) : fallback;
+}
+
+function firstNonEmptyString(...values) {
+  for (const value of values) {
+    const text = String(value || "").trim();
+    if (text) return text;
+  }
+  return "";
+}
+
+function hashText(value) {
+  const text = String(value || "");
+  if (!text) return "";
+  return crypto.createHash("sha256").update(text).digest("hex");
+}
+
+function buildAuditPayload(item = {}, options = {}) {
+  const ingestionMeta = item.ingestionMeta || {};
+  const sourceFetchAudit = ingestionMeta.sourceFetchAudit || {};
+  const sourceSitemapIndexAudit = ingestionMeta.sourceSitemapIndexAudit || {};
+
+  return {
+    runId: String(options.runId || "").trim(),
+    extractedAt:
+      String(options.extractedAt || "").trim() || new Date().toISOString(),
+    source: {
+      id: String(
+        options.sourceId || item.sourceId || ingestionMeta.source || ""
+      ).trim(),
+      name: String(options.sourceName || item.sourceName || "").trim(),
+      bucket:
+        String(item.bucket || ingestionMeta.bucket || "unknown").trim() ||
+        "unknown",
+      collectedFrom:
+        String(item.collectedFrom || ingestionMeta.collectedFrom || "").trim() ||
+        "unknown",
+    },
+    urls: {
+      discoveredUrl: String(item.url || "").trim(),
+      canonicalUrl: String(item.canonicalUrl || item.url || "").trim(),
+      finalUrl: String(sourceFetchAudit.finalUrl || "").trim(),
+    },
+    timing: {
+      discoveredAt:
+        String(options.extractedAt || "").trim() || new Date().toISOString(),
+      lastmod: String(item.lastmod || "").trim(),
+    },
+    robots: {
+      allowedForFetch: Boolean(ingestionMeta.robotsAllowedForFetch),
+      reason: String(ingestionMeta.robotsReason || "").trim(),
+      rule: String(ingestionMeta.robotsRule || "").trim(),
+      fetchRestricted: Boolean(item.fetchRestricted),
+    },
+    sourceRequest: {
+      requestedUrl: String(sourceFetchAudit.requestedUrl || "").trim(),
+      finalUrl: String(sourceFetchAudit.finalUrl || "").trim(),
+      statusCode: toInt(sourceFetchAudit.statusCode, 0),
+      contentType: String(sourceFetchAudit.contentType || "").trim(),
+      contentLength: toInt(sourceFetchAudit.contentLength, 0),
+      etag: String(sourceFetchAudit.etag || "").trim(),
+      lastModified: String(sourceFetchAudit.lastModified || "").trim(),
+      cacheControl: String(sourceFetchAudit.cacheControl || "").trim(),
+      responseHash: String(sourceFetchAudit.responseHash || "").trim(),
+    },
+    sitemapIndexRequest: {
+      requestedUrl: String(sourceSitemapIndexAudit.requestedUrl || "").trim(),
+      finalUrl: String(sourceSitemapIndexAudit.finalUrl || "").trim(),
+      statusCode: toInt(sourceSitemapIndexAudit.statusCode, 0),
+      contentType: String(sourceSitemapIndexAudit.contentType || "").trim(),
+      contentLength: toInt(sourceSitemapIndexAudit.contentLength, 0),
+      etag: String(sourceSitemapIndexAudit.etag || "").trim(),
+      lastModified: String(sourceSitemapIndexAudit.lastModified || "").trim(),
+      cacheControl: String(sourceSitemapIndexAudit.cacheControl || "").trim(),
+      responseHash: String(sourceSitemapIndexAudit.responseHash || "").trim(),
+    },
+    extraction: {
+      title: String(item.name || "").trim(),
+      titleHash: hashText(item.name || ""),
+      extractorVersion: "2026-05-audit-v1",
+    },
+    payloadHash: hashText(JSON.stringify(item || {})),
+  };
 }
 
 function serializeExtractedItem(item = {}, options = {}) {
@@ -44,8 +132,50 @@ function serializeExtractedItem(item = {}, options = {}) {
     url,
     lastmod: String(item.lastmod || "").trim(),
     fetchRestricted: normalizeBooleanFlag(item.fetchRestricted),
+    robotsReason: String(item.ingestionMeta?.robotsReason || "").trim(),
+    robotsRule: String(item.ingestionMeta?.robotsRule || "").trim(),
+    robotsAllowedForFetch: normalizeBooleanFlag(
+      item.ingestionMeta?.robotsAllowedForFetch
+    ),
+    requestStatusCode: toInt(item.ingestionMeta?.sourceFetchAudit?.statusCode, 0),
+    requestFinalUrl: firstNonEmptyString(
+      item.ingestionMeta?.sourceFetchAudit?.finalUrl,
+      item.url
+    ),
+    responseContentType: String(
+      item.ingestionMeta?.sourceFetchAudit?.contentType || ""
+    ).trim(),
+    responseContentLength: toInt(
+      item.ingestionMeta?.sourceFetchAudit?.contentLength,
+      0
+    ),
+    responseHash: String(item.ingestionMeta?.sourceFetchAudit?.responseHash || "").trim(),
+    extractorVersion: "2026-05-audit-v1",
+    auditJson: JSON.stringify(buildAuditPayload(item, options)),
     payloadJson: JSON.stringify(item || {}),
   };
+}
+
+async function ensureColumnExists(db, columnName, sqlTypeClause) {
+  const [rows] = await db.query(
+    `
+      SELECT 1
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = ?
+        AND COLUMN_NAME = ?
+      LIMIT 1
+    `,
+    [TABLE_NAME, columnName]
+  );
+
+  if (rows.length) return;
+
+  await db.query(
+    `ALTER TABLE ${quoteIdentifier(TABLE_NAME)} ADD COLUMN ${quoteIdentifier(
+      columnName
+    )} ${sqlTypeClause}`
+  );
 }
 
 async function ensureExtractorItemsTable() {
@@ -71,6 +201,16 @@ async function ensureExtractorItemsTable() {
       url VARCHAR(1024) NOT NULL,
       lastmod VARCHAR(64) NOT NULL DEFAULT '',
       fetch_restricted TINYINT(1) NOT NULL DEFAULT 0,
+      robots_reason VARCHAR(64) NOT NULL DEFAULT '',
+      robots_rule VARCHAR(255) NOT NULL DEFAULT '',
+      robots_allowed_for_fetch TINYINT(1) NOT NULL DEFAULT 0,
+      request_status_code INT NOT NULL DEFAULT 0,
+      request_final_url VARCHAR(1024) NOT NULL DEFAULT '',
+      response_content_type VARCHAR(128) NOT NULL DEFAULT '',
+      response_content_length BIGINT NOT NULL DEFAULT 0,
+      response_hash CHAR(64) NOT NULL DEFAULT '',
+      extractor_version VARCHAR(32) NOT NULL DEFAULT '',
+      audit_json JSON NULL,
       payload_json JSON NOT NULL,
       created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
       PRIMARY KEY (id),
@@ -78,9 +218,41 @@ async function ensureExtractorItemsTable() {
       KEY idx_source_extracted_at (source_id, extracted_at),
       KEY idx_extracted_at (extracted_at),
       KEY idx_bucket (bucket),
-      KEY idx_url (url(255))
+      KEY idx_url (url(255)),
+      KEY idx_request_status_code (request_status_code)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+
+  await ensureColumnExists(db, "robots_reason", "VARCHAR(64) NOT NULL DEFAULT ''");
+  await ensureColumnExists(db, "robots_rule", "VARCHAR(255) NOT NULL DEFAULT ''");
+  await ensureColumnExists(
+    db,
+    "robots_allowed_for_fetch",
+    "TINYINT(1) NOT NULL DEFAULT 0"
+  );
+  await ensureColumnExists(db, "request_status_code", "INT NOT NULL DEFAULT 0");
+  await ensureColumnExists(
+    db,
+    "request_final_url",
+    "VARCHAR(1024) NOT NULL DEFAULT ''"
+  );
+  await ensureColumnExists(
+    db,
+    "response_content_type",
+    "VARCHAR(128) NOT NULL DEFAULT ''"
+  );
+  await ensureColumnExists(
+    db,
+    "response_content_length",
+    "BIGINT NOT NULL DEFAULT 0"
+  );
+  await ensureColumnExists(db, "response_hash", "CHAR(64) NOT NULL DEFAULT ''");
+  await ensureColumnExists(
+    db,
+    "extractor_version",
+    "VARCHAR(32) NOT NULL DEFAULT ''"
+  );
+  await ensureColumnExists(db, "audit_json", "JSON NULL");
 }
 
 async function saveExtractedItemsSnapshot(items = [], options = {}) {
@@ -106,6 +278,16 @@ async function saveExtractedItemsSnapshot(items = [], options = {}) {
         item.url,
         item.lastmod,
         item.fetchRestricted,
+        item.robotsReason,
+        item.robotsRule,
+        item.robotsAllowedForFetch,
+        item.requestStatusCode,
+        item.requestFinalUrl,
+        item.responseContentType,
+        item.responseContentLength,
+        item.responseHash,
+        item.extractorVersion,
+        item.auditJson,
         item.payloadJson,
       ]);
 
@@ -122,6 +304,16 @@ async function saveExtractedItemsSnapshot(items = [], options = {}) {
           url,
           lastmod,
           fetch_restricted,
+          robots_reason,
+          robots_rule,
+          robots_allowed_for_fetch,
+          request_status_code,
+          request_final_url,
+          response_content_type,
+          response_content_length,
+          response_hash,
+          extractor_version,
+          audit_json,
           payload_json
         ) VALUES ?
       `;

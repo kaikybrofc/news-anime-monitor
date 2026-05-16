@@ -1,4 +1,5 @@
 const logger = require("../utils/logger.js");
+const crypto = require("crypto");
 const { checkRobotsForUrl } = require("../utils/robots.js");
 const { getWithRetry, toPositiveInt } = require("../utils/http.js");
 const {
@@ -95,11 +96,50 @@ function withBucket(items, source, bucket, collectedFrom) {
     bucket,
     collectedFrom,
     ingestionMeta: {
+      ...(item.ingestionMeta || {}),
       source: source.id,
       bucket,
       collectedFrom,
     },
   }));
+}
+
+function hashResponseBody(data) {
+  try {
+    const raw =
+      typeof data === "string"
+        ? data
+        : Buffer.isBuffer(data)
+          ? data
+          : JSON.stringify(data || "");
+    return crypto.createHash("sha256").update(String(raw)).digest("hex");
+  } catch {
+    return "";
+  }
+}
+
+function buildFetchAudit(response, requestedUrl = "") {
+  const headers = response?.headers || {};
+  const statusCode = Number(response?.status || 0) || 0;
+  const finalUrl = String(response?.request?.res?.responseUrl || requestedUrl || "");
+  const contentType = String(headers["content-type"] || "");
+  const contentLength = Number(headers["content-length"] || 0) || 0;
+  const etag = String(headers.etag || "");
+  const lastModified = String(headers["last-modified"] || "");
+  const cacheControl = String(headers["cache-control"] || "");
+  const responseHash = hashResponseBody(response?.data);
+
+  return {
+    requestedUrl: String(requestedUrl || ""),
+    finalUrl,
+    statusCode,
+    contentType,
+    contentLength,
+    etag,
+    lastModified,
+    cacheControl,
+    responseHash,
+  };
 }
 
 async function collectItemsFromSource(source, options = {}) {
@@ -129,6 +169,10 @@ async function collectItemsFromSource(source, options = {}) {
           context: `${source.name}/SitemapIndex`,
           headers: sourceHeaders,
         });
+        const sitemapIndexAudit = buildFetchAudit(
+          indexResponse,
+          source.sitemapIndexUrl
+        );
 
         const maxSitemaps = toPositiveInt(source.maxSitemaps, maxSitemapsPerSource);
         const sitemaps = extractSitemapsFromIndex(indexResponse.data).slice(
@@ -149,6 +193,7 @@ async function collectItemsFromSource(source, options = {}) {
             context: `${source.name}/SitemapFile`,
             headers: sourceHeaders,
           });
+          const sitemapFileAudit = buildFetchAudit(smResponse, sitemapUrl);
 
           const urls = extractUrlsFromSitemap(smResponse.data, source);
           urls.forEach((entry) => {
@@ -158,6 +203,10 @@ async function collectItemsFromSource(source, options = {}) {
               name: inferTitleFromUrl(entry.url),
               url: entry.url,
               lastmod: entry.lastmod,
+              ingestionMeta: {
+                sourceSitemapIndexAudit: sitemapIndexAudit,
+                sourceFetchAudit: sitemapFileAudit,
+              },
             });
           });
 
@@ -186,8 +235,16 @@ async function collectItemsFromSource(source, options = {}) {
           context: `${source.name}/Feed`,
           headers: sourceHeaders,
         });
+        const feedAudit = buildFetchAudit(feedResponse, source.feedUrl);
 
         feedItems = extractArticlesFromFeed(feedResponse.data, source);
+        feedItems = feedItems.map((item) => ({
+          ...item,
+          ingestionMeta: {
+            ...(item.ingestionMeta || {}),
+            sourceFetchAudit: feedAudit,
+          },
+        }));
         feedItems = filterByDays(feedItems, sourceDaysBack);
       } catch (_error) {
         if (metrics) metrics.parseErrorCount += 1;
@@ -217,8 +274,16 @@ async function collectItemsFromSource(source, options = {}) {
           context: `${source.name}/Home`,
           headers: sourceHeaders,
         });
+        const homeAudit = buildFetchAudit(homeResponse, source.monitorUrl);
 
         homeItems = extractArticlesFromHomeHtml(homeResponse.data, source);
+        homeItems = homeItems.map((item) => ({
+          ...item,
+          ingestionMeta: {
+            ...(item.ingestionMeta || {}),
+            sourceFetchAudit: homeAudit,
+          },
+        }));
       } catch (_error) {
         if (metrics) metrics.parseErrorCount += 1;
         logger.warn(
