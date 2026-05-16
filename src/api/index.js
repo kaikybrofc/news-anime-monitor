@@ -76,6 +76,10 @@ const {
   saveKeywordDiscoveryJobs,
   saveValidatedCandidates,
 } = require("../db/candidate-sources-repository.js");
+const {
+  ensureVisitsTables,
+  recordArticleVisit,
+} = require("../db/article-visits-repository.js");
 const { hasDbConfig } = require("../db/mysql.js");
 
 function parseCommaSeparatedList(value = "") {
@@ -203,6 +207,7 @@ const DATA_FILE = path.resolve(
 const app = express();
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
+app.use(express.json({ limit: "64kb" }));
 
 app.use(
   helmet({
@@ -225,7 +230,7 @@ const corsMiddleware = cors({
 
     callback(new Error("Origin não permitida."));
   },
-  methods: ["GET", "HEAD", "OPTIONS"],
+  methods: ["GET", "POST", "HEAD", "OPTIONS"],
   credentials: false,
   maxAge: 60 * 60 * 24,
 });
@@ -1618,6 +1623,7 @@ async function loadArticlesFromStorage() {
       await ensureDatabaseAndTable();
       await ensureExtractorItemsTable();
       await ensureCandidateValidationTables();
+      await ensureVisitsTables();
       const dbArticles = await loadAllArticles();
 
       if (dbArticles.length) {
@@ -1861,6 +1867,60 @@ app.get("/articles/:id", async (req, res) => {
     logger.error("[API:/articles/:id] Falha ao buscar artigo:", error);
     return res.status(500).json({
       error: "Falha ao buscar artigo.",
+    });
+  }
+});
+
+app.post("/analytics/visits", async (req, res) => {
+  try {
+    if (!USE_MYSQL) {
+      return res.status(503).json({
+        error: "Persistência de analytics indisponível sem MySQL.",
+      });
+    }
+
+    const payload = req.body && typeof req.body === "object" ? req.body : {};
+    const articleId = String(payload.articleId || "").trim();
+    if (!articleId) {
+      return res.status(400).json({
+        error: "articleId é obrigatório.",
+      });
+    }
+
+    await recordArticleVisit({
+      articleId,
+      articleSlug: payload.articleSlug,
+      path: payload.path || req.path,
+      eventType: payload.eventType,
+      sessionId: payload.sessionId,
+      referrer: payload.referrer || req.get("referer") || "",
+      utmSource: payload.utmSource,
+      utmMedium: payload.utmMedium,
+      utmCampaign: payload.utmCampaign,
+      utmTerm: payload.utmTerm,
+      utmContent: payload.utmContent,
+      deviceType: payload.deviceType,
+      browser: payload.browser,
+      os: payload.os,
+      userAgent: req.get("user-agent") || payload.userAgent || "",
+      countryCode: payload.countryCode,
+      region: payload.region,
+      city: payload.city,
+      timeOnPageMs: payload.timeOnPageMs,
+      scrollDepthPct: payload.scrollDepthPct,
+      clickedOutbound: payload.clickedOutbound,
+      eventAt: payload.eventAt || new Date().toISOString(),
+      ip:
+        normalizeIp(req.get("x-forwarded-for")) ||
+        normalizeIp(req.ip) ||
+        normalizeIp(req.socket?.remoteAddress),
+    });
+
+    return res.status(202).json({ ok: true });
+  } catch (error) {
+    logger.error("[API:/analytics/visits] Falha ao registrar visita:", error);
+    return res.status(500).json({
+      error: "Falha ao registrar visita.",
     });
   }
 });

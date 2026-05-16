@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound as renderNotFound, permanentRedirect } from "next/navigation";
 import { SafeImage } from "@/components/safe-image";
+import { ArticleVisitTracker } from "@/components/article-visit-tracker";
 import { fetchMonitor } from "@/lib/api";
 import { getArticleLifecycleBadges } from "@/lib/article-state";
 import {
@@ -496,6 +497,7 @@ export default async function NoticiaDetailPage(props) {
 
   return (
     <div className="flex flex-col gap-6 md:gap-10">
+      <ArticleVisitTracker articleId={String(article?.id || "")} articleSlug={rawArticleParam} />
       <script type="application/ld+json" suppressHydrationWarning>
         {JSON.stringify(articleSchema)}
       </script>
