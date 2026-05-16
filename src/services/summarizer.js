@@ -8,6 +8,19 @@ const { extractTitleFromHtml } = require("../utils/article-utils.js");
 const GEMINI_CLI_PATH =
   String(process.env.GEMINI_CLI_PATH || "gemini").trim() || "gemini";
 const GEMINI_MODEL = String(process.env.GEMINI_MODEL || "").trim();
+const GEMINI_MODEL_AUTO_SWITCH = toBoolean(
+  process.env.GEMINI_MODEL_AUTO_SWITCH,
+  true
+);
+const GEMINI_MODEL_CANDIDATES_DEFAULT = [
+  "gemini-2.5-flash-lite",
+  "gemini-2.5-flash",
+  "gemini-2.5-pro",
+];
+const GEMINI_MODEL_CANDIDATES = parseModelList(
+  process.env.GEMINI_MODEL_CANDIDATES,
+  GEMINI_MODEL_CANDIDATES_DEFAULT
+);
 const GEMINI_TIMEOUT_MS = toPositiveInt(process.env.GEMINI_TIMEOUT_MS, 90000);
 const GEMINI_MAX_ATTEMPTS = toPositiveInt(process.env.GEMINI_MAX_ATTEMPTS, 3);
 const GEMINI_RETRY_BASE_MS = toPositiveInt(
@@ -44,6 +57,16 @@ const SUMMARY_GENERIC_ERROR_MESSAGE = "Ocorreu um erro durante o resumo.";
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseModelList(value, fallback = []) {
+  const raw = String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const source = raw.length ? raw : fallback;
+  return Array.from(new Set(source.map((item) => String(item).trim()).filter(Boolean)));
 }
 
 function toBoolean(value, fallback = false) {
@@ -270,7 +293,7 @@ function createEmptySummaryError(details = {}) {
   return error;
 }
 
-function runGeminiCliPrompt(prompt) {
+function runGeminiCliPrompt(prompt, model = "") {
   return new Promise((resolve, reject) => {
     const args = ["-p", String(prompt || ""), "--output-format", "text"];
     if (GEMINI_DISABLE_EXTENSIONS) {
@@ -279,8 +302,8 @@ function runGeminiCliPrompt(prompt) {
     if (GEMINI_APPROVAL_MODE) {
       args.push("--approval-mode", GEMINI_APPROVAL_MODE);
     }
-    if (GEMINI_MODEL) {
-      args.push("--model", GEMINI_MODEL);
+    if (model) {
+      args.push("--model", model);
     }
 
     const child = spawn(GEMINI_CLI_PATH, args, {
@@ -379,15 +402,58 @@ function runGeminiCliPrompt(prompt) {
   });
 }
 
+function resolveGeminiModelSequence() {
+  if (!GEMINI_MODEL_AUTO_SWITCH) {
+    if (GEMINI_MODEL) return [GEMINI_MODEL];
+    return GEMINI_MODEL_CANDIDATES.length
+      ? GEMINI_MODEL_CANDIDATES
+      : GEMINI_MODEL_CANDIDATES_DEFAULT;
+  }
+
+  if (GEMINI_MODEL_CANDIDATES.length) return GEMINI_MODEL_CANDIDATES;
+  if (GEMINI_MODEL) return [GEMINI_MODEL];
+  return GEMINI_MODEL_CANDIDATES_DEFAULT;
+}
+
 async function generateSummary(prompt) {
+  const modelSequence = resolveGeminiModelSequence();
+  let currentModelIndex = 0;
   let lastError;
+  let lastModelTried = "";
+  let switchedModelAtLeastOnce = false;
 
   for (let attempt = 1; attempt <= GEMINI_MAX_ATTEMPTS; attempt += 1) {
+    const model = modelSequence[currentModelIndex] || "";
+    lastModelTried = model;
     try {
-      return await runGeminiCliPrompt(prompt);
+      const summary = await runGeminiCliPrompt(prompt, model);
+      return {
+        summary,
+        modelUsed: model || "padrão do Gemini CLI",
+        switchedModel: switchedModelAtLeastOnce,
+      };
     } catch (error) {
       lastError = error;
       const retryable = isRetryableGeminiError(error);
+      const shouldSwitchModel =
+        GEMINI_MODEL_AUTO_SWITCH &&
+        modelSequence.length > 1 &&
+        currentModelIndex < modelSequence.length - 1 &&
+        (isGeminiQuotaOrLimitError(error) ||
+          isGeminiUnavailableError(error) ||
+          error?.code === "GEMINI_CLI_EXIT_ERROR");
+
+      if (shouldSwitchModel) {
+        const previousModel = model || "padrão do Gemini CLI";
+        currentModelIndex += 1;
+        switchedModelAtLeastOnce = true;
+        const nextModel = modelSequence[currentModelIndex] || "padrão do Gemini CLI";
+        logger.warn(
+          `[Resumo] Alternando modelo Gemini automaticamente: ${previousModel} -> ${nextModel}`
+        );
+        continue;
+      }
+
       const willRetry = retryable && attempt < GEMINI_MAX_ATTEMPTS;
 
       if (!willRetry) break;
@@ -410,11 +476,18 @@ async function generateSummary(prompt) {
     }
   }
 
+  if (lastError && lastModelTried) {
+    lastError.lastModelTried = lastModelTried;
+  }
+
   throw lastError;
 }
 
 function getSummaryModelLabel() {
-  return GEMINI_MODEL || "padrão do Gemini CLI";
+  if (!GEMINI_MODEL_AUTO_SWITCH) {
+    return GEMINI_MODEL || "padrão do Gemini CLI";
+  }
+  return resolveGeminiModelSequence().join(" -> ");
 }
 
 function assertSummaryConfiguration() {
@@ -454,9 +527,12 @@ async function summarizeHtmlInternal(htmlContent, options = {}) {
     logger.info(`Provedor: Gemini CLI | Modelo: ${getSummaryModelLabel()}`);
     logger.info(`======================================\n`);
 
-    const summary = await generateSummary(buildPrompt(limitedText));
+    const generation = await generateSummary(buildPrompt(limitedText));
+    const summary = generation.summary;
+    const modelUsed = generation.modelUsed;
 
     logger.info("\n========== RESPOSTA DA IA ============");
+    logger.info(`Modelo usado: ${modelUsed}`);
     logger.info(summary);
     logger.info("======================================\n");
     logger.success("[Resumo] Resumo recebido.");
