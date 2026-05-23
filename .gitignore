@@ -1,9 +1,10 @@
 # Arquivos de configuração local e segredos
 .env
-
+.claude
 # Dependências do Node
 node_modules/
 
 # Arquivos de log
 *.log
 src/data/processed_articles.json
+test-results/.last-run.json

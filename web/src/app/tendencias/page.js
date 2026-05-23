@@ -15,12 +15,7 @@ export const dynamic = "force-dynamic";
 
 export default async function TendenciasPage({ searchParams }) {
   const top = clampInt(readQueryInt(searchParams, "top", 12), 1, 50, 12);
-  const windowHours = clampInt(
-    readQueryInt(searchParams, "windowHours", 72),
-    1,
-    24 * 30,
-    72
-  );
+  const windowHours = clampInt(readQueryInt(searchParams, "windowHours", 72), 1, 24 * 30, 72);
 
   let payload = null;
   let errorMessage = "";
@@ -37,147 +32,115 @@ export default async function TendenciasPage({ searchParams }) {
   const topSources = payload?.topSources || [];
 
   return (
-    <div className="flex flex-col gap-10">
-      {/* Header Section */}
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-1 bg-rose-500 rounded-full" />
-          <h1 className="!text-4xl">Tendências do Radar</h1>
+    <div className="page-shell">
+      <section className="page-intro animate-fade-in">
+        <div className="section-heading">
+          <span className="page-kicker">Leitura de sinais</span>
+          <h1>Tendências editoriais nas últimas {windowHours} horas</h1>
+          <p className="lead">
+            Um recorte premium do que ganhou tração no ecossistema anime, com franquias em alta, tópicos recentes e fontes mais ativas do ciclo atual.
+          </p>
         </div>
-        <p className="lead max-w-2xl">
-          Análise de dados em tempo real nas últimas {windowHours} horas.
-          Identificamos o que está em alta no ecossistema de anime.
-        </p>
       </section>
 
       {errorMessage ? (
         <article className="info-card warning-card">
-          <h2 className="text-rose-400">Falha ao carregar tendências</h2>
+          <h2 className="text-[var(--title)]">Falha ao carregar tendências</h2>
           <p>{errorMessage}</p>
         </article>
       ) : null}
 
-      {/* KPI Section */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <article className="info-card flex flex-col gap-2 relative overflow-hidden group">
-          <div className="absolute -right-4 -top-4 text-slate-800/20 text-6xl font-black group-hover:text-rose-500/10 transition-colors">
-            #
-          </div>
-          <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Volume de artigos</span>
-          <p className="kpi-number !text-5xl text-rose-500">{formatNumber(totals.articles || 0)}</p>
-          <span className="text-[10px] text-slate-600 font-medium">Processados na janela atual</span>
+      <section className="metric-strip animate-fade-in-up delay-100">
+        <article className="data-card">
+          <span className="data-card-label">Volume de artigos</span>
+          <p className="kpi-number">{formatNumber(totals.articles || 0)}</p>
+          <span className="data-card-note">Processados nesta janela.</span>
         </article>
-        
-        <article className="info-card flex flex-col gap-2 relative overflow-hidden group">
-          <div className="absolute -right-4 -top-4 text-slate-800/20 text-6xl font-black group-hover:text-rose-500/10 transition-colors">
-            ★
-          </div>
-          <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Franquias ativas</span>
-          <p className="kpi-number !text-5xl">{formatNumber(totals.franchises || 0)}</p>
-          <span className="text-[10px] text-slate-600 font-medium">Menções detectadas via pipeline</span>
+        <article className="data-card">
+          <span className="data-card-label">Franquias ativas</span>
+          <p className="kpi-number">{formatNumber(totals.franchises || 0)}</p>
+          <span className="data-card-note">Menções detectadas pelo monitor.</span>
         </article>
+        <article className="data-card">
+          <span className="data-card-label">Tópicos únicos</span>
+          <p className="kpi-number">{formatNumber(totals.topics || 0)}</p>
+          <span className="data-card-note">Temas recorrentes no ciclo atual.</span>
+        </article>
+      </section>
 
-        <article className="info-card flex flex-col gap-2 relative overflow-hidden group">
-          <div className="absolute -right-4 -top-4 text-slate-800/20 text-6xl font-black group-hover:text-rose-500/10 transition-colors">
-            ●
-          </div>
-          <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Tópicos únicos</span>
-          <p className="kpi-number !text-5xl">{formatNumber(totals.topics || 0)}</p>
-          <span className="text-[10px] text-slate-600 font-medium">Categorias e temas identificados</span>
-        </article>
-      </div>
-
-      {/* Lists Section */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Top Franquias */}
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-3 animate-fade-in-up delay-200">
         <section className="flex flex-col gap-4">
-          <div className="flex items-center justify-between px-1">
-            <h2 className="text-sm font-black uppercase tracking-widest text-slate-100">Top franquias</h2>
-            <span className="trend-badge">Alta</span>
+          <div className="section-heading">
+            <span className="page-kicker">Franquias</span>
+            <h2>As mais citadas agora</h2>
           </div>
-          <div className="info-card !p-2">
+          <div className="list-panel">
             <div className="list-stack">
               {topFranchises.length ? (
                 topFranchises.map((franchise) => (
-                  <Link
-                    key={franchise.slug}
-                    className="line-link"
-                    href={`/franquias/${franchise.slug}`}
-                  >
+                  <Link key={franchise.slug} className="line-link" href={`/franquias/${franchise.slug}`}>
                     <div className="flex items-center justify-between">
                       <strong>{franchise.name}</strong>
-                      <span className="text-rose-400 font-bold">+{franchise.mentions}</span>
+                      <span className="font-bold text-[var(--title)]">+{franchise.mentions}</span>
                     </div>
-                    <span>
-                      Score médio: {formatNumber(franchise.avgScore)}
-                    </span>
+                    <span>Score médio: {formatNumber(franchise.avgScore)}</span>
                   </Link>
                 ))
               ) : (
-                <p className="p-4 text-sm text-slate-600 italic text-center">Nenhuma franquia no topo.</p>
+                <p className="p-4 text-center text-sm italic text-[var(--muted)]">Nenhuma franquia no topo.</p>
               )}
             </div>
           </div>
         </section>
 
-        {/* Top Fontes */}
         <section className="flex flex-col gap-4">
-          <div className="flex items-center justify-between px-1">
-            <h2 className="text-sm font-black uppercase tracking-widest text-slate-100">Top fontes</h2>
-            <span className="trend-badge !text-sky-400 !bg-sky-500/10">Ativas</span>
+          <div className="section-heading">
+            <span className="page-kicker">Fontes</span>
+            <h2>Quem mais puxou o ciclo</h2>
           </div>
-          <div className="info-card !p-2">
+          <div className="list-panel">
             <div className="list-stack">
               {topSources.length ? (
                 topSources.map((source) => (
-                  <Link
-                    key={source.sourceId}
-                    className="line-link"
-                    href={`/fontes/${source.sourceId}`}
-                  >
+                  <Link key={source.sourceId} className="line-link" href={`/fontes/${source.sourceId}`}>
                     <div className="flex items-center justify-between">
                       <strong>{source.sourceName}</strong>
-                      <span className="text-slate-300 font-bold">{source.count}</span>
+                      <span className="font-bold text-[var(--title)]">{source.count}</span>
                     </div>
-                    <span>
-                      Score médio: {formatNumber(source.avgScore)}
-                    </span>
+                    <span>Score médio: {formatNumber(source.avgScore)}</span>
                   </Link>
                 ))
               ) : (
-                <p className="p-4 text-sm text-slate-600 italic text-center">Nenhuma fonte ativa.</p>
+                <p className="p-4 text-center text-sm italic text-[var(--muted)]">Nenhuma fonte ativa.</p>
               )}
             </div>
           </div>
         </section>
 
-        {/* Top Tópicos */}
         <section className="flex flex-col gap-4">
-          <div className="flex items-center justify-between px-1">
-            <h2 className="text-sm font-black uppercase tracking-widest text-slate-100">Tópicos recentes</h2>
-            <span className="trend-badge !text-amber-400 !bg-amber-500/10">Notícias</span>
+          <div className="section-heading">
+            <span className="page-kicker">Tópicos</span>
+            <h2>Assuntos que voltaram à superfície</h2>
           </div>
-          <div className="info-card !p-2">
+          <div className="list-panel">
             <div className="list-stack">
               {topTopics.length ? (
                 topTopics.map((topic) => (
                   <div key={topic.topicKey} className="line-item">
                     <div className="flex items-center justify-between">
                       <strong className="capitalize">{topic.topicKey}</strong>
-                      <span className="text-slate-500">{topic.mentions}</span>
+                      <span>{topic.mentions}</span>
                     </div>
-                    <span>
-                      Visto em: {formatDateTime(topic.lastSeenAt)}
-                    </span>
+                    <span>Visto em: {formatDateTime(topic.lastSeenAt)}</span>
                   </div>
                 ))
               ) : (
-                <p className="p-4 text-sm text-slate-600 italic text-center">Nenhum tópico detectado.</p>
+                <p className="p-4 text-center text-sm italic text-[var(--muted)]">Nenhum tópico detectado.</p>
               )}
             </div>
           </div>
         </section>
-      </div>
+      </section>
     </div>
   );
 }

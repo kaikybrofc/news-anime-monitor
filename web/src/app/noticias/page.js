@@ -22,9 +22,7 @@ export async function generateMetadata(props) {
   if (source) canonicalQuery.set("source", source);
   if (bucket) canonicalQuery.set("bucket", bucket);
 
-  const canonicalPath = canonicalQuery.size
-    ? `/noticias?${canonicalQuery.toString()}`
-    : "/noticias";
+  const canonicalPath = canonicalQuery.size ? `/noticias?${canonicalQuery.toString()}` : "/noticias";
 
   return {
     title: offset > 0 ? `Notícias (Página ${Math.floor(offset / limit) + 1}) | Anime Radar` : "Notícias | Anime Radar",
@@ -104,64 +102,72 @@ export default async function NoticiasPage(props) {
   };
 
   return (
-    <div className="flex flex-col gap-10">
+    <div className="page-shell">
       <script type="application/ld+json" suppressHydrationWarning>
         {JSON.stringify(collectionSchema)}
       </script>
 
-      {/* Search */}
-      <section className="relative z-30 animate-fade-in-up delay-50">
-        <div className="info-card glass !p-1 md:!p-2 shadow-2xl overflow-visible rounded-[2rem]">
-          <UnifiedSearch
-            initialQuery={filters.q}
-            className="w-full"
-            placeholder="Buscar notícia, franquia ou fonte..."
-          />
+      <section className="page-intro animate-fade-in">
+        <div className="section-heading">
+          <span className="page-kicker">Feed editorial</span>
+          <h1>Notícias monitoradas e priorizadas em tempo real</h1>
+          <p className="lead">
+            Acompanhe a coleção viva do radar com busca integrada, leitura guiada e paginação contínua por relevância editorial.
+          </p>
         </div>
+      </section>
+
+      <section className="animate-fade-in-up delay-100">
+        <UnifiedSearch
+          initialQuery={filters.q}
+          className="w-full"
+          placeholder="Buscar notícia, franquia ou fonte..."
+        />
       </section>
 
       {errorMessage ? (
         <article className="info-card warning-card animate-fade-in">
-          <h2 className="text-rose-400">Falha ao carregar notícias</h2>
+          <h2 className="text-[var(--title)]">Falha ao carregar notícias</h2>
           <p>{errorMessage}</p>
         </article>
       ) : null}
 
-      {/* Grid Section */}
-      <section className="relative z-10 flex flex-col gap-8">
+      <section className="flex flex-col gap-8">
         {payload.items?.length ? (
-          <div className="article-grid">
-            {payload.items.map((article, idx) => (
-              <div 
-                key={article.id} 
-                className="animate-fade-in-up" 
-                style={{ animationDelay: `${0.05 * (idx % 10)}s` }}
-              >
-                <ArticleCard article={article} />
-              </div>
-            ))}
-          </div>
+          <>
+            <div className="section-heading">
+              <span className="page-kicker">Coleção atual</span>
+              <h2>Leituras recentes do radar</h2>
+              <p className="section-copy">
+                Página {Math.floor((payload.offset || offset) / (payload.limit || limit)) + 1} da coleção pública com monitoramento contínuo.
+              </p>
+            </div>
+            <div className="article-grid">
+              {payload.items.map((article, idx) => (
+                <div key={article.id} className="animate-fade-in-up" style={{ animationDelay: `${0.04 * (idx % 10)}s` }}>
+                  <ArticleCard article={article} />
+                </div>
+              ))}
+            </div>
+          </>
         ) : (
-          <article className="info-card p-12 text-center animate-fade-in">
-            <h2 className="text-slate-200 mb-2">Sem resultados</h2>
-            <p className="text-slate-500">Não encontramos artigos para os filtros atuais.</p>
-            <Link href="/noticias" className="btn btn-secondary mt-6 inline-flex">Limpar Filtros</Link>
+          <article className="empty-state animate-fade-in">
+            <h2 className="mb-2 !text-2xl">Sem resultados</h2>
+            <p>Não encontramos artigos para os filtros atuais.</p>
+            <Link href="/noticias" className="btn btn-secondary mt-6 inline-flex">
+              Limpar filtros
+            </Link>
           </article>
         )}
       </section>
-{/* Pagination */}
-<section className="animate-fade-in-up mt-6">
-  <div className="info-card !p-6 md:!px-10 border-slate-800/40 bg-slate-900/30 shadow-2xl rounded-[2rem]">
-    <Pagination
-      pathname="/noticias"
-      searchParams={searchParams}
-      offset={payload.offset || offset}
-      limit={payload.limit || limit}
-      hasMore={Boolean(payload.hasMore)}
-    />
-  </div>
-</section>
 
-  </div>
-);
+      <Pagination
+        pathname="/noticias"
+        searchParams={searchParams}
+        offset={payload.offset || offset}
+        limit={payload.limit || limit}
+        hasMore={Boolean(payload.hasMore)}
+      />
+    </div>
+  );
 }

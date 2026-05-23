@@ -355,15 +355,13 @@ export default async function NoticiaDetailPage(props) {
 
   if (state.status === "error") {
     return (
-      <div className="site-container py-12">
-        <Link href="/noticias" className="inline-link mb-6 inline-block">← Voltar para notícias</Link>
-        <article className="info-card warning-card p-8">
-          <h1 className="text-2xl mb-4">Falha ao carregar notícia</h1>
-          <p className="text-slate-400">
-            Não foi possível carregar este artigo agora. Tente novamente em instantes.
-          </p>
+      <div className="page-shell">
+        <Link href="/noticias" className="inline-link">← Voltar para notícias</Link>
+        <article className="info-card warning-card !p-8">
+          <h1 className="!text-2xl mb-4">Falha ao carregar notícia</h1>
+          <p>Não foi possível carregar este artigo agora. Tente novamente em instantes.</p>
           {process.env.NODE_ENV !== "production" && state.errorMessage ? (
-            <p className="text-xs text-slate-500 mt-3">{state.errorMessage}</p>
+            <p className="technical-note mt-3">{state.errorMessage}</p>
           ) : null}
         </article>
       </div>
@@ -496,7 +494,7 @@ export default async function NoticiaDetailPage(props) {
   }
 
   return (
-    <div className="flex flex-col gap-6 md:gap-10">
+    <div className="page-shell">
       <ArticleVisitTracker articleId={String(article?.id || "")} articleSlug={rawArticleParam} />
       <script type="application/ld+json" suppressHydrationWarning>
         {JSON.stringify(articleSchema)}
@@ -505,66 +503,47 @@ export default async function NoticiaDetailPage(props) {
         {JSON.stringify(breadcrumbSchema)}
       </script>
 
-      {/* Mobile Back Button */}
       <div className="md:hidden">
         <Link href="/noticias" className="btn btn-secondary !py-2 !px-4 !text-xs w-fit">
           ← Voltar
         </Link>
       </div>
 
-      {/* Hero Section */}
-      <section className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-12">
-        <div className="flex flex-col gap-6 lg:w-2/3">
-          <header className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-xs font-black uppercase tracking-widest text-rose-500">{sourceName}</span>
-              <div className="h-1 w-1 rounded-full bg-slate-700" />
-              <span className="text-xs font-medium text-slate-400">{formatDateTime(publishedAt)}</span>
-            </div>
-            <h1 className="!text-3xl md:!text-5xl !leading-[1.15]">{title}</h1>
-            {badges.length > 0 && (
-              <div className="flex flex-wrap gap-2 pt-2">
-                {badges.map((badge) => (
-                  <span key={badge.key} className={`status-badge !text-[10px] ${badge.toneClass}`}>
-                    {badge.label}
-                  </span>
-                ))}
+      <section className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1.6fr)_minmax(280px,0.8fr)] xl:items-start animate-fade-in-up delay-100">
+        <div className="flex flex-col gap-8">
+          {imageUrl ? (
+            <article className="info-card !p-0 overflow-hidden">
+              <div className="relative aspect-video w-full overflow-hidden">
+                <SafeImage
+                  src={imageUrl}
+                  alt={title || "Imagem de destaque da notícia"}
+                  fill
+                  sizes="(max-width: 768px) 100vw, (max-width: 1280px) 66vw, 800px"
+                  className="h-full w-full object-cover"
+                  priority
+                  fallbackClassName="h-full w-full"
+                />
               </div>
-            )}
-          </header>
+            </article>
+          ) : null}
 
-          {imageUrl && (
-            <div className="relative aspect-video w-full overflow-hidden rounded-3xl border border-slate-800 shadow-2xl">
-              <SafeImage
-                src={imageUrl}
-                alt={title || "Imagem de destaque da notícia"}
-                fill
-                sizes="(max-width: 768px) 100vw, (max-width: 1280px) 66vw, 800px"
-                className="h-full w-full object-cover"
-                priority
-                fallbackClassName="h-full w-full"
-              />
-            </div>
-          )}
-
-          <div className="flex flex-col gap-6 bg-slate-900/50 p-6 md:p-10 rounded-3xl border border-slate-800">
-            <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-              <span className="h-5 w-1 bg-rose-500 rounded-full" />
-              Resumo da Notícia
-            </h2>
-            {summary ? (
-              <div className="text-base md:text-lg text-slate-300 leading-relaxed">
-                {renderMarkdownSummary(summary)}
-              </div>
-            ) : (
-              <p className="text-slate-500 italic italic">Resumo indisponível para este artigo.</p>
-            )}
-
-            <div className="flex flex-col gap-3">
-              <h2 className="text-lg font-bold text-slate-100">
-                Contexto e impacto da notícia
+          <article className="editorial-reading-panel">
+            <div className="section-heading">
+              <span className="page-kicker">Leitura principal</span>
+              <h2 className="!text-[1.5rem] md:!text-[2rem] flex items-center gap-3">
+                <span className="editorial-inline-accent" aria-hidden />
+                Resumo da notícia
               </h2>
-              <p className="text-slate-300">
+            </div>
+            {summary ? (
+              <div className="editorial-reading-copy">{renderMarkdownSummary(summary)}</div>
+            ) : (
+              <p className="muted italic">Resumo indisponível para este artigo.</p>
+            )}
+
+            <div className="editorial-reading-section">
+              <h2 className="!text-[1.25rem] md:!text-[1.5rem]">Contexto e impacto da notícia</h2>
+              <p>
                 Esta cobertura integra nosso monitor contínuo de{" "}
                 <Link href="/noticias" className="inline-link">
                   notícias de anime
@@ -582,38 +561,44 @@ export default async function NoticiaDetailPage(props) {
               </p>
             </div>
 
-            <div className="flex flex-col gap-3">
-              <h2 className="text-lg font-bold text-slate-100">Dados-chave</h2>
-              <ul className="list-disc pl-6 space-y-1 text-slate-300">
-                {factBlocks.keyFacts.map((item, index) => (
-                  <li key={`fact-key-${index}`}>{item}</li>
-                ))}
-              </ul>
+            <div className="panel-grid">
+              <article className="list-panel">
+                <div className="section-heading mb-3">
+                  <span className="page-kicker">Leitura rápida</span>
+                  <h2>Dados-chave</h2>
+                </div>
+                <ul className="list-disc pl-6 space-y-2">
+                  {factBlocks.keyFacts.map((item, index) => (
+                    <li key={`fact-key-${index}`}>{item}</li>
+                  ))}
+                </ul>
+              </article>
+
+              <article className="list-panel">
+                <div className="section-heading mb-3">
+                  <span className="page-kicker">Linha editorial</span>
+                  <h2>Linha do tempo</h2>
+                </div>
+                <ul className="list-disc pl-6 space-y-2">
+                  {factBlocks.timeline.map((item, index) => (
+                    <li key={`fact-time-${index}`}>{item}</li>
+                  ))}
+                </ul>
+              </article>
             </div>
 
-            <div className="flex flex-col gap-3">
-              <h2 className="text-lg font-bold text-slate-100">Linha do tempo</h2>
-              <ul className="list-disc pl-6 space-y-1 text-slate-300">
-                {factBlocks.timeline.map((item, index) => (
-                  <li key={`fact-time-${index}`}>{item}</li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <h2 className="text-lg font-bold text-slate-100">O que muda para fãs</h2>
-              <ul className="list-disc pl-6 space-y-1 text-slate-300">
+            <div className="editorial-reading-section">
+              <h2 className="!text-[1.25rem] md:!text-[1.5rem]">O que muda para fãs</h2>
+              <ul className="list-disc pl-6 space-y-2">
                 {factBlocks.fanImpact.map((item, index) => (
                   <li key={`fact-fans-${index}`}>{item}</li>
                 ))}
               </ul>
             </div>
 
-            <div className="flex flex-col gap-3">
-              <h2 className="text-lg font-bold text-slate-100">
-                Termos relacionados para busca
-              </h2>
-              <p className="text-slate-300">
+            <div className="editorial-reading-section">
+              <h2 className="!text-[1.25rem] md:!text-[1.5rem]">Termos relacionados para busca</h2>
+              <p>
                 Este conteúdo também atende buscas como <strong>ranking de animes 2026</strong>,{" "}
                 <strong>melhores animes do MyAnimeList</strong> e <strong>top animes populares</strong>,
                 conectando esta notícia a outros conteúdos relevantes dentro do Anime Radar.
@@ -621,17 +606,15 @@ export default async function NoticiaDetailPage(props) {
             </div>
 
             {entitySections.length > 0 && (
-              <div className="flex flex-col gap-3">
-                <h3 className="text-sm font-bold uppercase tracking-widest text-slate-400">
-                  Entidades relacionadas
-                </h3>
-                <div className="flex flex-wrap gap-2">
+              <div className="editorial-reading-section">
+                <h3 className="page-kicker">Entidades relacionadas</h3>
+                <div className="badge-row">
                   {entitySections.map((section) =>
                     section.items.map((item) => (
                       <Link
                         key={`${section.type}:${item.slug}`}
                         href={`${section.config.routeBase}/${item.slug}`}
-                        className="status-badge border border-slate-700 bg-slate-800/80 text-slate-200 normal-case tracking-normal"
+                        className="entity-pill"
                       >
                         {section.label}: {item.name}
                       </Link>
@@ -643,127 +626,115 @@ export default async function NoticiaDetailPage(props) {
 
             {rankingTemplateEnabled && (
               <div className="flex flex-col gap-5">
-                <div className="flex flex-col gap-3">
-                  <h2 className="text-lg font-bold text-slate-100">
-                    Top 10 destaques do ranking
-                  </h2>
-                  <p className="text-slate-300">
+                <div className="editorial-reading-section">
+                  <h2 className="!text-[1.25rem] md:!text-[1.5rem]">Top 10 destaques do ranking</h2>
+                  <p>
                     Recorte rápido para quem busca <strong>ranking de animes 2026</strong>,{" "}
                     <strong>melhores animes no MyAnimeList</strong> e termos similares.
                   </p>
                   {topHighlights.length ? (
-                    <ol className="list-decimal pl-6 space-y-1 text-slate-200">
+                    <ol className="list-decimal pl-6 space-y-2">
                       {topHighlights.map((row, index) => (
-                        <li key={`rank-top-${index}`}>
-                          <span>{row.name}</span>
-                        </li>
+                        <li key={`rank-top-${index}`}>{row.name}</li>
                       ))}
                     </ol>
                   ) : (
-                    <p className="text-slate-500">Sem dados suficientes para gerar o top 10.</p>
+                    <p className="muted">Sem dados suficientes para gerar o top 10.</p>
                   )}
                 </div>
 
-                <div className="flex flex-col gap-3">
-                  <h2 className="text-lg font-bold text-slate-100">
-                    Lista completa do ranking (até 50 itens)
-                  </h2>
-                  <p className="text-slate-300">
+                <div className="editorial-reading-section">
+                  <h2 className="!text-[1.25rem] md:!text-[1.5rem]">Lista completa do ranking</h2>
+                  <p>
                     Estrutura editorial para leitura escaneável. Esta lista é atualizada de forma contínua
                     conforme novas menções e sinais de relevância entram no monitor.
                   </p>
                   {rankingRows.length ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div className="ranking-grid">
                       {rankingRows.map((row, index) => (
-                        <div
-                          key={`rank-row-${index}`}
-                          className="rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2 text-sm text-slate-200"
-                        >
-                          <span className="font-semibold text-rose-300">{index + 1}.</span>{" "}
+                        <div key={`rank-row-${index}`} className="ranking-row">
+                          <span className="ranking-index">{index + 1}.</span>{" "}
                           <span>{row.name}</span>
-                          <span className="ml-2 text-[11px] text-slate-500">({row.source})</span>
+                          <span className="ranking-source">({row.source})</span>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-slate-500">Sem dados suficientes para montar a lista completa.</p>
+                    <p className="muted">Sem dados suficientes para montar a lista completa.</p>
                   )}
                 </div>
               </div>
             )}
-            
-            <div className="pt-6 border-t border-slate-800 flex flex-wrap gap-4">
-              {sourceUrl && (
+
+            <div className="article-footer-actions pt-6">
+              {sourceUrl ? (
                 <a href={sourceUrl} target="_blank" rel="noreferrer" className="btn btn-primary !px-8">
-                  Ler Fonte Original
+                  Ler fonte original
                 </a>
-              )}
+              ) : null}
               <Link href="/noticias" className="btn btn-secondary !px-8 hidden md:inline-flex">
-                Voltar para Lista
+                Voltar para lista
               </Link>
             </div>
-          </div>
+          </article>
         </div>
 
-        {/* Sidebar */}
-        <aside className="flex flex-col gap-6 lg:w-1/3 lg:sticky lg:top-24">
-          <div className="info-card flex flex-col gap-8">
-            <div className="flex flex-col gap-3">
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Inteligência Radar</span>
-              <div className="bg-slate-950/50 p-6 rounded-2xl border border-slate-800 flex flex-col gap-1 items-center justify-center text-center">
-                <span className="text-xs font-bold text-slate-500 uppercase">Score de Relevância</span>
-                <span className="text-5xl font-black text-rose-500 tracking-tighter">{score}</span>
+        <aside className="flex flex-col gap-6 xl:sticky xl:top-24">
+          <article className="info-card flex flex-col gap-8">
+            <div className="section-heading">
+              <span className="page-kicker">Inteligência Radar</span>
+              <h2>Leitura operacional</h2>
+            </div>
+
+            <div className="info-card !p-6 text-center">
+              <span className="data-card-label">Score de relevância</span>
+              <p className="kpi-number">{score}</p>
+            </div>
+
+            <div className="mini-stat-grid">
+              <div className="mini-stat-card">
+                <span className="mini-stat-label">Visto em</span>
+                <span className="mini-stat-value">{formatDateTime(lastSeenAt)}</span>
+              </div>
+              <div className="mini-stat-card">
+                <span className="mini-stat-label">Categoria</span>
+                <span className="mini-stat-value">{refined.bucket || "Geral"}</span>
+              </div>
+              <div className="mini-stat-card mini-stat-card-wide">
+                <span className="mini-stat-label">Tipo de conteúdo</span>
+                <span className="mini-stat-value">{refined.contentType || "Notícia"}</span>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1 p-3 bg-slate-900/30 rounded-xl border border-slate-800/50">
-                <span className="text-[9px] font-bold text-slate-500 uppercase">Visto em</span>
-                <span className="text-xs font-semibold text-slate-200">{formatDateTime(lastSeenAt)}</span>
-              </div>
-              <div className="flex flex-col gap-1 p-3 bg-slate-900/30 rounded-xl border border-slate-800/50">
-                <span className="text-[9px] font-bold text-slate-500 uppercase">Categoria</span>
-                <span className="text-xs font-semibold text-slate-200 capitalize">{refined.bucket || "Geral"}</span>
-              </div>
-              <div className="flex flex-col gap-1 p-3 bg-slate-900/30 rounded-xl border border-slate-800/50 col-span-2">
-                <span className="text-[9px] font-bold text-slate-500 uppercase">Tipo de Conteúdo</span>
-                <span className="text-xs font-semibold text-slate-200 capitalize">{refined.contentType || "Notícia"}</span>
-              </div>
-            </div>
-
-            <div className="p-4 bg-rose-500/5 border border-rose-500/10 rounded-2xl">
-              <p className="text-[11px] text-rose-400 leading-relaxed font-medium">
+            <div className="editorial-callout">
+              <p>
                 Curadoria do Anime Radar com apoio de automação para acelerar cobertura, organizar entidades e destacar temas de maior relevância.
               </p>
             </div>
-          </div>
+          </article>
 
-          <div className="info-card border-sky-500/20 bg-sky-500/5">
-            <h3 className="text-xs font-black uppercase tracking-[0.18em] text-sky-300">
-              Sugestões para você
-            </h3>
-            <p className="mt-2 text-xs text-slate-400">
-              Mais notícias da mesma fonte para continuar a leitura.
-            </p>
-            <div className="mt-4 flex flex-col gap-3">
+          <article className="info-card flex flex-col gap-2">
+            <div className="section-heading">
+              <span className="page-kicker">Continuidade</span>
+              <h2>Sugestões para você</h2>
+            </div>
+            <p className="text-xs">Mais notícias da mesma fonte para continuar a leitura.</p>
+            <div className="suggestion-stack">
               {suggestedNews.length ? (
                 suggestedNews.map((item) => {
                   const suggestedTitle = getArticleTitle(item);
                   const suggestedPath = getArticleDetailPath(item);
-                  const suggestedSummary = summarizeText(
-                    item?.refined?.summary || "",
-                    90
-                  );
+                  const suggestedSummary = summarizeText(item?.refined?.summary || "", 90);
                   const suggestedImage = getArticleImageUrl(item);
                   return (
                     <Link
                       key={String(item?.id || suggestedPath)}
                       href={suggestedPath}
-                      className="rounded-xl border border-slate-700 bg-slate-900/50 p-3 transition hover:border-sky-400/40 hover:bg-slate-900"
+                      className="suggestion-card"
                     >
-                      <div className="flex gap-3">
+                      <div className="suggestion-layout">
                         {suggestedImage ? (
-                          <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-slate-700">
+                          <div className="suggestion-thumb">
                             <Image
                               src={suggestedImage}
                               alt={suggestedTitle}
@@ -774,24 +745,20 @@ export default async function NoticiaDetailPage(props) {
                             />
                           </div>
                         ) : (
-                          <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-slate-700 bg-slate-800/70">
+                          <div className="suggestion-thumb suggestion-thumb--fallback">
                             <Image
                               src="/brand/logo-64.png"
                               alt="Logo Anime Radar"
                               fill
                               sizes="80px"
-                              className="object-cover"
+                              className="object-cover opacity-35"
                             />
                           </div>
                         )}
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-100 line-clamp-2">
-                            {renderInlineMarkdown(suggestedTitle)}
-                          </p>
+                        <div className="suggestion-copy">
+                          <p className="suggestion-title">{renderInlineMarkdown(suggestedTitle)}</p>
                           {suggestedSummary ? (
-                            <p className="mt-1 text-xs text-slate-400 line-clamp-2">
-                              {renderInlineMarkdown(suggestedSummary)}
-                            </p>
+                            <p className="suggestion-summary">{renderInlineMarkdown(suggestedSummary)}</p>
                           ) : null}
                         </div>
                       </div>
@@ -799,15 +766,13 @@ export default async function NoticiaDetailPage(props) {
                   );
                 })
               ) : (
-                <p className="text-xs text-slate-500">
-                  Sem sugestões no momento.
-                </p>
+                <p className="muted text-xs">Sem sugestões no momento.</p>
               )}
             </div>
-          </div>
+          </article>
 
           <Link href="/noticias" className="btn btn-secondary w-full md:hidden">
-            Voltar para Lista
+            Voltar para lista
           </Link>
         </aside>
       </section>

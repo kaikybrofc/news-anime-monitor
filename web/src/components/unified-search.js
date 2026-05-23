@@ -11,17 +11,6 @@ const TYPE_LABEL = {
   fonte: "Fonte",
 };
 
-function getTypeTone(type = "") {
-  const normalized = String(type || "").toLowerCase();
-  if (normalized === "noticia") {
-    return "bg-rose-950/30 border border-rose-700/40 text-rose-300";
-  }
-  if (normalized === "franquia") {
-    return "bg-sky-950/30 border border-sky-700/40 text-sky-300";
-  }
-  return "bg-emerald-950/30 border border-emerald-700/40 text-emerald-300";
-}
-
 function renderInlineMarkdown(text = "") {
   const source = String(text || "");
   if (!source) return source;
@@ -37,9 +26,7 @@ function renderInlineMarkdown(text = "") {
     const end = pattern.lastIndex;
 
     if (start > cursor) {
-      parts.push(
-        <span key={`md-text-${index}`}>{source.slice(cursor, start)}</span>
-      );
+      parts.push(<span key={`md-text-${index}`}>{source.slice(cursor, start)}</span>);
       index += 1;
     }
 
@@ -111,13 +98,10 @@ export function UnifiedSearch({
       setErrorMessage("");
 
       try {
-        const response = await fetch(
-          `/api/search-suggest?q=${encodeURIComponent(trimmedQuery)}`,
-          {
-            signal: controller.signal,
-            cache: "no-store",
-          }
-        );
+        const response = await fetch(`/api/search-suggest?q=${encodeURIComponent(trimmedQuery)}`, {
+          signal: controller.signal,
+          cache: "no-store",
+        });
 
         if (!response.ok) {
           throw new Error("Falha ao carregar sugestões.");
@@ -209,57 +193,49 @@ export function UnifiedSearch({
 
   return (
     <div ref={wrapperRef} className={`relative ${className}`.trim()}>
-      <form
-        action="/noticias"
-        method="get"
-        onSubmit={handleSubmit}
-        className="flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950/70 p-2"
-      >
-        <input type="hidden" name="offset" value="0" />
-        <input
-          type="text"
-          name="q"
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setOpen(true);
-          }}
-          onFocus={() => {
-            if (trimmedQuery.length >= MIN_QUERY_LENGTH) {
+      <div className="search-shell">
+        <form action="/noticias" method="get" onSubmit={handleSubmit} className="search-input-shell">
+          <input type="hidden" name="offset" value="0" />
+          <input
+            type="text"
+            name="q"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
               setOpen(true);
-            }
-          }}
-          onKeyDown={handleKeyDown}
-          autoComplete="off"
-          placeholder={placeholder}
-          className="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-slate-100 outline-none placeholder:text-slate-500 md:text-base"
-        />
-        <button type="submit" className="btn btn-primary !px-6 !py-2.5 text-sm">
-          {submitLabel}
-        </button>
-      </form>
+            }}
+            onFocus={() => {
+              if (trimmedQuery.length >= MIN_QUERY_LENGTH) {
+                setOpen(true);
+              }
+            }}
+            onKeyDown={handleKeyDown}
+            autoComplete="off"
+            placeholder={placeholder}
+            className="search-input"
+          />
+          <button type="submit" className="btn btn-primary !px-6 !py-3 text-sm">
+            {submitLabel}
+          </button>
+        </form>
+      </div>
 
       {open ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[120] rounded-2xl border border-slate-700 bg-slate-950/95 p-2 shadow-2xl backdrop-blur">
-          {loading ? (
-            <p className="px-3 py-4 text-sm text-slate-400">Buscando sugestões...</p>
-          ) : null}
+        <div className="search-dropdown">
+          {loading ? <p className="px-4 py-4 text-sm text-[var(--muted-foreground)]">Buscando sugestões...</p> : null}
 
           {!loading && errorMessage ? (
-            <p className="px-3 py-4 text-sm text-rose-300">{errorMessage}</p>
+            <p className="px-4 py-4 text-sm text-rose-300">{errorMessage}</p>
           ) : null}
 
           {!loading && !errorMessage && trimmedQuery.length < MIN_QUERY_LENGTH ? (
-            <p className="px-3 py-4 text-sm text-slate-400">
+            <p className="px-4 py-4 text-sm text-[var(--muted-foreground)]">
               Digite ao menos {MIN_QUERY_LENGTH} caracteres.
             </p>
           ) : null}
 
-          {!loading &&
-          !errorMessage &&
-          trimmedQuery.length >= MIN_QUERY_LENGTH &&
-          !items.length ? (
-            <p className="px-3 py-4 text-sm text-slate-400">
+          {!loading && !errorMessage && trimmedQuery.length >= MIN_QUERY_LENGTH && !items.length ? (
+            <p className="px-4 py-4 text-sm text-[var(--muted-foreground)]">
               Nenhum resultado encontrado. Pressione Enter para buscar em notícias.
             </p>
           ) : null}
@@ -277,24 +253,16 @@ export function UnifiedSearch({
                         navigateTo(item.href);
                       }}
                       onMouseEnter={() => setSelectedIndex(index)}
-                      className={`flex w-full flex-col gap-1 rounded-xl px-3 py-2 text-left transition ${
-                        isActive ? "bg-slate-800" : "hover:bg-slate-900"
-                      }`}
+                      className={`search-option ${isActive ? "is-active" : ""}`}
                     >
                       <div className="flex items-center gap-2">
-                        <span
-                          className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${getTypeTone(
-                            item.type
-                          )}`}
-                        >
-                          {TYPE_LABEL[item.type] || "Resultado"}
-                        </span>
-                        <span className="line-clamp-1 text-sm font-semibold text-slate-100">
+                        <span className="search-type-badge">{TYPE_LABEL[item.type] || "Resultado"}</span>
+                        <span className="line-clamp-1 text-sm font-semibold text-[var(--title)]">
                           {renderInlineMarkdown(item.title)}
                         </span>
                       </div>
                       {item.subtitle ? (
-                        <span className="line-clamp-1 text-xs text-slate-400">
+                        <span className="line-clamp-1 text-xs text-[var(--muted-foreground)]">
                           {renderInlineMarkdown(item.subtitle)}
                         </span>
                       ) : null}

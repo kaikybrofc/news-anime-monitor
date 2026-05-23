@@ -75,11 +75,17 @@ const SOURCE_DEFINITIONS = {
     monitorUrl: "https://animenew.com.br/",
     feedUrl: "https://animenew.com.br/feed/",
     sitemapIndexUrl: "https://animenew.com.br/sitemap_index.xml",
-    collectionPriority: ["sitemap", "feed", "home"],
+    collectionPriority: ["feed", "home", "sitemap"],
+    mergeBuckets: true,
     enableSitemap: true,
     domains: ["animenew.com.br"],
     excludedPathPrefixes: DEFAULT_ANIMENEW_EXCLUDED_PREFIXES,
-    homeLinkSelectors: [".entry-title .p-url"],
+    homeLinkSelectors: [
+      ".entry-title .p-url",
+      "article h2 a",
+      "h2.entry-title a",
+      "a[rel='bookmark']",
+    ],
     titleSuffixes: ["AnimeNew"],
   },
   animecorner: {
@@ -131,13 +137,18 @@ const SOURCE_DEFINITIONS = {
     id: "crunchyrollnews",
     name: "Crunchyroll News",
     monitorUrl: "https://www.crunchyroll.com/news/",
-    collectionPriority: ["home"],
-    enableSitemap: false,
+    sitemapIndexUrl: "https://www.crunchyroll.com/sitemaps/news/en-US/latest.xml?page=0",
+    collectionPriority: ["sitemap", "home"],
+    enableSitemap: true,
     domains: ["crunchyroll.com"],
     allowedPathPrefixes: ["/news/"],
     excludedPathPrefixes: ["/newsrss", "/news/feed"],
     suppressZeroFetchAlert: true,
     homeLinkSelectors: [
+      "article h2 a[href^='/news/']",
+      "article h3 a[href^='/news/']",
+      "h2 a[href^='/news/']",
+      "h3 a[href^='/news/']",
       "a[href^='/news/']",
       "a[href*='://www.crunchyroll.com/news/']",
     ],
@@ -203,9 +214,10 @@ const SOURCE_DEFINITIONS = {
     monitorUrl: "https://www.animeherald.com/",
     feedUrl: "https://www.animeherald.com/feed/",
     sitemapIndexUrl: "https://www.animeherald.com/sitemap_index.xml",
-    collectionPriority: ["feed", "home", "sitemap"],
+    collectionPriority: ["sitemap", "feed", "home"],
     daysBack: 30,
-    enableSitemap: false,
+    enableSitemap: true,
+    enabledByDefault: false,
     suppressZeroFetchAlert: true,
     suppressParseErrorAlert: true,
     domains: ["animeherald.com"],
@@ -292,7 +304,12 @@ const SOURCE_DEFINITIONS = {
     domains: ["nintendolife.com"],
     allowedPathPrefixes: ["/news/"],
     excludedPathPrefixes: ["/reviews/", "/guides/", "/features/", "/videos/", "/forums/"],
-    homeLinkSelectors: ["a[href^='/news/']"],
+    homeLinkSelectors: [
+      "a[href^='/news/']",
+      "article h2 a[href^='/news/']",
+      "article h3 a[href^='/news/']",
+      "h2 a[href^='/news/']",
+    ],
     titleSuffixes: ["Nintendo Life"],
   },
   pcgamer: {
@@ -314,6 +331,7 @@ const SOURCE_DEFINITIONS = {
     monitorUrl: "https://www.eurogamer.net/",
     collectionPriority: ["home"],
     enableSitemap: false,
+    enabledByDefault: false,
     suppressZeroFetchAlert: true,
     domains: ["eurogamer.net"],
     allowedPathPrefixes: ["/news/", "/features/"],
@@ -328,9 +346,10 @@ const SOURCE_DEFINITIONS = {
     feedUrl: "https://www.rockpapershotgun.com/feed/news",
     collectionPriority: ["feed", "home"],
     enableSitemap: false,
+    enabledByDefault: false,
     suppressZeroFetchAlert: true,
     domains: ["rockpapershotgun.com"],
-    allowedPathPrefixes: ["/", "/news/"],
+    allowedPathPrefixes: ["/news/"],
     excludedPathPrefixes: ["/guides/", "/reviews/", "/deals/"],
     homeLinkSelectors: ["article h2 a", "a[href*='rockpapershotgun.com/']"],
     titleSuffixes: ["Rock Paper Shotgun"],
@@ -416,7 +435,9 @@ const SOURCE_DEFINITIONS = {
   },
 };
 
-const DEFAULT_SOURCE_IDS = Object.keys(SOURCE_DEFINITIONS);
+const DEFAULT_SOURCE_IDS = Object.values(SOURCE_DEFINITIONS)
+  .filter((source) => source.enabledByDefault !== false)
+  .map((source) => source.id);
 
 function parseSourceIds(sourceIdsRaw) {
   if (!sourceIdsRaw || !String(sourceIdsRaw).trim()) {

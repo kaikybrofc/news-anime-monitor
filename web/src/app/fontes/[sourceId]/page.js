@@ -108,68 +108,89 @@ export default async function FonteDetailPage(props) {
   const contentTypes = payload?.stats?.contentTypes || {};
 
   return (
-    <section className="stack">
-      <h1>{payload.source?.name || sourceId}</h1>
-      <p className="lead">Detalhamento da cobertura e do ciclo de vida dos artigos.</p>
+    <div className="page-shell">
+      <section className="page-intro">
+        <div className="section-heading">
+          <span className="page-kicker">Fonte monitorada</span>
+          <h1>{payload.source?.name || sourceId}</h1>
+          <p className="lead">Detalhamento da cobertura, do ciclo de vida e dos tipos de conteúdo desta fonte dentro do radar.</p>
+        </div>
+      </section>
 
       {errorMessage ? (
         <article className="info-card warning-card">
-          <h2>Falha ao carregar fonte</h2>
+          <h2 className="text-[var(--title)]">Falha ao carregar fonte</h2>
           <p>{errorMessage}</p>
         </article>
       ) : null}
 
-      <article className="info-card split-card">
-        <div>
-          <h2>Total da fonte</h2>
+      <section className="metric-strip">
+        <article className="data-card">
+          <span className="data-card-label">Total da fonte</span>
           <p className="kpi-number">{formatNumber(payload.total || 0)}</p>
-        </div>
-        <div className="meta-stack">
-          <p>ID: {payload.source?.id || sourceId}</p>
-          <p>Sitemap: {payload.source?.enabledSitemap ? "sim" : "não"}</p>
-        </div>
-      </article>
+          <p className="data-card-note">Artigos rastreados nesta coleção.</p>
+        </article>
+        <article className="data-card">
+          <span className="data-card-label">Sitemap</span>
+          <p className="kpi-number !text-3xl">{payload.source?.enabledSitemap ? "Sim" : "Não"}</p>
+          <p className="data-card-note">Estrutura de coleta desta origem.</p>
+        </article>
+      </section>
 
-      <div className="grid-cards">
-        <article className="info-card">
-          <h2>Ciclo de vida</h2>
+      <section className="panel-grid">
+        <article className="list-panel">
+          <div className="section-heading mb-3">
+            <span className="page-kicker">Ciclo de vida</span>
+            <h2>Status da cobertura</h2>
+          </div>
           <div className="list-stack">
             {Object.keys(lifecycle).length ? (
               Object.entries(lifecycle).map(([key, count]) => (
-                <p key={key}>
-                  {key}: {formatNumber(count)}
-                </p>
+                <div key={key} className="line-item">
+                  <strong>{key}</strong>
+                  <span>{formatNumber(count)} registros</span>
+                </div>
               ))
             ) : (
               <p className="muted">Sem dados de ciclo de vida.</p>
             )}
           </div>
         </article>
-        <article className="info-card">
-          <h2>Tipos de conteúdo</h2>
+        <article className="list-panel">
+          <div className="section-heading mb-3">
+            <span className="page-kicker">Tipos</span>
+            <h2>Tipos de conteúdo</h2>
+          </div>
           <div className="list-stack">
             {Object.keys(contentTypes).length ? (
               Object.entries(contentTypes).map(([key, count]) => (
-                <p key={key}>
-                  {key}: {formatNumber(count)}
-                </p>
+                <div key={key} className="line-item">
+                  <strong>{key}</strong>
+                  <span>{formatNumber(count)} registros</span>
+                </div>
               ))
             ) : (
               <p className="muted">Sem dados de tipo de conteúdo.</p>
             )}
           </div>
         </article>
-      </div>
+      </section>
 
       {payload.items?.length ? (
-        <div className="article-grid">
-          {payload.items.map((article) => (
-            <ArticleCard key={article.id} article={article} />
-          ))}
-        </div>
+        <section className="flex flex-col gap-6">
+          <div className="section-heading">
+            <span className="page-kicker">Coleção</span>
+            <h2>Artigos desta fonte</h2>
+          </div>
+          <div className="article-grid">
+            {payload.items.map((article) => (
+              <ArticleCard key={article.id} article={article} />
+            ))}
+          </div>
+        </section>
       ) : (
-        <article className="info-card">
-          <h2>Sem artigos para esta fonte</h2>
+        <article className="empty-state">
+          <h2 className="mb-2 !text-2xl">Sem artigos para esta fonte</h2>
           <p>Ajuste os filtros ou aguarde o próximo ciclo do monitor.</p>
         </article>
       )}
@@ -180,8 +201,7 @@ export default async function FonteDetailPage(props) {
         offset={payload.offset || offset}
         limit={payload.limit || limit}
         hasMore={Boolean(payload.hasMore)}
-        total={payload.total || 0}
       />
-    </section>
+    </div>
   );
 }

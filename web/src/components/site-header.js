@@ -85,23 +85,27 @@ export function SiteHeader() {
   return (
     <header ref={headerRef} className="site-header">
       <div className="site-container header-inner">
-        <div className="flex items-center gap-4">
+        <div className="header-top-row">
           <Link href="/" className="brand" aria-label="Ir para a página inicial">
             <Image
               src="/brand/logo-64.png"
               alt="OmniZap Anime Radar"
               className="brand-logo"
-              width={28}
-              height={28}
-              sizes="28px"
+              width={44}
+              height={44}
+              sizes="44px"
               priority
             />
-            <span>Anime Radar</span>
+            <span className="brand-copy">
+              <span className="brand-title">Anime Radar</span>
+              <span className="brand-subtitle">editorial intelligence</span>
+            </span>
           </Link>
-        </div>
-        <div className="flex items-center gap-2 self-stretch md:self-auto">
-          <MainNav />
-          <ThemeToggle />
+
+          <div className="header-controls">
+            <ThemeToggle />
+            <MainNav />
+          </div>
         </div>
       </div>
     </header>

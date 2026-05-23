@@ -35,26 +35,27 @@ export async function SeoEntityIndexView({ routeKey, searchParams }) {
   const items = payload?.items || [];
 
   return (
-    <section className="stack">
-      <h1>{config.plural}</h1>
-      <p className="lead">{config.lead}</p>
+    <div className="page-shell">
+      <section className="page-intro">
+        <div className="section-heading">
+          <span className="page-kicker">Entidades SEO</span>
+          <h1>{config.plural}</h1>
+          <p className="lead">{config.lead}</p>
+        </div>
+      </section>
 
       {errorMessage ? (
         <article className="info-card warning-card">
-          <h2>Falha ao carregar {config.plural.toLowerCase()}</h2>
+          <h2 className="text-[var(--title)]">Falha ao carregar {config.plural.toLowerCase()}</h2>
           <p>{errorMessage}</p>
         </article>
       ) : null}
 
       {items.length ? (
-        <div className="grid-cards">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
           {items.map((entity) => (
-            <Link
-              key={entity.slug}
-              href={`${config.routeBase}/${entity.slug}`}
-              className="info-card link-card"
-            >
-              <h2>{entity.name}</h2>
+            <Link key={entity.slug} href={`${config.routeBase}/${entity.slug}`} className="info-card flex flex-col gap-3">
+              <h2 className="text-2xl">{entity.name}</h2>
               <p>{formatNumber(entity.count)} notícias relacionadas</p>
               <p>{formatNumber(entity.sourceCount)} fontes</p>
               <p>Última aparição: {formatDateTime(entity.lastSeenAt)}</p>
@@ -62,12 +63,12 @@ export async function SeoEntityIndexView({ routeKey, searchParams }) {
           ))}
         </div>
       ) : (
-        <article className="info-card">
-          <h2>Sem resultados no momento</h2>
+        <article className="empty-state">
+          <h2 className="mb-2 !text-2xl">Sem resultados no momento</h2>
           <p>As páginas desta entidade serão preenchidas conforme a coleta avançar.</p>
         </article>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -137,40 +138,53 @@ export async function SeoEntityDetailView({ routeKey, params, searchParams }) {
   const contentTypes = payload?.stats?.contentTypeDistribution || {};
 
   return (
-    <section className="stack">
-      <h1>{payload?.entity?.name || title}</h1>
-      <p className="lead">
-        Página programática de {config.singular.toLowerCase()} com cobertura consolidada do monitor.
-      </p>
+    <div className="page-shell">
+      <section className="page-intro">
+        <div className="section-heading">
+          <span className="page-kicker">Entidade</span>
+          <h1>{payload?.entity?.name || title}</h1>
+          <p className="lead">Página programática de {config.singular.toLowerCase()} com cobertura consolidada do monitor.</p>
+        </div>
+      </section>
 
-      <article className="info-card split-card">
-        <div>
-          <h2>Total de notícias</h2>
+      <section className="metric-strip">
+        <article className="data-card">
+          <span className="data-card-label">Total de notícias</span>
           <p className="kpi-number">{formatNumber(payload.total || 0)}</p>
-        </div>
-        <div className="meta-stack">
-          <p>Slug: {slug}</p>
-          <p>Fontes: {formatNumber(payload?.entity?.sourceCount || 0)}</p>
-          <p>Score médio: {formatNumber(payload?.entity?.avgScore || 0)}</p>
-        </div>
-      </article>
+          <p className="data-card-note">Cobertura consolidada desta entidade.</p>
+        </article>
+        <article className="data-card">
+          <span className="data-card-label">Fontes</span>
+          <p className="kpi-number">{formatNumber(payload?.entity?.sourceCount || 0)}</p>
+          <p className="data-card-note">Origens que citam esta entidade.</p>
+        </article>
+        <article className="data-card">
+          <span className="data-card-label">Score médio</span>
+          <p className="kpi-number">{formatNumber(payload?.entity?.avgScore || 0)}</p>
+          <p className="data-card-note">Prioridade editorial média.</p>
+        </article>
+      </section>
 
       {errorMessage ? (
         <article className="info-card warning-card">
-          <h2>Falha ao carregar {config.singular.toLowerCase()}</h2>
+          <h2 className="text-[var(--title)]">Falha ao carregar {config.singular.toLowerCase()}</h2>
           <p>{errorMessage}</p>
         </article>
       ) : null}
 
-      <div className="grid-cards">
-        <article className="info-card">
-          <h2>Distribuição por fonte</h2>
+      <section className="panel-grid">
+        <article className="list-panel">
+          <div className="section-heading mb-3">
+            <span className="page-kicker">Distribuição</span>
+            <h2>Por fonte</h2>
+          </div>
           <div className="list-stack">
             {sourceDistribution.length ? (
               sourceDistribution.map((row) => (
-                <p key={row.sourceId}>
-                  {row.sourceName}: {formatNumber(row.count)}
-                </p>
+                <div key={row.sourceId} className="line-item">
+                  <strong>{row.sourceName}</strong>
+                  <span>{formatNumber(row.count)} artigos</span>
+                </div>
               ))
             ) : (
               <p className="muted">Sem distribuição de fontes para esta entidade.</p>
@@ -178,31 +192,41 @@ export async function SeoEntityDetailView({ routeKey, params, searchParams }) {
           </div>
         </article>
 
-        <article className="info-card">
-          <h2>Tipos de conteúdo</h2>
+        <article className="list-panel">
+          <div className="section-heading mb-3">
+            <span className="page-kicker">Composição</span>
+            <h2>Tipos de conteúdo</h2>
+          </div>
           <div className="list-stack">
             {Object.keys(contentTypes).length ? (
               Object.entries(contentTypes).map(([key, count]) => (
-                <p key={key}>
-                  {key}: {formatNumber(count)}
-                </p>
+                <div key={key} className="line-item">
+                  <strong>{key}</strong>
+                  <span>{formatNumber(count)} registros</span>
+                </div>
               ))
             ) : (
               <p className="muted">Sem distribuição de conteúdo para esta entidade.</p>
             )}
           </div>
         </article>
-      </div>
+      </section>
 
       {payload.items?.length ? (
-        <div className="article-grid">
-          {payload.items.map((article) => (
-            <ArticleCard key={article.id} article={article} />
-          ))}
-        </div>
+        <section className="flex flex-col gap-6">
+          <div className="section-heading">
+            <span className="page-kicker">Coleção</span>
+            <h2>Notícias relacionadas</h2>
+          </div>
+          <div className="article-grid">
+            {payload.items.map((article) => (
+              <ArticleCard key={article.id} article={article} />
+            ))}
+          </div>
+        </section>
       ) : (
-        <article className="info-card">
-          <h2>Sem notícias para esta entidade</h2>
+        <article className="empty-state">
+          <h2 className="mb-2 !text-2xl">Sem notícias para esta entidade</h2>
           <p>Quando novas relações forem detectadas, os artigos aparecerão aqui.</p>
         </article>
       )}
@@ -213,8 +237,7 @@ export async function SeoEntityDetailView({ routeKey, params, searchParams }) {
         offset={payload.offset || offset}
         limit={payload.limit || limit}
         hasMore={Boolean(payload.hasMore)}
-        total={payload.total || 0}
       />
-    </section>
+    </div>
   );
 }

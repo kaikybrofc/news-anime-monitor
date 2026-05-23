@@ -70,56 +70,76 @@ export default async function HomePage() {
   };
 
   return (
-    <div className="flex flex-col gap-16 md:gap-24">
+    <div className="page-shell">
       <script type="application/ld+json" suppressHydrationWarning>
         {JSON.stringify([websiteSchema, collectionSchema, organizationSchema])}
       </script>
 
-      {/* Hero Section */}
-      <section className="relative py-12 md:py-24 animate-fade-in">
-        <div className="absolute top-0 right-0 -z-10 h-96 w-96 rounded-full bg-rose-500/10 blur-[120px]" />
-        <div className="absolute bottom-0 left-0 -z-10 h-80 w-80 rounded-full bg-sky-500/5 blur-[100px]" />
-        
-        <div className="flex flex-col gap-6 max-w-3xl">
-          <span className="eyebrow animate-fade-in-up">Sistema de Monitoramento 24/7</span>
-          <h1 className="!text-4xl md:!text-7xl font-black !leading-[1.1] tracking-tighter animate-fade-in-up delay-100">
-            Anime Radar: <span className="text-rose-500">Notícias de Anime</span> em tempo real.
-          </h1>
-          <p className="text-lg md:text-xl text-slate-400 max-w-2xl animate-fade-in-up delay-200">
-            Acompanhe lançamentos, trailers e rumores processados por nossa pipeline. 
-            Filtros avançados e inteligência por score de relevância.
-          </p>
-          
-          <div className="flex flex-wrap gap-4 pt-4 animate-fade-in-up delay-300">
-            <Link href="/noticias" className="btn btn-primary !px-8 !py-4 text-base shadow-xl shadow-rose-500/20">
-              Explorar Feed
-            </Link>
-            <Link href="/tendencias" className="btn btn-secondary !px-8 !py-4 text-base">
-              Ver Tendências
-            </Link>
+      <section className="editorial-hero animate-fade-in">
+        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex max-w-3xl flex-col gap-5">
+            <span className="eyebrow animate-fade-in-up">Sistema editorial em monitoramento contínuo</span>
+            <h1 className="animate-fade-in-up delay-100">
+              O radar premium para acompanhar o que realmente importa no universo anime.
+            </h1>
+            <p className="lead animate-fade-in-up delay-200">
+              O Anime Radar organiza lançamentos, trailers, rumores e movimentos de franquias em uma leitura mais clara, priorizada e orientada por inteligência editorial.
+            </p>
+            <div className="flex flex-wrap gap-4 pt-2 animate-fade-in-up delay-300">
+              <Link href="/noticias" className="btn btn-primary !px-8 !py-4 text-base">
+                Explorar feed editorial
+              </Link>
+              <Link href="/tendencias" className="btn btn-secondary !px-8 !py-4 text-base">
+                Ver tendências do radar
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid w-full max-w-xl grid-cols-1 gap-4 sm:grid-cols-2 animate-fade-in-up delay-300">
+            <article className="data-card min-h-[14rem] justify-between !p-6">
+              <div className="flex flex-col gap-3">
+                <span className="data-card-label">Cobertura viva</span>
+                <p className="kpi-number !text-4xl md:!text-5xl">{(latestPayload.total / 1000).toFixed(1)}k+</p>
+              </div>
+              <p className="data-card-note max-w-[18ch] text-sm leading-relaxed">Artigos monitorados na base editorial.</p>
+            </article>
+            <article className="data-card min-h-[14rem] justify-between !p-6">
+              <div className="flex flex-col gap-3">
+                <span className="data-card-label">Ritmo global</span>
+                <p className="kpi-number !text-4xl md:!text-5xl">24h</p>
+              </div>
+              <p className="data-card-note max-w-[20ch] text-sm leading-relaxed">Monitoramento contínuo de fontes e sinais.</p>
+            </article>
           </div>
         </div>
       </section>
 
-      <section className="relative z-30 animate-fade-in-up">
-        <UnifiedSearch className="mx-auto w-full max-w-3xl" />
+      <section className="animate-fade-in-up">
+        <div className="section-heading mb-5">
+          <span className="page-kicker">Descoberta</span>
+          <h2>Busque notícias, franquias e fontes em uma única entrada</h2>
+          <p className="section-copy">
+            A busca unificada conecta conteúdo editorial, hubs de franquia e cobertura por fonte com o mesmo vocabulário visual.
+          </p>
+        </div>
+        <UnifiedSearch className="mx-auto w-full max-w-4xl" />
       </section>
 
-      {/* Latest News Section */}
-      <section className="relative z-10 flex flex-col gap-10">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 animate-fade-in">
-          <div className="flex flex-col gap-2">
-            <h2 className="!text-3xl md:!text-4xl">Últimas do Radar</h2>
-            <p className="text-slate-400">Notícias processadas nos últimos minutos.</p>
+      <section className="flex flex-col gap-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="section-heading">
+            <span className="page-kicker">Últimas leituras</span>
+            <h2>As histórias mais recentes que entraram no radar</h2>
+            <p className="section-copy">Uma seleção do fluxo mais novo já organizada para leitura rápida e contexto imediato.</p>
           </div>
-          <Link href="/noticias" className="btn btn-secondary !py-2 !px-6 text-sm w-fit">
-            Ver Todas
+          <Link href="/noticias" className="btn btn-secondary w-fit !px-6 !py-2 text-sm">
+            Ver coleção completa
           </Link>
         </div>
 
         {errorMessage ? (
           <article className="info-card warning-card animate-fade-in">
-            <h3 className="text-rose-400">Falha ao carregar destaque editorial</h3>
+            <h3 className="text-[var(--title)]">Falha ao carregar destaque editorial</h3>
             <p>{errorMessage}</p>
           </article>
         ) : null}
@@ -127,34 +147,42 @@ export default async function HomePage() {
         {latestPayload.items?.length ? (
           <div className="article-grid">
             {latestPayload.items.map((article, idx) => (
-              <div 
-                key={article.id} 
-                className="animate-fade-in-up" 
-                style={{ animationDelay: `${0.1 * (idx + 1)}s` }}
-              >
+              <div key={article.id} className="animate-fade-in-up" style={{ animationDelay: `${0.08 * (idx + 1)}s` }}>
                 <ArticleCard article={article} />
               </div>
             ))}
           </div>
         ) : (
-          <article className="info-card animate-fade-in">
-            <p className="text-slate-400">Nenhuma notícia encontrada no momento.</p>
+          <article className="empty-state animate-fade-in">
+            <p>Nenhuma notícia encontrada no momento.</p>
           </article>
         )}
       </section>
 
-      {/* Stats Section (Brief Preview) */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in-up">
-        <div className="info-card bg-rose-500/5 border-rose-500/20 flex flex-col gap-4 p-10">
-          <h3 className="text-xl font-bold text-rose-400">Cobertura Total</h3>
-          <p className="text-5xl font-black text-rose-500 tracking-tighter">{(latestPayload.total / 1000).toFixed(1)}k+</p>
-          <p className="text-slate-400">Artigos monitorados na nossa base de dados.</p>
-        </div>
-        <div className="info-card flex flex-col gap-4 p-10">
-          <h3 className="text-xl font-bold text-sky-400">Rede Global</h3>
-          <p className="text-5xl font-black text-sky-500 tracking-tighter">24h</p>
-          <p className="text-slate-400">Monitoramento contínuo em mais de 20 fontes.</p>
-        </div>
+      <section className="panel-grid animate-fade-in-up">
+        <article className="info-card flex flex-col gap-4 bg-[color-mix(in_oklab,var(--primary)_6%,transparent)]">
+          <span className="page-kicker">Leitura guiada</span>
+          <h2 className="!text-3xl">Um portal construído para reduzir ruído e aumentar clareza.</h2>
+          <p className="section-copy">
+            O foco do produto não é só reunir links: é transformar volume em prioridade, contexto e navegação temática reutilizável.
+          </p>
+        </article>
+
+        <article className="info-card flex flex-col gap-4">
+          <span className="page-kicker">Próximo passo</span>
+          <h2 className="!text-3xl">Explore a API e os hubs analíticos do radar.</h2>
+          <p className="section-copy">
+            Consuma endpoints reais, entre em páginas por franquia e acompanhe os sinais de tendência que estruturam o portal.
+          </p>
+          <div className="flex flex-wrap gap-3 pt-2">
+            <Link href="/api" className="btn btn-primary">
+              Abrir API
+            </Link>
+            <Link href="/franquias" className="btn btn-secondary">
+              Ver franquias
+            </Link>
+          </div>
+        </article>
       </section>
     </div>
   );

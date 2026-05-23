@@ -60,9 +60,9 @@ function buildRankingFromItems(items = []) {
 
 function RankingColumn({ title, items = [], metricKey, metricLabel }) {
   return (
-    <article className="info-card !p-2">
-      <div className="flex items-center justify-between px-2 py-2">
-        <h2 className="text-sm font-black uppercase tracking-widest text-slate-100">{title}</h2>
+    <article className="list-panel">
+      <div className="mb-2 px-2 py-2">
+        <h2 className="text-base">{title}</h2>
       </div>
       <div className="list-stack">
         {items.length ? (
@@ -70,13 +70,13 @@ function RankingColumn({ title, items = [], metricKey, metricLabel }) {
             <Link key={`${title}-${item.slug}`} className="line-link" href={`/franquias/${item.slug}`}>
               <div className="flex items-center justify-between">
                 <strong>{getFranchiseDisplayName(item)}</strong>
-                <span className="text-rose-400 font-bold">{formatNumber(item[metricKey] || 0)}</span>
+                <span className="font-bold text-[var(--title)]">{formatNumber(item[metricKey] || 0)}</span>
               </div>
               <span>{metricLabel}</span>
             </Link>
           ))
         ) : (
-          <p className="p-4 text-sm text-slate-600 italic text-center">Sem dados para ranking.</p>
+          <p className="p-4 text-center text-sm italic text-[var(--muted)]">Sem dados para ranking.</p>
         )}
       </div>
     </article>
@@ -121,14 +121,11 @@ export default async function FranquiasPage(props) {
       if (rankingSeed.length < 5) {
         try {
           const rankingPayload = await fetchMonitor("/franchises", { top: 120 });
-          const fetchedItems = Array.isArray(rankingPayload?.items)
-            ? rankingPayload.items
-            : [];
+          const fetchedItems = Array.isArray(rankingPayload?.items) ? rankingPayload.items : [];
           if (fetchedItems.length) {
             rankingSeed = fetchedItems;
           }
         } catch {
-          // fallback silencioso para manter a página funcional mesmo sem endpoint de ranking
         }
       }
 
@@ -139,44 +136,43 @@ export default async function FranquiasPage(props) {
   }
 
   return (
-    <div className="flex flex-col gap-10">
-      <section className="flex flex-col gap-4 animate-fade-in">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-1 bg-rose-500 rounded-full" />
-          <h1 className="!text-4xl">Franquias e Temas</h1>
+    <div className="page-shell">
+      <section className="page-intro animate-fade-in">
+        <div className="section-heading">
+          <span className="page-kicker">Mapeamento temático</span>
+          <h1>Franquias e temas em leitura contínua</h1>
+          <p className="lead">
+            O monitor identifica relações entre notícias, franquias e temas para construir hubs que facilitam descoberta, prioridade editorial e navegação por contexto.
+          </p>
         </div>
-        <p className="lead max-w-2xl text-slate-400">
-          Nosso pipeline identifica automaticamente menções a franquias e temas, 
-          permitindo uma análise granular do que está em alta.
-        </p>
       </section>
 
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in-up delay-50">
-        <article className="info-card">
-          <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Total de franquias</span>
-          <p className="kpi-number !text-4xl">{formatNumber(payload.total || 0)}</p>
-          <p className="text-[11px] text-slate-500">Detectadas no monitor</p>
+      <section className="metric-strip animate-fade-in-up delay-50">
+        <article className="data-card">
+          <span className="data-card-label">Total de franquias</span>
+          <p className="kpi-number">{formatNumber(payload.total || 0)}</p>
+          <p className="data-card-note">Detectadas pelo monitor.</p>
         </article>
-        <article className="info-card">
-          <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Página atual</span>
-          <p className="kpi-number !text-4xl">{formatNumber(Math.floor((payload.offset || offset) / (payload.limit || limit)) + 1)}</p>
-          <p className="text-[11px] text-slate-500">Navegação paginada</p>
+        <article className="data-card">
+          <span className="data-card-label">Página atual</span>
+          <p className="kpi-number">{formatNumber(Math.floor((payload.offset || offset) / (payload.limit || limit)) + 1)}</p>
+          <p className="data-card-note">Navegação paginada.</p>
         </article>
-        <article className="info-card">
-          <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Itens por página</span>
-          <p className="kpi-number !text-4xl">{formatNumber(payload.limit || limit)}</p>
-          <p className="text-[11px] text-slate-500">Ajustável por querystring</p>
+        <article className="data-card">
+          <span className="data-card-label">Itens por página</span>
+          <p className="kpi-number">{formatNumber(payload.limit || limit)}</p>
+          <p className="data-card-note">Ajustável por querystring.</p>
         </article>
       </section>
 
       {errorMessage ? (
         <article className="info-card warning-card animate-fade-in">
-          <h2 className="text-rose-400">Falha ao carregar franquias</h2>
+          <h2 className="text-[var(--title)]">Falha ao carregar franquias</h2>
           <p>{errorMessage}</p>
         </article>
       ) : null}
 
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in-up delay-75">
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-3 animate-fade-in-up delay-75">
         <RankingColumn
           title="Top por menções"
           items={payload?.ranking?.byMentions || []}
@@ -197,52 +193,44 @@ export default async function FranquiasPage(props) {
         />
       </section>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 animate-fade-in-up delay-100">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 animate-fade-in-up delay-100">
         {payload.items?.length ? (
           payload.items.map((item, idx) => (
             <Link
               key={item.slug}
               href={`/franquias/${item.slug}`}
-              className="info-card !p-4 group hover:border-rose-500/30 transition-all hover:-translate-y-1"
+              className="info-card !p-5 group transition-all"
               style={{ animationDelay: `${0.03 * idx}s` }}
             >
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-hover:text-rose-500 transition-colors">
-                    #{(payload.offset || offset) + idx + 1}
-                  </span>
-                  <div className="trend-badge !text-[9px]">Ativo</div>
+                  <span className="page-kicker">#{(payload.offset || offset) + idx + 1}</span>
+                  <span className="trend-badge">Ativo</span>
                 </div>
-                <h2 className="text-lg font-bold text-slate-100 group-hover:text-rose-400 transition-colors truncate">
-                  {getFranchiseDisplayName(item)}
-                </h2>
-                <div className="text-[10px] text-slate-500">
+                <h2 className="text-xl truncate">{getFranchiseDisplayName(item)}</h2>
+                <p className="text-sm text-[var(--muted-foreground)]">
                   {formatNumber(item.mentions || 0)} menções · score {formatNumber(item.avgScore || 0)}
-                </div>
-                <div className="flex items-center gap-2 text-[10px] font-medium text-slate-500">
-                   Ver notícias →
+                </p>
+                <div className="article-footer-actions pt-2">
+                  <span className="ml-auto text-[11px] font-semibold text-[var(--title)]">Ver notícias →</span>
                 </div>
               </div>
             </Link>
           ))
         ) : (
-          <p className="text-slate-500 col-span-full py-12 text-center border border-dashed border-slate-800 rounded-2xl">
-            Nenhuma franquia detectada pelo monitor.
-          </p>
+          <article className="empty-state col-span-full">
+            <p>Nenhuma franquia detectada pelo monitor.</p>
+          </article>
         )}
-      </div>
-
-      <section className="animate-fade-in-up">
-        <div className="info-card !p-4 border-slate-800/50 bg-slate-900/20">
-          <Pagination
-            pathname="/franquias"
-            searchParams={searchParams}
-            offset={payload.offset || offset}
-            limit={payload.limit || limit}
-            hasMore={Boolean(payload.hasMore)}
-          />
-        </div>
       </section>
+
+      <Pagination
+        pathname="/franquias"
+        searchParams={searchParams}
+        offset={payload.offset || offset}
+        limit={payload.limit || limit}
+        hasMore={Boolean(payload.hasMore)}
+      />
     </div>
   );
 }

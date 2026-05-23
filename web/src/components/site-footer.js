@@ -6,18 +6,32 @@ export function SiteFooter() {
   return (
     <footer className="site-footer">
       <div className="site-container footer-inner">
-        <div className="flex flex-col gap-2">
-          <p className="font-bold">OmniZap Anime Radar</p>
-          <p className="max-w-xs text-xs">
-            Monitor de notícias e tendências de anime com inteligência de pipeline.
+        <div className="flex max-w-md flex-col gap-3">
+          <span className="page-kicker">Anime Radar</span>
+          <p className="text-2xl font-semibold tracking-tight text-[var(--title)]" style={{ fontFamily: "var(--font-heading), ui-serif, Georgia, serif" }}>
+            Inteligência editorial para navegar o fluxo de notícias do universo anime.
+          </p>
+          <p className="text-sm">
+            Um portal construído para transformar cobertura dispersa em leitura priorizada, contexto acionável e descoberta contínua.
           </p>
         </div>
-        <div className="flex flex-col justify-end gap-2 md:text-right">
-          <p>© {currentYear} OmniZap</p>
-          <div className="flex gap-4 md:justify-end">
-            <Link href="/privacidade" className="hover:text-[#e11d48]">Privacidade</Link>
-            <Link href="/termos" className="hover:text-[#e11d48]">Termos</Link>
-            <Link href="/contato" className="hover:text-[#e11d48]">Contato</Link>
+
+        <div className="flex flex-col gap-6 md:items-end md:text-right">
+          <div className="flex flex-col gap-2 text-sm">
+            <p className="font-semibold text-[var(--title)]">OmniZap Anime Radar</p>
+            <p>© {currentYear} OmniZap. Todos os direitos reservados.</p>
+          </div>
+
+          <div className="flex flex-wrap gap-3 md:justify-end">
+            <Link href="/privacidade" className="btn btn-secondary !px-5 !py-2 text-xs">
+              Privacidade
+            </Link>
+            <Link href="/termos" className="btn btn-secondary !px-5 !py-2 text-xs">
+              Termos
+            </Link>
+            <Link href="/contato" className="btn btn-primary !px-5 !py-2 text-xs">
+              Contato
+            </Link>
           </div>
         </div>
       </div>

@@ -95,39 +95,48 @@ export default async function FranquiaDetailPage(props) {
   const contentTypes = payload?.stats?.contentTypeDistribution || {};
 
   return (
-    <section className="stack">
-      <h1>{payload.name || title}</h1>
-      <p className="lead">
-        Acompanhamento da franquia com artigos consolidados e distribuição por fonte.
-      </p>
+    <div className="page-shell">
+      <section className="page-intro">
+        <div className="section-heading">
+          <span className="page-kicker">Franquia</span>
+          <h1>{payload.name || title}</h1>
+          <p className="lead">Acompanhamento da franquia com artigos consolidados, distribuição por fonte e leitura contínua de cobertura.</p>
+        </div>
+      </section>
 
-      <article className="info-card split-card">
-        <div>
-          <h2>Total da franquia</h2>
+      <section className="metric-strip">
+        <article className="data-card">
+          <span className="data-card-label">Total da franquia</span>
           <p className="kpi-number">{formatNumber(payload.total || 0)}</p>
-        </div>
-        <div className="meta-stack">
-          <p>Slug: {slug}</p>
-          <p>Offset: {formatNumber(payload.offset || offset)}</p>
-        </div>
-      </article>
+          <p className="data-card-note">Notícias relacionadas detectadas.</p>
+        </article>
+        <article className="data-card">
+          <span className="data-card-label">Slug</span>
+          <p className="kpi-number !text-3xl">{slug}</p>
+          <p className="data-card-note">Identificador público da coleção.</p>
+        </article>
+      </section>
 
       {errorMessage ? (
         <article className="info-card warning-card">
-          <h2>Falha ao carregar franquia</h2>
+          <h2 className="text-[var(--title)]">Falha ao carregar franquia</h2>
           <p>{errorMessage}</p>
         </article>
       ) : null}
 
-      <div className="grid-cards">
-        <article className="info-card">
-          <h2>Distribuição por fonte</h2>
+      <section className="panel-grid">
+        <article className="list-panel">
+          <div className="section-heading mb-3">
+            <span className="page-kicker">Distribuição</span>
+            <h2>Por fonte</h2>
+          </div>
           <div className="list-stack">
             {sourceDistribution.length ? (
               sourceDistribution.map((row) => (
-                <p key={row.sourceId}>
-                  {row.sourceName}: {formatNumber(row.count)}
-                </p>
+                <div key={row.sourceId} className="line-item">
+                  <strong>{row.sourceName}</strong>
+                  <span>{formatNumber(row.count)} artigos</span>
+                </div>
               ))
             ) : (
               <p className="muted">Sem dados de distribuição.</p>
@@ -135,31 +144,41 @@ export default async function FranquiaDetailPage(props) {
           </div>
         </article>
 
-        <article className="info-card">
-          <h2>Tipos de conteúdo</h2>
+        <article className="list-panel">
+          <div className="section-heading mb-3">
+            <span className="page-kicker">Composição</span>
+            <h2>Tipos de conteúdo</h2>
+          </div>
           <div className="list-stack">
             {Object.keys(contentTypes).length ? (
               Object.entries(contentTypes).map(([key, count]) => (
-                <p key={key}>
-                  {key}: {formatNumber(count)}
-                </p>
+                <div key={key} className="line-item">
+                  <strong>{key}</strong>
+                  <span>{formatNumber(count)} registros</span>
+                </div>
               ))
             ) : (
               <p className="muted">Sem dados de tipo de conteúdo.</p>
             )}
           </div>
         </article>
-      </div>
+      </section>
 
       {payload.items?.length ? (
-        <div className="article-grid">
-          {payload.items.map((article) => (
-            <ArticleCard key={article.id} article={article} />
-          ))}
-        </div>
+        <section className="flex flex-col gap-6">
+          <div className="section-heading">
+            <span className="page-kicker">Coleção</span>
+            <h2>Notícias relacionadas</h2>
+          </div>
+          <div className="article-grid">
+            {payload.items.map((article) => (
+              <ArticleCard key={article.id} article={article} />
+            ))}
+          </div>
+        </section>
       ) : (
-        <article className="info-card">
-          <h2>Sem notícias para esta franquia</h2>
+        <article className="empty-state">
+          <h2 className="mb-2 !text-2xl">Sem notícias para esta franquia</h2>
           <p>Quando houver cobertura detectada, os artigos aparecerão aqui.</p>
         </article>
       )}
@@ -170,8 +189,7 @@ export default async function FranquiaDetailPage(props) {
         offset={payload.offset || offset}
         limit={payload.limit || limit}
         hasMore={Boolean(payload.hasMore)}
-        total={payload.total || 0}
       />
-    </section>
+    </div>
   );
 }

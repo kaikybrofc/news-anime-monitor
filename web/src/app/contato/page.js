@@ -11,54 +11,49 @@ const GITHUB_ISSUES_URL = "https://github.com/kaikybrofc/news-anime-monitor/issu
 
 export default function ContatoPage() {
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-10 animate-fade-in">
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-1 rounded-full bg-rose-500" />
-          <h1 className="!text-4xl md:!text-5xl">Contato</h1>
+    <div className="page-shell mx-auto max-w-5xl animate-fade-in">
+      <section className="page-intro">
+        <div className="section-heading">
+          <span className="page-kicker">Canal aberto</span>
+          <h1>Contato e colaboração</h1>
+          <p className="lead">
+            Use os canais abaixo para suporte, sugestões de produto, relatos de inconsistência e acompanhamento da evolução pública do projeto.
+          </p>
         </div>
-        <p className="lead text-slate-300">
-          Use os canais abaixo para suporte, sugestões e melhoria contínua do projeto.
-        </p>
       </section>
 
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <article className="info-card flex flex-col gap-4">
-          <h2 className="text-xl font-bold text-slate-100">Suporte técnico</h2>
-          <p className="text-sm text-slate-400">
-            Para erros, falhas de rota, inconsistências de dados ou regressões, abra uma issue com passos de reprodução.
+          <span className="page-kicker">Suporte técnico</span>
+          <h2>Abra uma issue detalhada</h2>
+          <p className="text-sm text-[var(--muted-foreground)]">
+            Para erros, falhas de rota, inconsistências de dados ou regressões, registre um relato com passos de reprodução, contexto e impacto observado.
           </p>
-          <a
-            href={GITHUB_ISSUES_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="btn btn-secondary w-fit"
-          >
+          <a href={GITHUB_ISSUES_URL} target="_blank" rel="noreferrer" className="btn btn-primary w-fit">
             Abrir issue no GitHub
           </a>
         </article>
 
         <article className="info-card flex flex-col gap-4">
-          <h2 className="text-xl font-bold text-slate-100">Projeto e código</h2>
-          <p className="text-sm text-slate-400">
-            Consulte o repositório para acompanhar mudanças, roadmap e histórico de commits.
+          <span className="page-kicker">Projeto e código</span>
+          <h2>Acompanhe o repositório</h2>
+          <p className="text-sm text-[var(--muted-foreground)]">
+            Consulte o repositório para acompanhar mudanças, roadmap, histórico de commits e a evolução da base que sustenta o portal.
           </p>
-          <a
-            href={GITHUB_REPO_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="btn btn-secondary w-fit"
-          >
+          <a href={GITHUB_REPO_URL} target="_blank" rel="noreferrer" className="btn btn-secondary w-fit">
             Ver repositório
           </a>
         </article>
       </section>
 
-      <section className="info-card flex flex-col gap-4">
-        <h2 className="text-xl font-bold text-slate-100">Antes de abrir contato</h2>
-        <p className="text-sm text-slate-400">
-          Se a dúvida for sobre consumo de dados, visite a documentação da API para ver endpoints, filtros e exemplos.
-        </p>
+      <section className="info-card split-card !p-8 md:!p-10">
+        <div className="flex max-w-2xl flex-col gap-3">
+          <span className="page-kicker">Antes de abrir contato</span>
+          <h2 className="!text-3xl">Precisa consumir dados ou validar endpoints?</h2>
+          <p className="text-sm text-[var(--muted-foreground)]">
+            Se a dúvida for sobre uso programático, consulte primeiro a documentação da API para ver endpoints, filtros, exemplos e status operacional atual.
+          </p>
+        </div>
         <div>
           <Link href="/api" className="btn btn-primary w-fit">
             Ir para documentação da API

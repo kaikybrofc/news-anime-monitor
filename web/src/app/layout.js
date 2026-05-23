@@ -64,9 +64,11 @@ export default function RootLayout({ children }) {
         <link rel="preconnect" href="https://www.animenewsnetwork.com" crossOrigin="" />
       </head>
       <body className={`${headingFont.variable} ${bodyFont.variable}`}>
-        <SiteHeader />
-        <main className="site-container main-content">{children}</main>
-        <SiteFooter />
+        <div className="relative min-h-screen overflow-x-hidden">
+          <SiteHeader />
+          <main className="site-container main-content">{children}</main>
+          <SiteFooter />
+        </div>
       </body>
     </html>
   );

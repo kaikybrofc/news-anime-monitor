@@ -229,83 +229,65 @@ export default async function ApiPage() {
   const offlineCount = endpointStatus.length - onlineCount;
 
   return (
-    <div className="flex flex-col gap-12 animate-fade-in">
-      <section className="flex flex-col gap-4">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-1 rounded-full bg-rose-500" />
-          <h1 className="!text-4xl">Documentação da API</h1>
+    <div className="page-shell animate-fade-in">
+      <section className="page-intro">
+        <div className="section-heading">
+          <span className="page-kicker">Documentação técnica</span>
+          <h1>API do Anime Radar</h1>
+          <p className="lead">
+            Endpoints reais do monitor com exemplo de chamada, amostra de retorno e leitura operacional em tempo real dentro de um portal técnico mais claro e premium.
+          </p>
         </div>
-        <p className="lead max-w-3xl text-slate-300">
-          Esta página mostra endpoints reais do monitor com exemplo de chamada, retorno e status operacional em tempo real.
-        </p>
       </section>
 
-      <section className="grid grid-cols-1 gap-8 xl:grid-cols-3 items-start animate-fade-in-up delay-100">
+      <section className="grid grid-cols-1 items-start gap-8 xl:grid-cols-3 animate-fade-in-up delay-100">
         <div className="xl:col-span-2 flex flex-col gap-8">
-          <article className="info-card !p-8 border-slate-800 bg-slate-900/40">
-            <h2 className="mb-3 text-xl font-bold text-slate-100">Base URL</h2>
-            <div className="flex flex-col gap-2 text-sm text-slate-300">
-              <p>
-                Produção (Nginx): <code>{API_BASE_PROD}</code>
-              </p>
-              <p>
-                Local (API direta): <code>{API_BASE_LOCAL}</code>
-              </p>
+          <article className="info-card !p-8">
+            <div className="section-heading">
+              <span className="page-kicker">Base URL</span>
+              <h2>Ambientes disponíveis</h2>
+            </div>
+            <div className="mt-4 flex flex-col gap-3 text-sm text-[var(--muted-foreground)]">
+              <p>Produção (Nginx): <code>{API_BASE_PROD}</code></p>
+              <p>Local (API direta): <code>{API_BASE_LOCAL}</code></p>
             </div>
           </article>
 
-          <article className="info-card !p-8 border-slate-800 bg-slate-900/40">
+          <article className="info-card !p-8">
             <div className="mb-6 flex flex-wrap items-center gap-3">
-              <h2 className="text-xl font-bold text-slate-100">Endpoints com Status e Retorno</h2>
-              <span className="rounded border border-emerald-600/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-bold text-emerald-300">
-                Online: {onlineCount}
-              </span>
-              <span className="rounded border border-rose-600/30 bg-rose-500/10 px-2 py-1 text-[11px] font-bold text-rose-300">
-                Falha: {offlineCount}
-              </span>
+              <h2>Endpoints com status e retorno</h2>
+              <span className="status-badge status-new">Online: {onlineCount}</span>
+              <span className="status-badge status-restricted">Falha: {offlineCount}</span>
             </div>
             <div className="flex flex-col gap-6">
               {endpointStatus.map((endpoint) => (
-                <article
-                  key={endpoint.key}
-                  className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5"
-                >
+                <article key={endpoint.key} className="info-card !p-5">
                   <div className="mb-3 flex flex-wrap items-center gap-2">
-                    <span className="rounded border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-[10px] font-black text-rose-400">
-                      {endpoint.method}
-                    </span>
-                    <code className="text-sm font-bold text-slate-200">{endpoint.path}</code>
-                    <span
-                      className={`rounded px-2 py-1 text-[10px] font-black uppercase ${
-                        endpoint.online
-                          ? "border border-emerald-600/30 bg-emerald-500/10 text-emerald-300"
-                          : "border border-rose-600/30 bg-rose-500/10 text-rose-300"
-                      }`}
-                    >
+                    <span className="status-badge">{endpoint.method}</span>
+                    <code className="text-sm font-bold text-[var(--title)]">{endpoint.path}</code>
+                    <span className={`status-badge ${endpoint.online ? "status-new" : "status-restricted"}`}>
                       {endpoint.online ? "operando" : "indisponível"}
                     </span>
                   </div>
 
-                  <p className="mb-4 text-sm text-slate-400">{endpoint.desc}</p>
+                  <p className="mb-4 text-sm text-[var(--muted-foreground)]">{endpoint.desc}</p>
 
                   <div className="mb-4">
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Exemplo de chamada</p>
-                    <pre className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs text-slate-300">
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--muted)]">Exemplo de chamada</p>
+                    <pre className="technical-block">
 {endpoint.curl}
                     </pre>
                   </div>
 
                   <div className="mb-3">
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Exemplo de retorno</p>
-                    <pre className="max-h-80 overflow-auto rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs text-slate-300">
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--muted)]">Exemplo de retorno</p>
+                    <pre className="max-h-80 overflow-auto rounded-[1rem] border p-3 text-xs" style={{ borderColor: "var(--border-strong)", backgroundColor: "var(--background-elevated)", color: "var(--foreground)" }}>
 {endpoint.preview}
                     </pre>
                   </div>
 
                   {!endpoint.online && endpoint.error ? (
-                    <p className="text-xs text-rose-300">
-                      Erro: {endpoint.error}
-                    </p>
+                    <p className="technical-note">Erro: {endpoint.error}</p>
                   ) : null}
                 </article>
               ))}
@@ -313,12 +295,15 @@ export default async function ApiPage() {
           </article>
 
           <article className="info-card !p-8">
-            <h2 className="text-xl font-bold text-slate-100 mb-6">Filtros e parâmetros</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="section-heading mb-6">
+              <span className="page-kicker">Parâmetros</span>
+              <h2>Filtros e querystring</h2>
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {queryParams.map((param) => (
-                <div key={param.key} className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
-                  <p className="text-xs uppercase tracking-wide text-rose-400 font-black mb-1">{param.key}</p>
-                  <p className="text-sm text-slate-400">{param.desc}</p>
+                <div key={param.key} className="line-item">
+                  <p className="page-kicker">{param.key}</p>
+                  <p className="text-sm text-[var(--muted-foreground)]">{param.desc}</p>
                 </div>
               ))}
             </div>
@@ -327,39 +312,36 @@ export default async function ApiPage() {
 
         <aside className="flex flex-col gap-6">
           <article className="info-card flex flex-col gap-6">
-            <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 border-b border-slate-800 pb-2">
-              Informações técnicas
-            </h3>
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Formato</span>
-                <span className="text-sm font-semibold text-slate-200">JSON (UTF-8)</span>
+            <div className="section-heading">
+              <span className="page-kicker">Informações técnicas</span>
+              <h2>Perfil da API</h2>
+            </div>
+            <div className="flex flex-col gap-4 text-sm">
+              <div className="line-item">
+                <strong>Formato</strong>
+                <span>JSON (UTF-8)</span>
               </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Autenticação</span>
-                <span className="text-sm font-semibold text-slate-200">Pública (sem token)</span>
+              <div className="line-item">
+                <strong>Autenticação</strong>
+                <span>Pública (sem token)</span>
               </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Atualização</span>
-                <span className="text-sm font-semibold text-slate-200">Status em tempo real</span>
+              <div className="line-item">
+                <strong>Atualização</strong>
+                <span>Status em tempo real</span>
               </div>
             </div>
           </article>
 
-          <article className="info-card bg-sky-500/5 border-sky-500/20">
-            <h3 className="text-sm font-bold text-sky-400 mb-2">Páginas do portal</h3>
-            <p className="text-xs text-slate-400 leading-normal mb-4">
-              Rotas do frontend que consomem esta API:
-            </p>
+          <article className="info-card flex flex-col gap-4 bg-[color-mix(in_oklab,var(--primary)_5%,transparent)]">
+            <div className="section-heading">
+              <span className="page-kicker">Portal</span>
+              <h2>Páginas que consomem esta API</h2>
+            </div>
             <div className="flex flex-col gap-2">
               {portalPages.map((page) => (
-                <Link
-                  key={page.href}
-                  href={page.href}
-                  className="rounded-lg border border-slate-700 px-3 py-2 hover:border-sky-400/40 hover:bg-sky-500/5 transition-colors"
-                >
-                  <p className="text-sm font-semibold text-slate-100">{page.label}</p>
-                  <p className="text-xs text-slate-500">{page.href} - {page.desc}</p>
+                <Link key={page.href} href={page.href} className="line-link">
+                  <strong>{page.label}</strong>
+                  <span>{page.href} — {page.desc}</span>
                 </Link>
               ))}
             </div>

@@ -34,47 +34,51 @@ export function Pagination({ pathname, searchParams, offset, limit, hasMore }) {
   const currentPage = Math.floor(safeOffset / safeLimit) + 1;
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-6 w-full">
-      <div className="flex flex-col gap-1 items-center sm:items-start order-2 sm:order-1">
-        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Navegação</span>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-400">Página atual:</span>
-          <span className="text-sm font-black text-rose-500">{currentPage}</span>
+    <div className="pagination-shell">
+      <div className="flex w-full flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-1">
+          <span className="page-kicker">Navegação</span>
+          <div className="flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
+            <span>Página atual</span>
+            <span className="text-lg font-semibold text-[var(--title)]" style={{ fontFamily: "var(--font-heading), ui-serif, Georgia, serif" }}>
+              {currentPage}
+            </span>
+          </div>
         </div>
-      </div>
 
-      <div className="flex items-center gap-3 order-1 sm:order-2 w-full sm:w-auto">
-        {canGoBack ? (
-          <Link
-            className="btn btn-secondary !py-2.5 !px-6 text-xs flex-1 sm:flex-none text-center justify-center"
-            href={buildHref(pathname, searchParams, {
-              offset: previousOffset,
-              limit: safeLimit,
-            })}
-          >
-            ← Anterior
-          </Link>
-        ) : (
-          <span className="btn btn-disabled !py-2.5 !px-6 text-xs flex-1 sm:flex-none text-center justify-center opacity-30">
-            Anterior
-          </span>
-        )}
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+          {canGoBack ? (
+            <Link
+              className="btn btn-secondary !py-2.5 !px-6 text-xs justify-center"
+              href={buildHref(pathname, searchParams, {
+                offset: previousOffset,
+                limit: safeLimit,
+              })}
+            >
+              ← Página anterior
+            </Link>
+          ) : (
+            <span className="btn btn-disabled !py-2.5 !px-6 text-xs justify-center opacity-60">
+              Página anterior
+            </span>
+          )}
 
-        {hasMore ? (
-          <Link
-            className="btn btn-primary !py-2.5 !px-8 text-xs flex-1 sm:flex-none text-center justify-center shadow-lg shadow-rose-500/10"
-            href={buildHref(pathname, searchParams, {
-              offset: nextOffset,
-              limit: safeLimit,
-            })}
-          >
-            Próxima →
-          </Link>
-        ) : (
-          <span className="btn btn-disabled !py-2.5 !px-8 text-xs flex-1 sm:flex-none text-center justify-center opacity-30">
-            Fim da Lista
-          </span>
-        )}
+          {hasMore ? (
+            <Link
+              className="btn btn-primary !py-2.5 !px-7 text-xs justify-center"
+              href={buildHref(pathname, searchParams, {
+                offset: nextOffset,
+                limit: safeLimit,
+              })}
+            >
+              Próxima página →
+            </Link>
+          ) : (
+            <span className="btn btn-disabled !py-2.5 !px-7 text-xs justify-center opacity-60">
+              Fim da coleção
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

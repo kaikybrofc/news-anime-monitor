@@ -142,6 +142,10 @@ function buildFetchAudit(response, requestedUrl = "") {
   };
 }
 
+function isUrlsetDocument(xml = "") {
+  return /<urlset\b/i.test(String(xml || ""));
+}
+
 async function collectItemsFromSource(source, options = {}) {
   const {
     daysBack,
@@ -175,27 +179,32 @@ async function collectItemsFromSource(source, options = {}) {
         );
 
         const maxSitemaps = toPositiveInt(source.maxSitemaps, maxSitemapsPerSource);
-        const sitemaps = extractSitemapsFromIndex(indexResponse.data).slice(
-          0,
-          maxSitemaps
-        );
+        const sitemapDocuments = isUrlsetDocument(indexResponse.data)
+          ? [source.sitemapIndexUrl]
+          : extractSitemapsFromIndex(indexResponse.data).slice(0, maxSitemaps);
 
         const seenSitemapUrls = new Set();
-        for (const sitemapUrl of sitemaps) {
-          const sitemapAllowed = await isSourceUrlAllowedByRobots(
-            sitemapUrl,
-            source,
-            `${source.name}/SitemapFile`
-          );
-          if (!sitemapAllowed) continue;
+        for (const sitemapUrl of sitemapDocuments) {
+          let sitemapPayload = indexResponse.data;
+          let sitemapFileAudit = sitemapIndexAudit;
 
-          const smResponse = await getWithRetry(sitemapUrl, {
-            context: `${source.name}/SitemapFile`,
-            headers: sourceHeaders,
-          });
-          const sitemapFileAudit = buildFetchAudit(smResponse, sitemapUrl);
+          if (sitemapUrl !== source.sitemapIndexUrl) {
+            const sitemapAllowed = await isSourceUrlAllowedByRobots(
+              sitemapUrl,
+              source,
+              `${source.name}/SitemapFile`
+            );
+            if (!sitemapAllowed) continue;
 
-          const urls = extractUrlsFromSitemap(smResponse.data, source);
+            const smResponse = await getWithRetry(sitemapUrl, {
+              context: `${source.name}/SitemapFile`,
+              headers: sourceHeaders,
+            });
+            sitemapPayload = smResponse.data;
+            sitemapFileAudit = buildFetchAudit(smResponse, sitemapUrl);
+          }
+
+          const urls = extractUrlsFromSitemap(sitemapPayload, source);
           urls.forEach((entry) => {
             if (seenSitemapUrls.has(entry.url)) return;
             seenSitemapUrls.add(entry.url);
