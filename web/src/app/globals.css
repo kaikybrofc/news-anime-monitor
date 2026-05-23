@@ -191,11 +191,11 @@
   }
 
   .main-nav {
-    @apply flex items-center lg:w-auto;
+    @apply flex items-center xl:w-auto;
   }
 
   .nav-desktop {
-    @apply hidden lg:flex;
+    @apply hidden xl:flex;
   }
 
   .nav-cluster {
@@ -222,7 +222,7 @@
   }
 
   .nav-mobile-shell {
-    @apply flex w-auto lg:hidden;
+    @apply flex w-auto xl:hidden;
   }
 
   .mobile-nav-toggle {
@@ -329,6 +329,14 @@
   }
 
   @media (max-width: 1023px) {
+    .nav-desktop {
+      display: none !important;
+    }
+
+    .nav-mobile-shell {
+      display: flex !important;
+    }
+
     .header-inner {
       @apply min-h-[4.25rem] py-3;
     }
