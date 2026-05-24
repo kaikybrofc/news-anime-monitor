@@ -1,6 +1,6 @@
 {
   "name": "news-anime-monitor",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Monitor de noticias de anime com pipeline inteligente, API REST e frontend Next.js.",
   "main": "src/api/index.js",
   "scripts": {
