@@ -9,10 +9,25 @@ DOMAIN_URL="${DEPLOY_DOMAIN_URL:-https://animeradar.shop}"
 LOCAL_API_URL="${DEPLOY_LOCAL_API_URL:-http://127.0.0.1:3001}"
 LOCAL_WEB_URL="${DEPLOY_LOCAL_WEB_URL:-http://127.0.0.1:3010}"
 PUBLIC_API_URL="${DEPLOY_PUBLIC_API_URL:-${DOMAIN_URL}/monitor-api/articles?limit=1}"
+NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 PREVIOUS_SHA="$(git -C "$ROOT_DIR" rev-parse HEAD)"
 
 cd "$ROOT_DIR"
 
+if ! command -v npm >/dev/null 2>&1; then
+  if [ -s "$NVM_DIR/nvm.sh" ]; then
+    # shellcheck disable=SC1090
+    . "$NVM_DIR/nvm.sh"
+    nvm use --lts >/dev/null 2>&1 || nvm use default >/dev/null 2>&1 || true
+  fi
+fi
+
+if ! command -v npm >/dev/null 2>&1; then
+  echo "[deploy:vps] npm não encontrado no shell remoto. Verifique a instalação do Node/NVM." >&2
+  exit 127
+fi
+
+echo "[deploy:vps] usando node $(node -v) e npm $(npm -v)"
 echo "[deploy:vps] sha atual: $PREVIOUS_SHA"
 echo "[deploy:vps] preparando ref: $DEPLOY_REF"
 
