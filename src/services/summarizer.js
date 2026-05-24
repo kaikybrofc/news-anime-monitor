@@ -8,6 +8,9 @@ const { extractTitleFromHtml } = require("../utils/article-utils.js");
 const GEMINI_CLI_PATH =
   String(process.env.GEMINI_CLI_PATH || "gemini").trim() || "gemini";
 const GEMINI_MODEL = String(process.env.GEMINI_MODEL || "").trim();
+const CLAUDE_CLI_PATH =
+  String(process.env.CLAUDE_CLI_PATH || "claude").trim() || "claude";
+const CLAUDE_MODEL = String(process.env.CLAUDE_MODEL || "").trim();
 const GEMINI_MODEL_AUTO_SWITCH = toBoolean(
   process.env.GEMINI_MODEL_AUTO_SWITCH,
   true
@@ -288,26 +291,23 @@ ${articleText}
 function createEmptySummaryError(details = {}) {
   const error = new Error("EMPTY_SUMMARY_RESPONSE");
   error.code = "EMPTY_SUMMARY_RESPONSE";
-  error.provider = "gemini-cli";
+  error.provider = details.provider || "unknown-cli";
   error.responseStatus = details.responseStatus || null;
   return error;
 }
 
-function runGeminiCliPrompt(prompt, model = "") {
+function runCliPrompt({
+  cliPath,
+  args,
+  provider,
+  timeoutMs,
+  startErrorCode,
+  exitErrorCode,
+  env = process.env,
+}) {
   return new Promise((resolve, reject) => {
-    const args = ["-p", String(prompt || ""), "--output-format", "text"];
-    if (GEMINI_DISABLE_EXTENSIONS) {
-      args.push("--extensions", "");
-    }
-    if (GEMINI_APPROVAL_MODE) {
-      args.push("--approval-mode", GEMINI_APPROVAL_MODE);
-    }
-    if (model) {
-      args.push("--model", model);
-    }
-
-    const child = spawn(GEMINI_CLI_PATH, args, {
-      env: process.env,
+    const child = spawn(cliPath, args, {
+      env,
       stdio: ["ignore", "pipe", "pipe"],
     });
 
@@ -332,10 +332,10 @@ function runGeminiCliPrompt(prompt, model = "") {
 
     timeoutTimer = setTimeout(() => {
       const error = new Error(
-        `Gemini CLI excedeu o timeout de ${GEMINI_TIMEOUT_MS}ms.`
+        `${provider} excedeu o timeout de ${timeoutMs}ms.`
       );
       error.code = "ETIMEDOUT";
-      error.provider = "gemini-cli";
+      error.provider = provider;
 
       child.kill("SIGTERM");
       setTimeout(() => {
@@ -345,7 +345,7 @@ function runGeminiCliPrompt(prompt, model = "") {
       }, 2500);
 
       finishWithError(error);
-    }, GEMINI_TIMEOUT_MS);
+    }, timeoutMs);
 
     child.stdout.on("data", (chunk) => {
       stdout += chunk.toString();
@@ -357,10 +357,10 @@ function runGeminiCliPrompt(prompt, model = "") {
 
     child.on("error", (error) => {
       const wrapped = new Error(
-        `Falha ao iniciar Gemini CLI em "${GEMINI_CLI_PATH}": ${error?.message || "erro desconhecido"}`
+        `Falha ao iniciar ${provider} em "${cliPath}": ${error?.message || "erro desconhecido"}`
       );
-      wrapped.code = error?.code || "GEMINI_CLI_START_ERROR";
-      wrapped.provider = "gemini-cli";
+      wrapped.code = error?.code || startErrorCode;
+      wrapped.provider = provider;
       wrapped.originalError = error;
       finishWithError(wrapped);
     });
@@ -375,10 +375,10 @@ function runGeminiCliPrompt(prompt, model = "") {
           .find(Boolean);
         const details = firstStderrLine ? `: ${firstStderrLine}` : "";
         const error = new Error(
-          `Gemini CLI retornou erro (exit=${exitCode}${signal ? `, signal=${signal}` : ""})${details}`
+          `${provider} retornou erro (exit=${exitCode}${signal ? `, signal=${signal}` : ""})${details}`
         );
-        error.code = "GEMINI_CLI_EXIT_ERROR";
-        error.provider = "gemini-cli";
+        error.code = exitErrorCode;
+        error.provider = provider;
         error.exitCode = exitCode;
         error.signal = signal || null;
         error.stderr = stderr;
@@ -390,6 +390,7 @@ function runGeminiCliPrompt(prompt, model = "") {
       if (!summary) {
         finishWithError(
           createEmptySummaryError({
+            provider,
             responseStatus: "stdout_empty",
           })
         );
@@ -399,6 +400,54 @@ function runGeminiCliPrompt(prompt, model = "") {
       finishWithSuccess(summary);
     });
 
+  });
+}
+
+function runGeminiCliPrompt(prompt, model = "") {
+  const args = ["-p", String(prompt || ""), "--output-format", "text"];
+  if (GEMINI_DISABLE_EXTENSIONS) {
+    args.push("--extensions", "");
+  }
+  if (GEMINI_APPROVAL_MODE) {
+    args.push("--approval-mode", GEMINI_APPROVAL_MODE);
+  }
+  if (model) {
+    args.push("--model", model);
+  }
+
+  return runCliPrompt({
+    cliPath: GEMINI_CLI_PATH,
+    args,
+    provider: "Gemini CLI",
+    timeoutMs: GEMINI_TIMEOUT_MS,
+    startErrorCode: "GEMINI_CLI_START_ERROR",
+    exitErrorCode: "GEMINI_CLI_EXIT_ERROR",
+  });
+}
+
+function runClaudeCliPrompt(prompt, model = "") {
+  const args = [
+    "-p",
+    String(prompt || ""),
+    "--bare",
+    "--output-format",
+    "text",
+  ];
+  if (model) {
+    args.push("--model", model);
+  }
+
+  return runCliPrompt({
+    cliPath: CLAUDE_CLI_PATH,
+    args,
+    provider: "Claude CLI",
+    timeoutMs: GEMINI_TIMEOUT_MS,
+    startErrorCode: "CLAUDE_CLI_START_ERROR",
+    exitErrorCode: "CLAUDE_CLI_EXIT_ERROR",
+    env: {
+      ...process.env,
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API,
+    },
   });
 }
 
@@ -429,8 +478,10 @@ async function generateSummary(prompt) {
       const summary = await runGeminiCliPrompt(prompt, model);
       return {
         summary,
+        providerUsed: "Gemini CLI",
         modelUsed: model || "padrão do Gemini CLI",
         switchedModel: switchedModelAtLeastOnce,
+        usedFallback: false,
       };
     } catch (error) {
       lastError = error;
@@ -480,19 +531,42 @@ async function generateSummary(prompt) {
     lastError.lastModelTried = lastModelTried;
   }
 
-  throw lastError;
+  logger.warn("[Resumo] Gemini esgotou as tentativas. Acionando fallback para Claude CLI.");
+  try {
+    const summary = await runClaudeCliPrompt(prompt, CLAUDE_MODEL);
+    return {
+      summary,
+      providerUsed: "Claude CLI",
+      modelUsed: CLAUDE_MODEL || "padrão do Claude CLI",
+      switchedModel: switchedModelAtLeastOnce,
+      usedFallback: true,
+      fallbackFrom: lastModelTried || "padrão do Gemini CLI",
+    };
+  } catch (fallbackError) {
+    fallbackError.previousError = lastError;
+    throw fallbackError;
+  }
 }
 
 function getSummaryModelLabel() {
-  if (!GEMINI_MODEL_AUTO_SWITCH) {
-    return GEMINI_MODEL || "padrão do Gemini CLI";
-  }
-  return resolveGeminiModelSequence().join(" -> ");
+  const geminiLabel = !GEMINI_MODEL_AUTO_SWITCH
+    ? GEMINI_MODEL || "padrão do Gemini CLI"
+    : resolveGeminiModelSequence().join(" -> ");
+  const claudeLabel = CLAUDE_MODEL || "padrão do Claude CLI";
+  return `${geminiLabel} | fallback: ${claudeLabel}`;
 }
 
 function assertSummaryConfiguration() {
   if (!GEMINI_CLI_PATH) {
     throw new Error("A variável GEMINI_CLI_PATH não foi definida.");
+  }
+
+  if (!CLAUDE_CLI_PATH) {
+    throw new Error("A variável CLAUDE_CLI_PATH não foi definida.");
+  }
+
+  if (!(process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API)) {
+    throw new Error("Defina ANTHROPIC_API_KEY ou CLAUDE_API para habilitar o fallback com Claude CLI.");
   }
 }
 
@@ -530,9 +604,16 @@ async function summarizeHtmlInternal(htmlContent, options = {}) {
     const generation = await generateSummary(buildPrompt(limitedText));
     const summary = generation.summary;
     const modelUsed = generation.modelUsed;
+    const providerUsed = generation.providerUsed;
 
     logger.info("\n========== RESPOSTA DA IA ============");
+    logger.info(`Provedor usado: ${providerUsed}`);
     logger.info(`Modelo usado: ${modelUsed}`);
+    if (generation.usedFallback) {
+      logger.warn(
+        `[Resumo] Fallback acionado: Gemini (${generation.fallbackFrom}) -> Claude CLI (${modelUsed})`
+      );
+    }
     logger.info(summary);
     logger.info("======================================\n");
     logger.success("[Resumo] Resumo recebido.");
