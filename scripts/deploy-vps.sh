@@ -18,12 +18,18 @@ echo "[deploy:vps] usuário: $(whoami)"
 echo "[deploy:vps] home: $HOME"
 echo "[deploy:vps] diretório: $(pwd)"
 
-if ! command -v npm >/dev/null 2>&1; then
-  if [ -s "$NVM_DIR/nvm.sh" ]; then
-    # shellcheck disable=SC1090
-    . "$NVM_DIR/nvm.sh"
-    nvm use --lts >/dev/null 2>&1 || nvm use default >/dev/null 2>&1 || true
+if ! command -v npm >/dev/null 2>&1 && [ -d "$NVM_DIR/versions/node" ]; then
+  LATEST_NODE_BIN="$(find "$NVM_DIR/versions/node" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)/bin"
+  if [ -d "$LATEST_NODE_BIN" ]; then
+    export PATH="$LATEST_NODE_BIN:$PATH"
+    echo "[deploy:vps] PATH ajustado com Node via NVM: $LATEST_NODE_BIN"
   fi
+fi
+
+if ! command -v npm >/dev/null 2>&1 && [ -s "$NVM_DIR/nvm.sh" ]; then
+  # shellcheck disable=SC1090
+  . "$NVM_DIR/nvm.sh"
+  nvm use --lts >/dev/null 2>&1 || nvm use default >/dev/null 2>&1 || true
 fi
 
 if ! command -v npm >/dev/null 2>&1; then
