@@ -1495,6 +1495,138 @@ function buildTopicSummary(articles = []) {
     });
 }
 
+function hasUsefulTrendImage(article = {}) {
+  const image = String(article?.refined?.image || article?.image || "").trim().toLowerCase();
+  if (!image) return false;
+  if (image.startsWith("data:image/svg+xml")) return false;
+  if (image.includes("/brand/logo-64.png")) return false;
+  if (image.includes("/news/img/favicons/")) return false;
+  if (image.endsWith("/favicon.ico")) return false;
+  return true;
+}
+
+function hasUsefulTrendSummary(article = {}) {
+  const summary = normalizeSummaryText(article?.refined?.summary || "");
+  const lowered = summary.toLowerCase();
+  if (!summary) return false;
+  if (isSummaryErrorText(summary)) return false;
+  if (isSummaryCorruptedText(summary)) return false;
+  if (lowered === "não foi possível extrair o conteúdo para resumo.") return false;
+  return true;
+}
+
+function compareTrendRepresentativeArticles(left, right) {
+  const leftHasImage = hasUsefulTrendImage(left);
+  const rightHasImage = hasUsefulTrendImage(right);
+  if (leftHasImage !== rightHasImage) return rightHasImage ? 1 : -1;
+
+  const leftHasSummary = hasUsefulTrendSummary(left);
+  const rightHasSummary = hasUsefulTrendSummary(right);
+  if (leftHasSummary !== rightHasSummary) return rightHasSummary ? 1 : -1;
+
+  const leftScore = Number(left?.refined?.score || 0);
+  const rightScore = Number(right?.refined?.score || 0);
+  if (rightScore !== leftScore) return rightScore - leftScore;
+
+  return getItemTimestamp(right) - getItemTimestamp(left);
+}
+
+function selectTrendRepresentativeArticle(articles = []) {
+  const valid = articles.filter((article) => article?.id);
+  if (!valid.length) return null;
+  return valid.slice().sort(compareTrendRepresentativeArticles)[0] || null;
+}
+
+function buildTopicLabel(topicKey = "") {
+  const parts = String(topicKey || "")
+    .split("|")
+    .map((part) => normalizeQueryText(part))
+    .filter((part) => part && part !== "na");
+
+  const meaningfulParts = parts.slice(1).length ? parts.slice(1) : parts;
+  const labels = Array.from(
+    new Set(
+      meaningfulParts
+        .map((part) => slugToName(String(part || "").replace(/_/g, "-")))
+        .filter(Boolean)
+    )
+  );
+
+  if (!labels.length) {
+    return slugToName(String(topicKey || "").replace(/[|_]+/g, "-")) || "Tópico";
+  }
+
+  return labels.join(" · ");
+}
+
+function enrichTrendsWithEditorial(basePayload = {}, scopedArticles = []) {
+  const byFranchise = new Map();
+  const bySource = new Map();
+  const byTopic = new Map();
+
+  for (const article of scopedArticles) {
+    const refined = article?.refined || {};
+    const franchise = deriveFranchiseFromRefined(refined);
+    const topicKey = String(refined.topicKey || "").trim();
+    const sourceId = String(refined.sourceId || "").trim();
+
+    if (franchise.slug) {
+      if (!byFranchise.has(franchise.slug)) byFranchise.set(franchise.slug, []);
+      byFranchise.get(franchise.slug).push(article);
+    }
+
+    if (topicKey) {
+      if (!byTopic.has(topicKey)) byTopic.set(topicKey, []);
+      byTopic.get(topicKey).push(article);
+    }
+
+    if (sourceId) {
+      if (!bySource.has(sourceId)) bySource.set(sourceId, []);
+      bySource.get(sourceId).push(article);
+    }
+  }
+
+  const topFranchises = (basePayload.topFranchises || []).map((row) => ({
+    ...row,
+    representativeArticle: selectTrendRepresentativeArticle(byFranchise.get(String(row.slug || "")) || []),
+  }));
+
+  const topTopics = (basePayload.topTopics || []).map((row) => ({
+    ...row,
+    label: buildTopicLabel(row.topicKey),
+    representativeArticle: selectTrendRepresentativeArticle(byTopic.get(String(row.topicKey || "")) || []),
+  }));
+
+  const topSources = (basePayload.topSources || []).map((row) => ({
+    ...row,
+    representativeArticle: selectTrendRepresentativeArticle(bySource.get(String(row.sourceId || "")) || []),
+  }));
+
+  const featuredArticles = [];
+  const seen = new Set();
+  [
+    ...topFranchises.map((row) => row.representativeArticle),
+    ...topTopics.map((row) => row.representativeArticle),
+    ...topSources.map((row) => row.representativeArticle),
+  ]
+    .filter(Boolean)
+    .sort(compareTrendRepresentativeArticles)
+    .forEach((article) => {
+      const key = String(article?.id || article?.refined?.canonicalUrl || "");
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      featuredArticles.push(article);
+    });
+
+  return {
+    ...basePayload,
+    topFranchises,
+    topTopics,
+    topSources,
+    featuredArticles: featuredArticles.slice(0, 12),
+  };
+}
+
 function createEntityAggregationRow(type, entity) {
   return {
     type,
@@ -1929,8 +2061,11 @@ app.get("/trends", async (req, res) => {
   try {
     const windowHours = toPositiveInt(req.query.windowHours, 72);
     const top = normalizeLimit(req.query.top, 10);
+    const includeEditorial = ["1", "true", "yes", "on"].includes(
+      normalizeQueryText(req.query.includeEditorial)
+    );
 
-    if (USE_MYSQL) {
+    if (USE_MYSQL && !includeEditorial) {
       const trendSnapshot = await queryTrendSnapshot({ top, windowHours });
       return res.json({
         generatedAt: new Date().toISOString(),
@@ -1944,23 +2079,25 @@ app.get("/trends", async (req, res) => {
 
     const allArticles = await loadAllArticlesForContract();
     const inWindow = filterArticlesByWindowHours(allArticles, windowHours);
-    const topFranchises = buildFranchiseSummary(inWindow).slice(0, top);
-    const topTopics = buildTopicSummary(inWindow).slice(0, top);
-    const topSources = buildSourceSummary(inWindow).slice(0, top);
-
-    res.json({
+    const basePayload = {
       generatedAt: new Date().toISOString(),
       windowHours,
       totals: {
         articles: inWindow.length,
-        sources: topSources.length,
-        franchises: topFranchises.length,
-        topics: topTopics.length,
+        sources: buildSourceSummary(inWindow).length,
+        franchises: buildFranchiseSummary(inWindow).length,
+        topics: buildTopicSummary(inWindow).length,
       },
-      topFranchises,
-      topTopics,
-      topSources,
-    });
+      topFranchises: buildFranchiseSummary(inWindow).slice(0, top),
+      topTopics: buildTopicSummary(inWindow).slice(0, top),
+      topSources: buildSourceSummary(inWindow).slice(0, top),
+    };
+
+    if (!includeEditorial) {
+      return res.json(basePayload);
+    }
+
+    return res.json(enrichTrendsWithEditorial(basePayload, inWindow));
   } catch (error) {
     logger.error("[API:/trends] Falha ao montar tendências:", error);
     res.status(500).json({

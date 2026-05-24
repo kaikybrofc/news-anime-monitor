@@ -979,6 +979,107 @@
     color: color-mix(in oklab, var(--primary) 86%, var(--foreground));
   }
 
+  .trend-hero-shell {
+    @apply mb-2;
+  }
+
+  .trend-spotlight-card {
+    @apply grid grid-cols-1 gap-6 overflow-hidden xl:grid-cols-[minmax(320px,0.95fr)_minmax(0,1.05fr)];
+  }
+
+  .trend-spotlight-media {
+    @apply min-h-[18rem];
+  }
+
+  .trend-spotlight-image {
+    @apply relative block h-full min-h-[18rem] overflow-hidden rounded-[1.5rem];
+    background-color: color-mix(in oklab, var(--foreground) 10%, var(--background));
+  }
+
+  .trend-spotlight-image img {
+    @apply h-full w-full object-cover;
+  }
+
+  .trend-spotlight-body {
+    @apply flex flex-col gap-6;
+  }
+
+  .trend-spotlight-copy {
+    @apply flex flex-col gap-3;
+  }
+
+  .trend-spotlight-copy h3 {
+    @apply text-[1.25rem] font-semibold leading-tight md:text-[1.45rem];
+    color: var(--title);
+  }
+
+  .trend-spotlight-copy p {
+    @apply text-sm leading-relaxed md:text-base;
+    color: var(--muted-foreground);
+  }
+
+  .trend-card-grid {
+    @apply grid grid-cols-1 gap-4;
+  }
+
+  .trend-entity-card {
+    @apply flex flex-col gap-5;
+  }
+
+  .trend-metric-list {
+    @apply flex flex-wrap gap-2;
+  }
+
+  .trend-metric-pill {
+    @apply inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs;
+    border-color: color-mix(in oklab, var(--border-strong) 84%, transparent);
+    background-color: color-mix(in oklab, var(--background-elevated) 70%, transparent);
+  }
+
+  .trend-metric-pill strong {
+    color: var(--title);
+  }
+
+  .trend-metric-label {
+    @apply font-bold uppercase tracking-[0.16em] text-[10px];
+    color: var(--muted);
+  }
+
+  .trend-related-article {
+    @apply grid grid-cols-[112px_minmax(0,1fr)] gap-4 rounded-[1.2rem] border p-3 transition-colors;
+    border-color: color-mix(in oklab, var(--border-strong) 82%, transparent);
+    background-color: color-mix(in oklab, var(--background-elevated) 34%, transparent);
+  }
+
+  .trend-related-article:hover {
+    border-color: color-mix(in oklab, var(--primary) 18%, var(--border-strong));
+    background-color: color-mix(in oklab, var(--foreground) 5%, var(--card-strong));
+  }
+
+  .trend-related-thumb {
+    @apply relative h-24 overflow-hidden rounded-[1rem];
+    background-color: color-mix(in oklab, var(--foreground) 10%, var(--background));
+  }
+
+  .trend-related-copy {
+    @apply flex min-w-0 flex-col gap-2;
+  }
+
+  .trend-related-copy strong {
+    @apply line-clamp-2 text-sm font-semibold;
+    color: var(--title);
+  }
+
+  .trend-related-copy p {
+    @apply line-clamp-3 text-xs leading-relaxed;
+    color: var(--muted-foreground);
+  }
+
+  .trend-related-copy span {
+    @apply text-[11px];
+    color: var(--muted);
+  }
+
   .pagination-shell {
     @apply rounded-[1.6rem] border p-4 md:px-6;
     border-color: color-mix(in oklab, var(--border-strong) 84%, transparent);

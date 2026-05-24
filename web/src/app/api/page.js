@@ -23,6 +23,7 @@ const queryParams = [
   { key: "from / to", desc: "Faixa temporal em formato de data ISO." },
   { key: "windowHours", desc: "Janela em horas para /trends, /sources e /franchises." },
   { key: "top", desc: "Top N de agregados para rankings e tendências." },
+  { key: "includeEditorial", desc: "Enriquece /trends com artigos representativos, labels amigáveis e cards de apoio." },
 ];
 
 const portalPages = [
@@ -79,9 +80,9 @@ const endpointDefinitions = [
     key: "trends",
     method: "GET",
     path: "/trends",
-    desc: "Tendências por janela temporal (franquias, tópicos e fontes).",
-    curl: `curl -X GET "${API_BASE_PROD}/trends?windowHours=72&top=5"`,
-    fetcher: async () => fetchMonitor("/trends", { windowHours: 72, top: 5 }),
+    desc: "Tendências por janela temporal com modo editorial opcional para cards ricos e notícias representativas.",
+    curl: `curl -X GET "${API_BASE_PROD}/trends?windowHours=72&top=5&includeEditorial=1"`,
+    fetcher: async () => fetchMonitor("/trends", { windowHours: 72, top: 5, includeEditorial: 1 }),
   },
   {
     key: "sources",
