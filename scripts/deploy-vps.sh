@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+: "${HOME:=/root}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEPLOY_REF="${1:-${DEPLOY_REF:-main}}"
 DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
@@ -10,9 +11,12 @@ LOCAL_API_URL="${DEPLOY_LOCAL_API_URL:-http://127.0.0.1:3001}"
 LOCAL_WEB_URL="${DEPLOY_LOCAL_WEB_URL:-http://127.0.0.1:3010}"
 PUBLIC_API_URL="${DEPLOY_PUBLIC_API_URL:-${DOMAIN_URL}/monitor-api/articles?limit=1}"
 NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-PREVIOUS_SHA="$(git -C "$ROOT_DIR" rev-parse HEAD)"
 
 cd "$ROOT_DIR"
+
+echo "[deploy:vps] usuário: $(whoami)"
+echo "[deploy:vps] home: $HOME"
+echo "[deploy:vps] diretório: $(pwd)"
 
 if ! command -v npm >/dev/null 2>&1; then
   if [ -s "$NVM_DIR/nvm.sh" ]; then
@@ -27,6 +31,7 @@ if ! command -v npm >/dev/null 2>&1; then
   exit 127
 fi
 
+PREVIOUS_SHA="$(git rev-parse HEAD)"
 echo "[deploy:vps] usando node $(node -v) e npm $(npm -v)"
 echo "[deploy:vps] sha atual: $PREVIOUS_SHA"
 echo "[deploy:vps] preparando ref: $DEPLOY_REF"
