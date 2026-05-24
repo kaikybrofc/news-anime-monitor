@@ -240,6 +240,12 @@ function buildFactBlocks({ title = "", summary = "", sourceName = "", publishedA
   };
 }
 
+function getRenderableArticleTitle(article = {}) {
+  return String(
+    getArticleTitle(article) || article?.title || article?.headline || article?.seoTitle || "Notícia"
+  ).trim();
+}
+
 async function loadArticleById(articleId = "") {
   const parsedId = String(articleId || "").trim();
   if (!parsedId) return null;
@@ -307,7 +313,7 @@ export async function generateMetadata(props) {
   }
 
   const article = resolved.item;
-  const title = getArticleTitle(article);
+  const title = getRenderableArticleTitle(article);
   const description = buildClickableMetaDescription({
     title,
     summary: article?.refined?.summary || "",
@@ -370,7 +376,7 @@ export default async function NoticiaDetailPage(props) {
 
   const article = state.item || {};
   const refined = article?.refined || {};
-  const title = getArticleTitle(article);
+  const title = getRenderableArticleTitle(article);
   const sourceUrl = getArticleUrl(article);
   const sourceName = String(refined.sourceName || refined.sourceId || "fonte desconhecida");
   const imageUrl = getArticleImageUrl(article);
@@ -528,6 +534,25 @@ export default async function NoticiaDetailPage(props) {
           ) : null}
 
           <article className="editorial-reading-panel">
+            <header className="flex flex-col gap-4">
+              <span className="page-kicker">Notícia</span>
+              <h1 className="!text-[2rem] md:!text-[3rem] leading-tight text-balance">{title}</h1>
+              <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--muted)]">
+                <span>Fonte: {sourceName}</span>
+                <span aria-hidden>•</span>
+                <time dateTime={publishedAt || undefined}>{formatDateTime(publishedAt)}</time>
+              </div>
+              {badges.length ? (
+                <div className="badge-row">
+                  {badges.map((badge) => (
+                    <span key={badge.label} className={`badge badge-${badge.tone || "default"}`}>
+                      {badge.label}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </header>
+
             <div className="section-heading">
               <span className="page-kicker">Leitura principal</span>
               <h2 className="!text-[1.5rem] md:!text-[2rem] flex items-center gap-3">
