@@ -266,6 +266,21 @@ function resolveArticleName(articleInfo, html) {
   return providedName || inferredName;
 }
 
+function isCrunchyrollShellTitle(title = "") {
+  const normalized = normalizeText(title).toLowerCase();
+  return normalized === "anime news, top stories & in-depth anime insights";
+}
+
+function isCrunchyrollBodyMissing(html = "") {
+  const source = String(html || "");
+  const $ = cheerio.load(source);
+  const bodyText = normalizeText($("body").text());
+
+  if (!bodyText) return true;
+  if (/self\.__next_f\.push\(\[/i.test(source)) return true;
+  return bodyText.length < 200;
+}
+
 async function evaluateFetchPermission(url, sourceConfig, context) {
   const result = await checkRobotsForUrl(url, {
     headers: sourceConfig?.requestHeaders,
@@ -330,13 +345,25 @@ async function processArticleCandidate(
     headers: candidate.sourceConfig?.requestHeaders,
   });
 
-  const html = articlePageResponse.data;
+  const html = String(articlePageResponse.data || "");
+  const name = resolveArticleName(candidate, html);
+
+  if (
+    candidate?.sourceId === "crunchyrollnews" &&
+    isCrunchyrollShellTitle(name) &&
+    isCrunchyrollBodyMissing(html)
+  ) {
+    logger.warn(
+      `[Crunchyroll News] Página descartada por app shell sem conteúdo editorial utilizável: ${candidate.url}`
+    );
+    return null;
+  }
+
   const summary = await summarizeHtml(html, {
     onAutoRetry: options.onSummaryRetry,
     sourceConfig: candidate.sourceConfig,
     articleUrl: candidate.url,
   });
-  const name = resolveArticleName(candidate, html);
   const image = await resolveArticleImage({ ...candidate, name }, html);
 
   if (String(image).startsWith("data:image/svg+xml")) {
