@@ -140,7 +140,7 @@ const IN_MEMORY_MAX_ARTICLES = toPositiveInt(
 );
 const API_DEFAULT_LIMIT = toPositiveInt(process.env.API_DEFAULT_LIMIT, 50);
 const API_MAX_LIMIT = toPositiveInt(process.env.API_MAX_LIMIT, 200);
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || "127.0.0.1";
 const USE_MYSQL = hasDbConfig();
 const CORS_ALLOWED_ORIGINS = parseCommaSeparatedList(

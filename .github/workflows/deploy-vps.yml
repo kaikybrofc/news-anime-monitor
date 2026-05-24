@@ -1,0 +1,91 @@
+name: Deploy VPS
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag ou SHA para deploy"
+        required: false
+        default: "main"
+      component:
+        description: "Escopo do deploy"
+        required: false
+        default: "full"
+        type: choice
+        options:
+          - full
+          - api
+          - web
+      skip_seo_check:
+        description: "Ignorar SEO check no deploy do frontend"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+
+      - name: Install API dependencies
+        run: npm ci
+
+      - name: Lint API
+        run: npm run lint
+
+      - name: Install frontend dependencies
+        run: npm --prefix web ci
+
+      - name: Lint frontend
+        run: npm run web:lint
+
+      - name: Build frontend
+        run: npm run web:build
+
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: validate
+    environment: production
+
+    steps:
+      - name: Configure SSH key
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' '${{ secrets.VPS_SSH_PRIVATE_KEY }}' > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p '${{ secrets.VPS_PORT }}' '${{ secrets.VPS_HOST }}' >> ~/.ssh/known_hosts
+
+      - name: Deploy over SSH
+        env:
+          DEPLOY_REF: ${{ inputs.ref }}
+          DEPLOY_COMPONENT: ${{ inputs.component }}
+          DEPLOY_SKIP_SEO_CHECK: ${{ inputs.skip_seo_check }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          DEPLOY_DOMAIN_URL: ${{ vars.DEPLOY_DOMAIN_URL }}
+          DEPLOY_LOCAL_API_URL: ${{ vars.DEPLOY_LOCAL_API_URL }}
+          DEPLOY_LOCAL_WEB_URL: ${{ vars.DEPLOY_LOCAL_WEB_URL }}
+          DEPLOY_PUBLIC_API_URL: ${{ vars.DEPLOY_PUBLIC_API_URL }}
+          PM2_API_NAME: ${{ vars.PM2_API_NAME }}
+          PM2_WEB_NAME: ${{ vars.PM2_WEB_NAME }}
+        run: |
+          ssh -p '${{ secrets.VPS_PORT }}' '${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}' "export DEPLOY_REF='$DEPLOY_REF' DEPLOY_COMPONENT='$DEPLOY_COMPONENT' DEPLOY_SKIP_SEO_CHECK='$DEPLOY_SKIP_SEO_CHECK' DEPLOY_DOMAIN_URL='$DEPLOY_DOMAIN_URL' DEPLOY_LOCAL_API_URL='$DEPLOY_LOCAL_API_URL' DEPLOY_LOCAL_WEB_URL='$DEPLOY_LOCAL_WEB_URL' DEPLOY_PUBLIC_API_URL='$DEPLOY_PUBLIC_API_URL' PM2_API_NAME='$PM2_API_NAME' PM2_WEB_NAME='$PM2_WEB_NAME'; cd '$DEPLOY_PATH'; bash scripts/deploy-vps.sh '$DEPLOY_REF'"

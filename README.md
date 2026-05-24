@@ -89,7 +89,7 @@ Modulos principais:
 
 ## API REST
 
-Base local padrão: `http://127.0.0.1:3000`
+Base local padrão: `http://127.0.0.1:3001`
 
 Endpoints principais:
 - `GET /` - inventário bruto atual em memória.
@@ -159,6 +159,8 @@ cp .env.example .env
 - `npm run start:pm2` - sobe API via PM2 (`news-anime-monitor`).
 - `npm run pm2:restart` - reinicia API no PM2.
 - `npm run pm2:logs` - logs da API no PM2.
+- `npm run api:deploy:safe` - restart seguro da API com checagens locais.
+- `npm run deploy:vps -- <ref>` - deploy orquestrado completo na VPS para uma branch, tag ou SHA.
 - `npm run web:dev` - sobe frontend em dev (`web`, porta 3010).
 - `npm run web:build` - build do frontend.
 - `npm run web:start` - start do frontend built.
@@ -181,7 +183,7 @@ Obrigatório:
 - `CLAUDE_API` ou `ANTHROPIC_API_KEY` definido para autenticar o Claude CLI
 
 Principais opcionais:
-- `PORT` (padrão `3000`)
+- `PORT` (padrão `3001`)
 - `NODE_ENV`
 - `GEMINI_CLI_PATH` (padrão `gemini`)
 - `GEMINI_MODEL` (usa o padrão do CLI quando vazio)
@@ -236,23 +238,23 @@ npm run start:pm2
 npm run web:pm2:start
 ```
 
-### 2) Nginx para `omnizap.xyz`
+### 2) Nginx para `animeradar.shop`
 
 Exemplo de bloco server (ajuste paths de certificado):
 
 ```nginx
 server {
     listen 80;
-    server_name omnizap.xyz www.omnizap.xyz;
+    server_name animeradar.shop www.animeradar.shop;
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl http2;
-    server_name omnizap.xyz www.omnizap.xyz;
+    server_name animeradar.shop www.animeradar.shop;
 
-    ssl_certificate /etc/letsencrypt/live/omnizap.xyz/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/omnizap.xyz/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/animeradar.shop/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/animeradar.shop/privkey.pem;
 
     location / {
         proxy_pass http://127.0.0.1:3010;
@@ -274,10 +276,60 @@ server {
 }
 ```
 
-## CI (GitHub Actions)
+## CI e Deploy (GitHub Actions + VPS)
 
-Atualmente o repositório mantém workflow de revisão de dependências (`dependency-review.yml`).
-O deploy em VPS via GitHub Actions foi removido e o fluxo recomendado é deploy manual/operacional via PM2 + Nginx.
+O repositório mantém:
+- `dependency-review.yml` para revisão de dependências em pull requests.
+- `deploy-vps.yml` para deploy manual na VPS via GitHub Actions.
+
+### Pré-requisitos na VPS
+
+- repositório clonado em um diretório fixo
+- Node.js 20+ e npm instalados
+- PM2 instalado para o usuário de deploy
+- Nginx configurado para `animeradar.shop`
+- `.env` configurado localmente na VPS
+- Gemini CLI instalado/autenticado
+- Claude CLI instalado com `CLAUDE_API` ou `ANTHROPIC_API_KEY` disponível no ambiente
+
+### Secrets no GitHub
+
+Configure no environment `production`:
+- `VPS_HOST`
+- `VPS_PORT`
+- `VPS_USER`
+- `VPS_SSH_PRIVATE_KEY`
+
+### Variables no GitHub
+
+Configure no environment `production`:
+- `DEPLOY_PATH`
+- `DEPLOY_DOMAIN_URL=https://animeradar.shop`
+- `DEPLOY_LOCAL_API_URL=http://127.0.0.1:3001`
+- `DEPLOY_LOCAL_WEB_URL=http://127.0.0.1:3010`
+- `DEPLOY_PUBLIC_API_URL=https://animeradar.shop/monitor-api/articles?limit=1`
+- `PM2_API_NAME=news-anime-monitor`
+- `PM2_WEB_NAME=news-anime-web`
+
+### Como disparar o deploy
+
+1. Abra `Actions` no GitHub.
+2. Selecione `Deploy VPS`.
+3. Use `Run workflow`.
+4. Informe:
+   - `ref`: branch, tag ou SHA a implantar
+   - `component`: `full`, `api` ou `web`
+   - `skip_seo_check`: use `true` apenas em contingência
+
+### Estratégia inicial de rollout
+
+O workflow foi configurado para `workflow_dispatch` no primeiro ciclo.
+A recomendação é validar 2–3 deploys estáveis antes de adicionar gatilho automático em `push` para `main`.
+
+### Rollback
+
+O script `scripts/deploy-vps.sh` registra o SHA anterior e o SHA implantado.
+Para rollback, execute novamente o workflow manual informando um `ref`/SHA conhecido como estável.
 
 ## Estrutura de pastas
 
@@ -306,7 +358,7 @@ news-anime-monitor/
 - Frontend sem dados: configure `NEWS_MONITOR_API_URL` para a API correta.
 - MySQL não conecta: confira `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`.
 - ANN com restrição: configure `ANIMENEWSNETWORK_COOKIE` (ou `ANN_COOKIE`) e mantenha fallback guest.
-- Deploy: use os scripts PM2 locais e valide logs após restart.
+- Deploy: valide `DEPLOY_PATH`, secrets/variables do environment `production`, `pm2 status` e logs após restart.
 - `npm run web:lint` com warnings de `<img>`: esperado no estado atual, não bloqueia build.
 
 ## Licença
