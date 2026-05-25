@@ -75,45 +75,6 @@ export default async function HomePage() {
         {JSON.stringify([websiteSchema, collectionSchema, organizationSchema])}
       </script>
 
-      <section className="editorial-hero animate-fade-in">
-        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
-          <div className="flex max-w-3xl flex-col gap-5">
-            <span className="eyebrow animate-fade-in-up">Sistema editorial em monitoramento contínuo</span>
-            <h1 className="animate-fade-in-up delay-100">
-              O radar premium para acompanhar o que realmente importa no universo anime.
-            </h1>
-            <p className="lead animate-fade-in-up delay-200">
-              O Anime Radar organiza lançamentos, trailers, rumores e movimentos de franquias em uma leitura mais clara, priorizada e orientada por inteligência editorial.
-            </p>
-            <div className="flex flex-wrap gap-4 pt-2 animate-fade-in-up delay-300">
-              <Link href="/noticias" className="btn btn-primary !px-8 !py-4 text-base">
-                Explorar feed editorial
-              </Link>
-              <Link href="/tendencias" className="btn btn-secondary !px-8 !py-4 text-base">
-                Ver tendências do radar
-              </Link>
-            </div>
-          </div>
-
-          <div className="grid w-full max-w-xl grid-cols-1 gap-4 sm:grid-cols-2 animate-fade-in-up delay-300">
-            <article className="data-card min-h-[14rem] justify-between !p-6">
-              <div className="flex flex-col gap-3">
-                <span className="data-card-label">Cobertura viva</span>
-                <p className="kpi-number !text-4xl md:!text-5xl">{(latestPayload.total / 1000).toFixed(1)}k+</p>
-              </div>
-              <p className="data-card-note max-w-[18ch] text-sm leading-relaxed">Artigos monitorados na base editorial.</p>
-            </article>
-            <article className="data-card min-h-[14rem] justify-between !p-6">
-              <div className="flex flex-col gap-3">
-                <span className="data-card-label">Ritmo global</span>
-                <p className="kpi-number !text-4xl md:!text-5xl">24h</p>
-              </div>
-              <p className="data-card-note max-w-[20ch] text-sm leading-relaxed">Monitoramento contínuo de fontes e sinais.</p>
-            </article>
-          </div>
-        </div>
-      </section>
-
       <section className="animate-fade-in-up">
         <div className="section-heading mb-5">
           <span className="page-kicker">Descoberta</span>
@@ -183,6 +144,45 @@ export default async function HomePage() {
             </Link>
           </div>
         </article>
+      </section>
+
+      <section className="editorial-hero animate-fade-in">
+        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex max-w-3xl flex-col gap-5">
+            <span className="eyebrow animate-fade-in-up">Sistema editorial em monitoramento contínuo</span>
+            <h1 className="animate-fade-in-up delay-100">
+              O radar premium para acompanhar o que realmente importa no universo anime.
+            </h1>
+            <p className="lead animate-fade-in-up delay-200">
+              O Anime Radar organiza lançamentos, trailers, rumores e movimentos de franquias em uma leitura mais clara, priorizada e orientada por inteligência editorial.
+            </p>
+            <div className="flex flex-wrap gap-4 pt-2 animate-fade-in-up delay-300">
+              <Link href="/noticias" className="btn btn-primary !px-8 !py-4 text-base">
+                Explorar feed editorial
+              </Link>
+              <Link href="/tendencias" className="btn btn-secondary !px-8 !py-4 text-base">
+                Ver tendências do radar
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid w-full max-w-xl grid-cols-1 gap-4 sm:grid-cols-2 animate-fade-in-up delay-300">
+            <article className="data-card min-h-[14rem] justify-between !p-6">
+              <div className="flex flex-col gap-3">
+                <span className="data-card-label">Cobertura viva</span>
+                <p className="kpi-number !text-4xl md:!text-5xl">{(latestPayload.total / 1000).toFixed(1)}k+</p>
+              </div>
+              <p className="data-card-note max-w-[18ch] text-sm leading-relaxed">Artigos monitorados na base editorial.</p>
+            </article>
+            <article className="data-card min-h-[14rem] justify-between !p-6">
+              <div className="flex flex-col gap-3">
+                <span className="data-card-label">Ritmo global</span>
+                <p className="kpi-number !text-4xl md:!text-5xl">24h</p>
+              </div>
+              <p className="data-card-note max-w-[20ch] text-sm leading-relaxed">Monitoramento contínuo de fontes e sinais.</p>
+            </article>
+          </div>
+        </div>
       </section>
     </div>
   );
