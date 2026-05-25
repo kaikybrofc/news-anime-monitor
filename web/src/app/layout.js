@@ -1,7 +1,11 @@
 import { Space_Grotesk, Inter } from "next/font/google";
+import { config } from "@fortawesome/fontawesome-svg-core";
+import "@fortawesome/fontawesome-svg-core/styles.css";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import "./globals.css";
+
+config.autoAddCss = false;
 
 const headingFont = Space_Grotesk({
   subsets: ["latin"],
@@ -53,11 +57,11 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" data-theme="dark">
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var key='anime-radar-theme';var saved=localStorage.getItem(key);var theme=(saved==='light'||saved==='dark')?saved:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',theme);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`,
+            __html: `(function(){try{var key='anime-radar-theme';var saved=localStorage.getItem(key);var theme=(saved==='light'||saved==='dark')?saved:'dark';document.documentElement.setAttribute('data-theme',theme);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`,
           }}
         />
         <link rel="preconnect" href="https://animenew.com.br" crossOrigin="" />
