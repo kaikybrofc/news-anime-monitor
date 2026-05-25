@@ -136,7 +136,7 @@ export default async function NoticiasPage(props) {
             <div className="article-grid">
               {payload.items.map((article, idx) => (
                 <div key={article.id} className="animate-fade-in-up" style={{ animationDelay: `${0.04 * (idx % 10)}s` }}>
-                  <ArticleCard article={article} />
+                  <ArticleCard article={article} prioritizeImage={idx === 0} />
                 </div>
               ))}
             </div>

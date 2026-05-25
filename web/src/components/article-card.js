@@ -81,7 +81,7 @@ function renderSummaryMarkdown(summary = "") {
   );
 }
 
-export function ArticleCard({ article }) {
+export function ArticleCard({ article, prioritizeImage = false }) {
   const refined = article?.refined || {};
   const title = getArticleTitle(article);
   const url = getArticleUrl(article);
@@ -102,9 +102,13 @@ export function ArticleCard({ article }) {
             src={imageUrl}
             alt={title || "Imagem de capa da notícia"}
             fill
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1536px) 33vw, 25vw"
             className="object-cover"
             fallbackClassName="article-cover"
+            priority={prioritizeImage}
+            loading={prioritizeImage ? "eager" : "lazy"}
+            fetchPriority={prioritizeImage ? "high" : "auto"}
+            quality={72}
           />
         </Link>
       ) : (
@@ -113,8 +117,11 @@ export function ArticleCard({ article }) {
             src="/brand/logo-64.png"
             alt="Logo Anime Radar"
             fill
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1536px) 33vw, 25vw"
             className="object-cover opacity-35"
+            priority={prioritizeImage}
+            loading={prioritizeImage ? "eager" : "lazy"}
+            fetchPriority={prioritizeImage ? "high" : "auto"}
           />
         </Link>
       )}

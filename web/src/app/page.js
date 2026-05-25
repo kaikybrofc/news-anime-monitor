@@ -102,7 +102,7 @@ export default async function HomePage() {
           <div className="article-grid">
             {latestPayload.items.map((article, idx) => (
               <div key={article.id} className="animate-fade-in-up" style={{ animationDelay: `${0.08 * (idx + 1)}s` }}>
-                <ArticleCard article={article} />
+                <ArticleCard article={article} prioritizeImage={idx === 0} />
               </div>
             ))}
           </div>

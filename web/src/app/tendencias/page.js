@@ -201,7 +201,7 @@ export default async function TendenciasPage({ searchParams }) {
           <div className="article-grid">
             {featuredArticles.map((article, idx) => (
               <div key={article.id} className="animate-fade-in-up" style={{ animationDelay: `${0.05 * (idx + 1)}s` }}>
-                <ArticleCard article={article} />
+                <ArticleCard article={article} prioritizeImage={idx === 0} />
               </div>
             ))}
           </div>

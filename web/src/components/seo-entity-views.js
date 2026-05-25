@@ -220,8 +220,8 @@ export async function SeoEntityDetailView({ routeKey, params, searchParams }) {
             <h2>Notícias relacionadas</h2>
           </div>
           <div className="article-grid">
-            {payload.items.map((article) => (
-              <ArticleCard key={article.id} article={article} />
+            {payload.items.map((article, index) => (
+              <ArticleCard key={article.id} article={article} prioritizeImage={index === 0} />
             ))}
           </div>
         </section>
