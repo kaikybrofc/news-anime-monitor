@@ -1,6 +1,9 @@
 name: Deploy VPS
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       ref:
@@ -35,7 +38,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -77,9 +80,9 @@ jobs:
 
       - name: Deploy over SSH
         env:
-          DEPLOY_REF: ${{ inputs.ref }}
-          DEPLOY_COMPONENT: ${{ inputs.component }}
-          DEPLOY_SKIP_SEO_CHECK: ${{ inputs.skip_seo_check }}
+          DEPLOY_REF: ${{ inputs.ref || github.sha }}
+          DEPLOY_COMPONENT: ${{ inputs.component || 'full' }}
+          DEPLOY_SKIP_SEO_CHECK: ${{ inputs.skip_seo_check || 'false' }}
           DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
           DEPLOY_DOMAIN_URL: ${{ vars.DEPLOY_DOMAIN_URL }}
           DEPLOY_LOCAL_API_URL: ${{ vars.DEPLOY_LOCAL_API_URL }}
