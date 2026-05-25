@@ -26,6 +26,19 @@ import {
 
 export const dynamic = "force-dynamic";
 
+function decodeHtmlEntities(value = "") {
+  return String(value || "")
+    .replace(/&#(\d+);/g, (_match, dec) => String.fromCharCode(Number(dec)))
+    .replace(/&#x([0-9a-f]+);/gi, (_match, hex) =>
+      String.fromCharCode(parseInt(hex, 16))
+    )
+    .replace(/&quot;/g, "\"")
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
 function renderInlineMarkdown(text = "") {
   const source = String(text || "");
   if (!source) return source;
@@ -194,8 +207,8 @@ function extractMonthYear(text = "") {
 }
 
 function buildClickableMetaDescription({ title = "", summary = "", publishedAt = "" }) {
-  const cleanSummary = sanitizeSeoText(summary);
-  const cleanTitle = sanitizeSeoText(title);
+  const cleanSummary = sanitizeSeoText(decodeHtmlEntities(summary));
+  const cleanTitle = sanitizeSeoText(decodeHtmlEntities(title));
   const year = extractYear(cleanSummary) || String(new Date(publishedAt || Date.now()).getUTCFullYear());
   const monthYear = extractMonthYear(cleanSummary);
   const timeHint = monthYear || year;
@@ -204,10 +217,10 @@ function buildClickableMetaDescription({ title = "", summary = "", publishedAt =
     return `Entenda o que mudou em ${cleanTitle} e por que essa notícia importa para fãs de anime em ${timeHint}.`;
   }
 
-  const lead = summarizeSeoText(cleanSummary, 120);
+  const lead = summarizeSeoText(cleanSummary, 145);
   return summarizeSeoText(
     `${lead} Veja os dados-chave, a linha do tempo e o impacto para fãs em ${timeHint}.`,
-    160
+    185
   );
 }
 
@@ -241,7 +254,7 @@ function buildFactBlocks({ title = "", summary = "", sourceName = "", publishedA
 }
 
 function getRenderableArticleTitle(article = {}) {
-  return String(
+  return decodeHtmlEntities(
     getArticleTitle(article) || article?.title || article?.headline || article?.seoTitle || "Notícia"
   ).trim();
 }
@@ -353,6 +366,10 @@ export async function generateMetadata(props) {
       title,
       description: description || "Notícia no Anime Radar.",
       images: [metadataImage],
+    },
+    robots: {
+      index: true,
+      follow: true,
     },
   };
 }

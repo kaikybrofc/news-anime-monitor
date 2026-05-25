@@ -19,6 +19,7 @@
     "web:pm2:restart": "pm2 restart news-anime-web",
     "web:pm2:logs": "pm2 logs news-anime-web --lines 200",
     "seo:check": "node src/scripts/seo-healthcheck.js",
+    "seo:news:check": "node src/scripts/seo-news-metadata-check.js",
     "web:deploy:safe": "bash scripts/deploy-web-safe.sh",
     "lint": "eslint \"src/**/*.js\"",
     "lint:fix": "eslint \"src/**/*.js\" --fix",
