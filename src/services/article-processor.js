@@ -1,7 +1,7 @@
 const cheerio = require("cheerio");
 const axios = require("axios");
 
-const { summarizeHtml } = require("./summarizer.js");
+const { summarizeHtml, translateTitleToPtBr } = require("./summarizer.js");
 const logger = require("../utils/logger.js");
 const { getWithRetry } = require("../utils/http.js");
 const { checkRobotsForUrl } = require("../utils/robots.js");
@@ -346,7 +346,8 @@ async function processArticleCandidate(
   });
 
   const html = String(articlePageResponse.data || "");
-  const name = resolveArticleName(candidate, html);
+  const resolvedName = resolveArticleName(candidate, html);
+  const name = await translateTitleToPtBr(resolvedName);
 
   if (
     candidate?.sourceId === "crunchyrollnews" &&

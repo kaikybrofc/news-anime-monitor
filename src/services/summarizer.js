@@ -288,6 +288,32 @@ ${articleText}
 </article>`;
 }
 
+function buildTitleTranslationPrompt(title = "") {
+  return `Você é um editor de notícias de anime.
+Traduza o título abaixo para português do Brasil.
+
+Regras obrigatórias:
+- Preserve nomes próprios oficiais (anime, personagens, estúdios, eventos, plataformas).
+- Preserve números, datas e sinais importantes.
+- Não invente contexto novo.
+- Não use aspas nem explicações.
+- Responda com apenas 1 linha contendo somente o título traduzido.
+
+Título:
+${String(title || "").trim()}`;
+}
+
+function normalizeTranslatedTitle(value = "") {
+  const singleLine = String(value || "")
+    .replace(/\r?\n+/g, " ")
+    .replace(/^["'“”]+|["'“”]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!singleLine) return "";
+  return singleLine.slice(0, 220).trim();
+}
+
 function createEmptySummaryError(details = {}) {
   const error = new Error("EMPTY_SUMMARY_RESPONSE");
   error.code = "EMPTY_SUMMARY_RESPONSE";
@@ -573,6 +599,11 @@ function assertSummaryConfiguration() {
 // Fila para garantir processamento sequencial das requisições à IA
 let iaQueue = Promise.resolve();
 
+function enqueueIaTask(taskFactory) {
+  iaQueue = iaQueue.then(taskFactory, taskFactory);
+  return iaQueue;
+}
+
 async function summarizeHtmlInternal(htmlContent, options = {}) {
   let limitedText = "";
 
@@ -693,12 +724,33 @@ function summarizeHtml(htmlContent, options = {}) {
     );
   }
 
-  iaQueue = iaQueue.then(
-    () => summarizeHtmlWithAutoRetry(htmlContent, options),
-    () => summarizeHtmlWithAutoRetry(htmlContent, options)
-  );
+  return enqueueIaTask(() => summarizeHtmlWithAutoRetry(htmlContent, options));
+}
 
-  return iaQueue;
+async function translateTitleInternal(title = "") {
+  const baseTitle = String(title || "").trim();
+  if (!baseTitle) return "";
+
+  try {
+    const generation = await generateSummary(buildTitleTranslationPrompt(baseTitle));
+    const translated = normalizeTranslatedTitle(generation.summary);
+    return translated || baseTitle;
+  } catch (error) {
+    logger.warn(
+      `[Título] Falha ao traduzir título. Mantendo original. Motivo: ${error?.message || error}`
+    );
+    return baseTitle;
+  }
+}
+
+function translateTitleToPtBr(title = "") {
+  try {
+    assertSummaryConfiguration();
+  } catch {
+    return Promise.resolve(String(title || "").trim());
+  }
+
+  return enqueueIaTask(() => translateTitleInternal(title));
 }
 
 async function summarizeUrl(url, options = {}) {
@@ -721,5 +773,6 @@ async function summarizeUrl(url, options = {}) {
 module.exports = {
   summarizeHtml,
   summarizeUrl,
+  translateTitleToPtBr,
   SUMMARY_GENERIC_ERROR_MESSAGE,
 };
