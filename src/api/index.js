@@ -169,6 +169,7 @@ const API_DEFAULT_LIMIT = toPositiveInt(process.env.API_DEFAULT_LIMIT, 50);
 const API_MAX_LIMIT = toPositiveInt(process.env.API_MAX_LIMIT, 200);
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || "127.0.0.1";
+const IS_PRODUCTION = String(process.env.NODE_ENV || "").trim() === "production";
 const USE_MYSQL = hasDbConfig();
 const CORS_ALLOWED_ORIGINS = parseCommaSeparatedList(
   process.env.CORS_ALLOWED_ORIGINS ||
@@ -178,8 +179,30 @@ const RATE_LIMIT_WINDOW_MS = toPositiveInt(
   process.env.RATE_LIMIT_WINDOW_MS,
   60 * 1000
 );
-const RATE_LIMIT_MAX = toPositiveInt(process.env.RATE_LIMIT_MAX, 180);
-const DEBUG_RATE_LIMIT_MAX = toPositiveInt(process.env.DEBUG_RATE_LIMIT_MAX, 30);
+const RATE_LIMIT_MAX = toPositiveInt(
+  process.env.RATE_LIMIT_MAX,
+  IS_PRODUCTION ? 120 : 500
+);
+const DEBUG_RATE_LIMIT_MAX = toPositiveInt(
+  process.env.DEBUG_RATE_LIMIT_MAX,
+  IS_PRODUCTION ? 20 : 120
+);
+const READ_RATE_LIMIT_MAX = toPositiveInt(
+  process.env.READ_RATE_LIMIT_MAX,
+  IS_PRODUCTION ? 80 : 300
+);
+const CACHE_TTL_SECONDS = toPositiveInt(
+  process.env.CACHE_TTL_SECONDS,
+  IS_PRODUCTION ? 45 : 5
+);
+const CACHE_SWR_SECONDS = toPositiveInt(
+  process.env.CACHE_SWR_SECONDS,
+  IS_PRODUCTION ? 120 : 15
+);
+const CACHE_MAX_ENTRIES = toPositiveInt(
+  process.env.CACHE_MAX_ENTRIES,
+  IS_PRODUCTION ? 2000 : 300
+);
 const DEBUG_SOURCES_TOKEN = String(process.env.DEBUG_SOURCES_TOKEN || "").trim();
 const ALERT_HISTORY_SIZE = toPositiveInt(process.env.ALERT_HISTORY_SIZE, 72);
 const ALERT_BASELINE_WINDOW = toPositiveInt(process.env.ALERT_BASELINE_WINDOW, 12);
@@ -296,7 +319,94 @@ const debugRateLimiter = rateLimit({
   },
 });
 
+const readRateLimiter = rateLimit({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  max: READ_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: "Muitas requisições de leitura. Aguarde alguns instantes.",
+  },
+});
+
 app.use(apiRateLimiter);
+
+const responseCache = new Map();
+const CACHEABLE_GET_PATHS = new Set([
+  "/articles",
+  "/trends",
+  "/franchises",
+  "/sources",
+  "/seo/entities",
+]);
+const CACHEABLE_GET_PREFIXES = [
+  "/articles/slug/",
+  "/articles/",
+  "/franchises/",
+  "/sources/",
+  "/seo/",
+];
+
+function isCacheableGetRequest(req) {
+  if (req.method !== "GET") return false;
+  if (req.path.startsWith("/debug")) return false;
+  if (req.path === "/" || req.path === "/domain") return false;
+  if (String(req.query.noCache || "").trim() === "1") return false;
+  if (CACHEABLE_GET_PATHS.has(req.path)) return true;
+  return CACHEABLE_GET_PREFIXES.some((prefix) => req.path.startsWith(prefix));
+}
+
+function pruneCacheIfNeeded() {
+  if (responseCache.size <= CACHE_MAX_ENTRIES) return;
+  const entries = Array.from(responseCache.entries()).sort(
+    (a, b) => a[1].expiresAt - b[1].expiresAt
+  );
+  const toDelete = Math.ceil(responseCache.size * 0.2);
+  for (let index = 0; index < toDelete; index += 1) {
+    responseCache.delete(entries[index][0]);
+  }
+}
+
+app.use((req, res, next) => {
+  if (isCacheableGetRequest(req)) {
+    return readRateLimiter(req, res, next);
+  }
+  return next();
+});
+
+app.use((req, res, next) => {
+  if (!isCacheableGetRequest(req)) return next();
+
+  const cacheKey = `${req.method}:${req.originalUrl}`;
+  const now = Date.now();
+  const hit = responseCache.get(cacheKey);
+
+  res.set(
+    "Cache-Control",
+    `public, max-age=${CACHE_TTL_SECONDS}, stale-while-revalidate=${CACHE_SWR_SECONDS}`
+  );
+
+  if (hit && hit.expiresAt > now) {
+    res.set("X-Cache", "HIT");
+    return res.status(hit.status).json(hit.body);
+  }
+
+  res.set("X-Cache", "MISS");
+  const originalJson = res.json.bind(res);
+  res.json = (payload) => {
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      responseCache.set(cacheKey, {
+        status: res.statusCode,
+        body: payload,
+        expiresAt: now + CACHE_TTL_SECONDS * 1000,
+      });
+      pruneCacheIfNeeded();
+    }
+    return originalJson(payload);
+  };
+
+  return next();
+});
 
 const knownArticleUrls = new Set();
 let processedArticles = [];
@@ -3101,6 +3211,7 @@ async function checkPageForNews() {
     if (!additions.length && touchedExisting) {
       rebuildKnownArticleUrls();
       await saveArticlesToStorage();
+      responseCache.clear();
       logger.info("Nenhum artigo novo adicionado; cache atualizado por recorrência.");
       return;
     }
@@ -3119,6 +3230,7 @@ async function checkPageForNews() {
 
     logger.success(`${additions.length} artigo(s) adicionado(s) à API.`);
     await saveArticlesToStorage();
+    responseCache.clear();
   } catch (error) {
     logger.error("Ocorreu um erro no loop de verificação:", error.message || error);
   } finally {

@@ -330,6 +330,14 @@ export default async function ApiPage() {
                 <strong>Atualização</strong>
                 <span>Status em tempo real</span>
               </div>
+              <div className="line-item">
+                <strong>Rate limit</strong>
+                <span>Limite global + limite dedicado em rotas de leitura pesada</span>
+              </div>
+              <div className="line-item">
+                <strong>Cache</strong>
+                <span>GET com cache curto e header <code>X-Cache</code> (HIT/MISS)</span>
+              </div>
             </div>
           </article>
 
