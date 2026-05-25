@@ -106,6 +106,15 @@ function toPositiveNumber(value, fallback) {
   return parsed;
 }
 
+function toBoolean(value, fallback = false) {
+  if (value === undefined || value === null) return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized) return fallback;
+  if (["1", "true", "yes", "on", "sim"].includes(normalized)) return true;
+  if (["0", "false", "no", "off", "nao", "não"].includes(normalized)) return false;
+  return fallback;
+}
+
 // --- CONFIGURAÇÃO ---
 const NEWS_SOURCES = getNewsSources();
 const DAYS_BACK = toPositiveInt(process.env.DAYS_BACK, 3);
@@ -129,6 +138,24 @@ const EXPIRATION_TIME_MS = toPositiveInt(
 const CLEANUP_INTERVAL_MS = toPositiveInt(
   process.env.CLEANUP_INTERVAL_MS,
   60 * 60 * 1000
+);
+const ENABLE_AUTO_DISCOVERY = toBoolean(process.env.ENABLE_AUTO_DISCOVERY, false);
+const AUTO_DISCOVERY_MIN_INTERVAL_MS = toPositiveInt(
+  process.env.AUTO_DISCOVERY_MIN_INTERVAL_MS,
+  6 * 60 * 60 * 1000
+);
+const AUTO_DISCOVERY_TOP = toPositiveInt(process.env.AUTO_DISCOVERY_TOP, 80);
+const AUTO_DISCOVERY_THRESHOLD = toPositiveInt(
+  process.env.AUTO_DISCOVERY_THRESHOLD,
+  75
+);
+const AUTO_DISCOVERY_ARTICLE_SAMPLE = toPositiveInt(
+  process.env.AUTO_DISCOVERY_ARTICLE_SAMPLE,
+  40
+);
+const AUTO_DISCOVERY_TOP_PER_QUERY = toPositiveInt(
+  process.env.AUTO_DISCOVERY_TOP_PER_QUERY,
+  20
 );
 const ARTICLE_PROCESS_CONCURRENCY = toPositiveInt(
   process.env.ARTICLE_PROCESS_CONCURRENCY,
@@ -275,6 +302,8 @@ const knownArticleUrls = new Set();
 let processedArticles = [];
 let isCheckingNews = false;
 let isShuttingDown = false;
+let isAutoDiscoveryRunning = false;
+let lastAutoDiscoveryAt = 0;
 let lastCycleMetrics = null;
 let lastSourceMetrics = [];
 const observabilityTracker = createObservabilityTracker(NEWS_SOURCES, {
@@ -3104,7 +3133,70 @@ async function checkPageForNews() {
         observabilityError?.message || observabilityError
       );
     }
+    try {
+      await maybeRunAutoDiscovery();
+    } catch (autoDiscoveryError) {
+      logger.error(
+        "[AutoDiscovery] Falha inesperada na descoberta automática:",
+        autoDiscoveryError?.message || autoDiscoveryError
+      );
+    }
     isCheckingNews = false;
+  }
+}
+
+async function maybeRunAutoDiscovery() {
+  if (!ENABLE_AUTO_DISCOVERY) return;
+  if (isShuttingDown) return;
+  if (isAutoDiscoveryRunning) return;
+
+  const now = Date.now();
+  if (
+    lastAutoDiscoveryAt &&
+    now - lastAutoDiscoveryAt < AUTO_DISCOVERY_MIN_INTERVAL_MS
+  ) {
+    return;
+  }
+
+  isAutoDiscoveryRunning = true;
+
+  try {
+    const knownDomains = buildKnownDomainsSet();
+    const keywordDiscovery = await runKeywordDiscovery({
+      articles: processedArticles.slice(0, AUTO_DISCOVERY_ARTICLE_SAMPLE),
+      knownDomains,
+      topPerQuery: Math.min(20, AUTO_DISCOVERY_TOP_PER_QUERY),
+    });
+
+    const discovered = keywordDiscovery.candidates.slice(0, AUTO_DISCOVERY_TOP);
+    const validated = await validateCandidates(discovered, {
+      approvalThreshold: AUTO_DISCOVERY_THRESHOLD,
+    });
+
+    if (USE_MYSQL) {
+      if (keywordDiscovery.jobs.length) {
+        await saveKeywordDiscoveryJobs(keywordDiscovery.jobs);
+      }
+      if (discovered.length) {
+        await saveDiscoveredCandidates(discovered);
+      }
+      if (validated.length) {
+        await saveValidatedCandidates(validated);
+      }
+    }
+
+    const approved = validated.filter((item) => item.status === "validated").length;
+    logger.info(
+      `[AutoDiscovery] concluído: jobs=${keywordDiscovery.jobs.length}, candidatos=${discovered.length}, validados=${validated.length}, aprovados=${approved}.`
+    );
+  } catch (error) {
+    logger.error(
+      "[AutoDiscovery] erro na descoberta automática:",
+      error?.message || error
+    );
+  } finally {
+    lastAutoDiscoveryAt = Date.now();
+    isAutoDiscoveryRunning = false;
   }
 }
 
