@@ -692,7 +692,12 @@ function isSummaryCorruptedText(value) {
     /<img\b/.test(summary) ||
     lowered.includes("srcset=") ||
     lowered.includes("self.__next_f.push([") ||
-    lowered.includes("ann.layout.body_start();")
+    lowered.includes("ann.layout.body_start();") ||
+    lowered.includes("i have understood the requirements") ||
+    lowered.includes("requirements summary") ||
+    lowered.includes("please confirm if i should proceed") ||
+    lowered.includes("phase 2: project exploration") ||
+    lowered.includes("as this task is independent of the codebase")
   );
 }
 

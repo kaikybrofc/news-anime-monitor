@@ -259,6 +259,19 @@ function buildRawTextFallback(articleText) {
   return truncateText(normalized, SUMMARY_RAW_FALLBACK_MAX_CHARS);
 }
 
+function isInvalidSummaryOutput(summary = "") {
+  const lowered = String(summary || "").toLowerCase();
+  if (!lowered) return true;
+
+  return (
+    lowered.includes("i have understood the requirements") ||
+    lowered.includes("requirements summary") ||
+    lowered.includes("please confirm if i should proceed") ||
+    lowered.includes("phase 2: project exploration") ||
+    lowered.includes("as this task is independent of the codebase")
+  );
+}
+
 function buildPrompt(articleText) {
   return `Você é um radar inteligente de mídia para anime, mangá e cultura pop japonesa.
 Sua tarefa é produzir um resumo editorial curto em português do Brasil com base apenas no conteúdo entre <article> e </article>.
@@ -634,6 +647,13 @@ async function summarizeHtmlInternal(htmlContent, options = {}) {
 
     const generation = await generateSummary(buildPrompt(limitedText));
     const summary = generation.summary;
+    if (isInvalidSummaryOutput(summary)) {
+      const invalidError = new Error(
+        "A IA retornou resposta instrucional/meta em vez de resumo editorial."
+      );
+      invalidError.code = "INVALID_SUMMARY_OUTPUT";
+      throw invalidError;
+    }
     const modelUsed = generation.modelUsed;
     const providerUsed = generation.providerUsed;
 
@@ -671,6 +691,13 @@ async function summarizeHtmlInternal(htmlContent, options = {}) {
       const fallback = buildFallbackSummary(limitedText);
       logger.warn("[Resumo] IA retornou vazio após tentativas. Usando fallback local.");
       return fallback;
+    }
+
+    if (error?.code === "INVALID_SUMMARY_OUTPUT") {
+      logger.warn(
+        "[Resumo] IA retornou saída inválida (instrucional/meta). Marcando falha para retentativa automática."
+      );
+      return SUMMARY_GENERIC_ERROR_MESSAGE;
     }
 
     logger.error("[Resumo] Erro ao gerar resumo:", error.message || error);
