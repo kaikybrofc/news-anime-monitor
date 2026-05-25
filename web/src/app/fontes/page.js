@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { fetchMonitor } from "@/lib/api";
+import { PageKicker } from "@/components/page-kicker";
 
 export const metadata = {
   title: "Fontes Monitoradas | Anime Radar",
@@ -23,7 +24,7 @@ export default async function FontesPage() {
     <div className="page-shell">
       <section className="page-intro animate-fade-in">
         <div className="section-heading">
-          <span className="page-kicker">Cobertura</span>
+          <PageKicker>Cobertura</PageKicker>
           <h1>Fontes monitoradas pelo radar</h1>
           <p className="lead">
             Um catálogo editorial das origens que alimentam o monitor, com acesso rápido ao histórico e à leitura por fonte.
@@ -49,7 +50,7 @@ export default async function FontesPage() {
             >
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
-                  <span className="page-kicker">{source.type || "RSS/Web"}</span>
+                  <PageKicker>{source.type || "RSS/Web"}</PageKicker>
                   <span className="trend-badge">Ativa</span>
                 </div>
                 <h2 className="text-xl">{source.name}</h2>

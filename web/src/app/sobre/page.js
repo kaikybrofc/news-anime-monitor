@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageKicker } from "@/components/page-kicker";
 
 export const metadata = {
   title: "Sobre | OmniZap Anime Radar",
@@ -122,7 +123,7 @@ export default function SobrePage() {
 
       <section className="flex flex-col gap-6 animate-fade-in-up delay-100">
         <div className="section-heading">
-          <span className="page-kicker">Proposta de valor</span>
+          <PageKicker>Proposta de valor</PageKicker>
           <h2>Por que o projeto existe</h2>
           <p className="section-copy">
             O volume de publicações sobre anime cresce o tempo todo, mas volume sem priorização gera atraso, duplicidade e leitura fragmentada. O Anime Radar existe para transformar esse cenário em contexto acionável.
@@ -141,7 +142,7 @@ export default function SobrePage() {
 
       <section className="flex flex-col gap-6 animate-fade-in-up delay-200">
         <div className="section-heading">
-          <span className="page-kicker">Pipeline</span>
+          <PageKicker>Pipeline</PageKicker>
           <h2>Como a inteligência editorial funciona</h2>
           <p className="section-copy">
             A pipeline do Anime Radar converte fluxo bruto em informação navegável. Cada etapa ajuda a remover ruído, consolidar contexto e destacar o que merece atenção primeiro.
@@ -156,7 +157,7 @@ export default function SobrePage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {pipelineSteps.map((item, index) => (
               <div key={item.label} className="info-card !p-5 flex flex-col gap-3 animate-fade-in-up" style={{ animationDelay: `${0.08 * (index + 1)}s` }}>
-                <span className="page-kicker">Etapa {String(index + 1).padStart(2, "0")}</span>
+                <PageKicker>Etapa {String(index + 1).padStart(2, "0")}</PageKicker>
                 <h3 className="text-base">{item.label}</h3>
                 <p className="text-sm text-[var(--muted-foreground)]">{item.text}</p>
               </div>
@@ -168,7 +169,7 @@ export default function SobrePage() {
       <section className="panel-grid animate-fade-in-up delay-300">
         <article className="info-card flex flex-col gap-5">
           <div className="section-heading">
-            <span className="page-kicker">Cobertura</span>
+            <PageKicker>Cobertura</PageKicker>
             <h2>O que entra no radar</h2>
           </div>
 
@@ -183,7 +184,7 @@ export default function SobrePage() {
 
         <article className="info-card flex flex-col gap-5 bg-[color-mix(in_oklab,var(--primary)_6%,transparent)]">
           <div className="section-heading">
-            <span className="page-kicker">Critérios editoriais</span>
+            <PageKicker>Critérios editoriais</PageKicker>
             <h2>Como definimos relevância</h2>
           </div>
 
@@ -199,7 +200,7 @@ export default function SobrePage() {
 
       <section className="flex flex-col gap-6 animate-fade-in-up delay-300">
         <div className="section-heading">
-          <span className="page-kicker">Roadmap</span>
+          <PageKicker>Roadmap</PageKicker>
           <h2>Para onde o Anime Radar está evoluindo</h2>
           <p className="section-copy">
             O projeto continua avançando para se tornar uma camada de inteligência cada vez mais reutilizável para leitura, análise e distribuição de notícias do universo anime.
@@ -219,7 +220,7 @@ export default function SobrePage() {
       <section className="animate-fade-in-up delay-300">
         <article className="info-card split-card !p-8 md:!p-10 bg-[color-mix(in_oklab,var(--primary)_6%,transparent)]">
           <div className="flex max-w-2xl flex-col gap-3">
-            <span className="page-kicker">Próximo passo</span>
+            <PageKicker>Próximo passo</PageKicker>
             <h2 className="!text-3xl">Quer explorar os dados ou acompanhar a evolução do projeto?</h2>
             <p className="text-[var(--muted-foreground)]">
               A página da API mostra os endpoints disponíveis e a rota de contato centraliza sugestões, suporte e oportunidades de colaboração.

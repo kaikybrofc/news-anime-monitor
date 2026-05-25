@@ -1,9 +1,19 @@
+import {
+  faHouse,
+  faNewspaper,
+  faFire,
+  faLayerGroup,
+  faSatelliteDish,
+  faCode,
+  faCircleInfo,
+} from "@fortawesome/free-solid-svg-icons";
+
 export const siteNav = [
-  { href: "/", label: "Home" },
-  { href: "/noticias", label: "Notícias" },
-  { href: "/tendencias", label: "Tendências" },
-  { href: "/franquias", label: "Franquias" },
-  { href: "/fontes", label: "Fontes" },
-  { href: "/api", label: "API" },
-  { href: "/sobre", label: "Sobre" },
+  { href: "/", label: "Home", icon: faHouse },
+  { href: "/noticias", label: "Notícias", icon: faNewspaper },
+  { href: "/tendencias", label: "Tendências", icon: faFire },
+  { href: "/franquias", label: "Franquias", icon: faLayerGroup },
+  { href: "/fontes", label: "Fontes", icon: faSatelliteDish },
+  { href: "/api", label: "API", icon: faCode },
+  { href: "/sobre", label: "Sobre", icon: faCircleInfo },
 ];

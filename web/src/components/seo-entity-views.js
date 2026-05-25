@@ -5,6 +5,7 @@ import { Pagination } from "@/components/pagination";
 import { clampInt, fetchMonitor, readQueryInt } from "@/lib/api";
 import { formatDateTime, formatNumber, titleFromSlug } from "@/lib/formatters";
 import { getSeoEntityConfigByRoute } from "@/lib/seo-entities";
+import { PageKicker } from "@/components/page-kicker";
 
 export async function SeoEntityIndexView({ routeKey, searchParams }) {
   const config = getSeoEntityConfigByRoute(routeKey);
@@ -38,7 +39,7 @@ export async function SeoEntityIndexView({ routeKey, searchParams }) {
     <div className="page-shell">
       <section className="page-intro">
         <div className="section-heading">
-          <span className="page-kicker">Entidades SEO</span>
+          <PageKicker>Entidades SEO</PageKicker>
           <h1>{config.plural}</h1>
           <p className="lead">{config.lead}</p>
         </div>
@@ -141,7 +142,7 @@ export async function SeoEntityDetailView({ routeKey, params, searchParams }) {
     <div className="page-shell">
       <section className="page-intro">
         <div className="section-heading">
-          <span className="page-kicker">Entidade</span>
+          <PageKicker>Entidade</PageKicker>
           <h1>{payload?.entity?.name || title}</h1>
           <p className="lead">Página programática de {config.singular.toLowerCase()} com cobertura consolidada do monitor.</p>
         </div>
@@ -175,7 +176,7 @@ export async function SeoEntityDetailView({ routeKey, params, searchParams }) {
       <section className="panel-grid">
         <article className="list-panel">
           <div className="section-heading mb-3">
-            <span className="page-kicker">Distribuição</span>
+            <PageKicker>Distribuição</PageKicker>
             <h2>Por fonte</h2>
           </div>
           <div className="list-stack">
@@ -194,7 +195,7 @@ export async function SeoEntityDetailView({ routeKey, params, searchParams }) {
 
         <article className="list-panel">
           <div className="section-heading mb-3">
-            <span className="page-kicker">Composição</span>
+            <PageKicker>Composição</PageKicker>
             <h2>Tipos de conteúdo</h2>
           </div>
           <div className="list-stack">
@@ -215,7 +216,7 @@ export async function SeoEntityDetailView({ routeKey, params, searchParams }) {
       {payload.items?.length ? (
         <section className="flex flex-col gap-6">
           <div className="section-heading">
-            <span className="page-kicker">Coleção</span>
+            <PageKicker>Coleção</PageKicker>
             <h2>Notícias relacionadas</h2>
           </div>
           <div className="article-grid">

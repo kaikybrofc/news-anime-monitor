@@ -1,4 +1,10 @@
 import Link from "next/link";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faShieldHalved,
+  faFileContract,
+  faEnvelope,
+} from "@fortawesome/free-solid-svg-icons";
 
 export function SiteFooter() {
   const currentYear = new Date().getFullYear();
@@ -24,12 +30,15 @@ export function SiteFooter() {
 
           <div className="flex flex-wrap gap-3 md:justify-end">
             <Link href="/privacidade" className="btn btn-secondary !px-5 !py-2 text-xs">
+              <FontAwesomeIcon icon={faShieldHalved} className="mr-2" />
               Privacidade
             </Link>
             <Link href="/termos" className="btn btn-secondary !px-5 !py-2 text-xs">
+              <FontAwesomeIcon icon={faFileContract} className="mr-2" />
               Termos
             </Link>
             <Link href="/contato" className="btn btn-primary !px-5 !py-2 text-xs">
+              <FontAwesomeIcon icon={faEnvelope} className="mr-2" />
               Contato
             </Link>
           </div>

@@ -5,6 +5,7 @@ import { UnifiedSearch } from "@/components/unified-search";
 import { clampInt, fetchMonitor, readQueryInt, readQueryString } from "@/lib/api";
 import { getArticleDetailPath, getArticleTitle } from "@/lib/formatters";
 import { toAbsoluteSiteUrl } from "@/lib/site-url";
+import { PageKicker } from "@/components/page-kicker";
 
 export async function generateMetadata(props) {
   const resolvedProps = await props;
@@ -126,7 +127,7 @@ export default async function NoticiasPage(props) {
         {payload.items?.length ? (
           <>
             <div className="section-heading">
-              <span className="page-kicker">Coleção atual</span>
+              <PageKicker>Coleção atual</PageKicker>
               <h2>Leituras recentes do radar</h2>
               <p className="section-copy">
                 Página {Math.floor((payload.offset || offset) / (payload.limit || limit)) + 1} da coleção pública com monitoramento contínuo.

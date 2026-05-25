@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Pagination } from "@/components/pagination";
 import { clampInt, fetchMonitor, readQueryInt } from "@/lib/api";
 import { formatNumber } from "@/lib/formatters";
+import { PageKicker } from "@/components/page-kicker";
 
 export const metadata = {
   title: "Franquias e Temas | Anime Radar",
@@ -139,7 +140,7 @@ export default async function FranquiasPage(props) {
     <div className="page-shell">
       <section className="page-intro animate-fade-in">
         <div className="section-heading">
-          <span className="page-kicker">Mapeamento temático</span>
+          <PageKicker>Mapeamento temático</PageKicker>
           <h1>Franquias e temas em leitura contínua</h1>
           <p className="lead">
             O monitor identifica relações entre notícias, franquias e temas para construir hubs que facilitam descoberta, prioridade editorial e navegação por contexto.
@@ -204,7 +205,7 @@ export default async function FranquiasPage(props) {
             >
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
-                  <span className="page-kicker">#{(payload.offset || offset) + idx + 1}</span>
+                  <PageKicker>#{(payload.offset || offset) + idx + 1}</PageKicker>
                   <span className="trend-badge">Ativo</span>
                 </div>
                 <h2 className="text-xl truncate">{getFranchiseDisplayName(item)}</h2>

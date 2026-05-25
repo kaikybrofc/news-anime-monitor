@@ -1,3 +1,4 @@
+import { PageKicker } from "@/components/page-kicker";
 export const metadata = {
   title: "Termos de Uso | OmniZap Anime Radar",
   description:
@@ -11,7 +12,7 @@ export default function TermosPage() {
     <div className="page-shell mx-auto max-w-5xl animate-fade-in">
       <section className="page-intro">
         <div className="section-heading">
-          <span className="page-kicker">Condições de uso</span>
+          <PageKicker>Condições de uso</PageKicker>
           <h1>Termos de Uso</h1>
           <p className="lead">Regras para acesso ao portal, consumo da API e uso do conteúdo agregado.</p>
           <p className="text-sm text-[var(--muted)]">Última atualização: {LAST_UPDATED}</p>

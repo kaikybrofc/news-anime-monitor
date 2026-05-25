@@ -5,6 +5,7 @@ import { TrendHero } from "@/components/trends/trend-hero";
 import { TrendSpotlightCard } from "@/components/trends/trend-spotlight-card";
 import { clampInt, fetchMonitor, readQueryInt } from "@/lib/api";
 import { formatDateTime } from "@/lib/formatters";
+import { PageKicker } from "@/components/page-kicker";
 
 export const metadata = {
   title: "Tendências | OmniZap Anime Radar",
@@ -78,7 +79,7 @@ export default async function TendenciasPage({ searchParams }) {
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-3 animate-fade-in-up delay-200">
         <section className="flex flex-col gap-4">
           <div className="section-heading">
-            <span className="page-kicker">Franquias</span>
+            <PageKicker>Franquias</PageKicker>
             <h2>Quem realmente puxou a conversa</h2>
             <p className="section-copy">
               Os universos com maior recorrência no ciclo, cruzando volume, score e sinais de continuidade editorial.
@@ -112,7 +113,7 @@ export default async function TendenciasPage({ searchParams }) {
 
         <section className="flex flex-col gap-4">
           <div className="section-heading">
-            <span className="page-kicker">Assuntos</span>
+            <PageKicker>Assuntos</PageKicker>
             <h2>Temas que voltaram à superfície</h2>
             <p className="section-copy">
               Tópicos recorrentes que ganharam espaço nas últimas horas e podem antecipar movimentos maiores do feed.
@@ -146,7 +147,7 @@ export default async function TendenciasPage({ searchParams }) {
 
         <section className="flex flex-col gap-4">
           <div className="section-heading">
-            <span className="page-kicker">Fontes</span>
+            <PageKicker>Fontes</PageKicker>
             <h2>Quem mais abasteceu o radar</h2>
             <p className="section-copy">
               Leituras rápidas das fontes mais ativas da janela, com notícia representativa para entender o tipo de pauta em alta.
@@ -182,7 +183,7 @@ export default async function TendenciasPage({ searchParams }) {
       <section className="flex flex-col gap-6 animate-fade-in-up delay-300">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="section-heading">
-            <span className="page-kicker">Leituras que sustentam o ciclo</span>
+            <PageKicker>Leituras que sustentam o ciclo</PageKicker>
             <h2>Notícias representativas por trás das tendências</h2>
             <p className="section-copy">
               Cards editoriais completos para aprofundar rapidamente nos sinais mais fortes desta janela de monitoramento.

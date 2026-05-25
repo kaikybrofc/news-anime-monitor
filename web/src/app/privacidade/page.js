@@ -1,3 +1,4 @@
+import { PageKicker } from "@/components/page-kicker";
 export const metadata = {
   title: "Política de Privacidade | OmniZap Anime Radar",
   description:
@@ -11,7 +12,7 @@ export default function PrivacidadePage() {
     <div className="page-shell mx-auto max-w-5xl animate-fade-in">
       <section className="page-intro">
         <div className="section-heading">
-          <span className="page-kicker">Privacidade</span>
+          <PageKicker>Privacidade</PageKicker>
           <h1>Política de Privacidade</h1>
           <p className="lead">Esta política explica como tratamos informações de uso no portal e na API.</p>
           <p className="text-sm text-[var(--muted)]">Última atualização: {LAST_UPDATED}</p>

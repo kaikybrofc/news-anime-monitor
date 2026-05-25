@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faArrowRight, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { siteNav } from "@/lib/site-nav";
 
 function isActive(pathname, href) {
@@ -27,6 +29,7 @@ export function MainNav() {
             href={item.href}
             className={`nav-link ${isActive(pathname, item.href) ? "active" : ""}`}
           >
+            {item.icon ? <FontAwesomeIcon icon={item.icon} className="mr-2 text-[0.75rem] opacity-80" /> : null}
             {item.label}
           </Link>
         ))}
@@ -65,7 +68,7 @@ export function MainNav() {
               aria-label="Fechar menu"
               onClick={() => setIsOpen(false)}
             >
-              ×
+              <FontAwesomeIcon icon={faXmark} />
             </button>
           </div>
 
@@ -77,8 +80,13 @@ export function MainNav() {
                   href={item.href}
                   className={`mobile-nav-link ${isActive(pathname, item.href) ? "active" : ""}`}
                 >
-                  <span>{item.label}</span>
-                  <span className="mobile-nav-link-arrow" aria-hidden>→</span>
+                  <span className="inline-flex items-center gap-2">
+                    {item.icon ? <FontAwesomeIcon icon={item.icon} className="text-xs opacity-80" /> : null}
+                    <span>{item.label}</span>
+                  </span>
+                  <span className="mobile-nav-link-arrow" aria-hidden>
+                    <FontAwesomeIcon icon={faArrowRight} />
+                  </span>
                 </Link>
               ))}
             </div>

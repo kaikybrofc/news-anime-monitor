@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageKicker } from "@/components/page-kicker";
 import { fetchMonitor } from "@/lib/api";
 
 export const metadata = {
@@ -233,7 +234,7 @@ export default async function ApiPage() {
     <div className="page-shell animate-fade-in">
       <section className="page-intro">
         <div className="section-heading">
-          <span className="page-kicker">Documentação técnica</span>
+          <PageKicker>Documentação técnica</PageKicker>
           <h1>API do Anime Radar</h1>
           <p className="lead">
             Endpoints reais do monitor com exemplo de chamada, amostra de retorno e leitura operacional em tempo real dentro de um portal técnico mais claro e premium.
@@ -245,7 +246,7 @@ export default async function ApiPage() {
         <div className="xl:col-span-2 flex flex-col gap-8">
           <article className="info-card !p-8">
             <div className="section-heading">
-              <span className="page-kicker">Base URL</span>
+              <PageKicker>Base URL</PageKicker>
               <h2>Ambientes disponíveis</h2>
             </div>
             <div className="mt-4 flex flex-col gap-3 text-sm text-[var(--muted-foreground)]">
@@ -297,13 +298,13 @@ export default async function ApiPage() {
 
           <article className="info-card !p-8">
             <div className="section-heading mb-6">
-              <span className="page-kicker">Parâmetros</span>
+              <PageKicker>Parâmetros</PageKicker>
               <h2>Filtros e querystring</h2>
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {queryParams.map((param) => (
                 <div key={param.key} className="line-item">
-                  <p className="page-kicker">{param.key}</p>
+                  <PageKicker as="p">{param.key}</PageKicker>
                   <p className="text-sm text-[var(--muted-foreground)]">{param.desc}</p>
                 </div>
               ))}
@@ -314,7 +315,7 @@ export default async function ApiPage() {
         <aside className="flex flex-col gap-6">
           <article className="info-card flex flex-col gap-6">
             <div className="section-heading">
-              <span className="page-kicker">Informações técnicas</span>
+              <PageKicker>Informações técnicas</PageKicker>
               <h2>Perfil da API</h2>
             </div>
             <div className="flex flex-col gap-4 text-sm">
@@ -343,7 +344,7 @@ export default async function ApiPage() {
 
           <article className="info-card flex flex-col gap-4 bg-[color-mix(in_oklab,var(--primary)_5%,transparent)]">
             <div className="section-heading">
-              <span className="page-kicker">Portal</span>
+              <PageKicker>Portal</PageKicker>
               <h2>Páginas que consomem esta API</h2>
             </div>
             <div className="flex flex-col gap-2">
