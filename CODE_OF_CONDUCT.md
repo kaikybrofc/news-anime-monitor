@@ -1,12 +1,12 @@
-# Codigo de Conduta
+# Código de Conduta
 
 ## Nosso compromisso
 
-No interesse de promover um ambiente aberto e acolhedor, nos (mantenedores e contribuidores) nos comprometemos a fazer da participacao neste projeto e na comunidade uma experiencia livre de assedio para todos, independentemente de idade, tipo de corpo, deficiencia visivel ou invisivel, etnia, caracteristicas sexuais, identidade e expressao de genero, nivel de experiencia, educacao, status socioeconomico, nacionalidade, aparencia pessoal, raca, religiao ou identidade e orientacao sexual.
+No interesse de promover um ambiente aberto e acolhedor, nós (mantenedores e contribuidores) nos comprometemos a fazer da participação neste projeto e na comunidade uma experiência livre de assédio para todos, independentemente de idade, tipo de corpo, deficiência visível ou invisível, etnia, características sexuais, identidade e expressão de gênero, nível de experiência, educação, status socioeconômico, nacionalidade, aparência pessoal, raça, religião ou identidade e orientação sexual.
 
 Comprometemo-nos a agir e interagir de formas que contribuam para uma comunidade aberta, inclusiva, diversa e saudavel.
 
-## Nossos padroes
+## Nossos padrões
 
 Exemplos de comportamento que contribuem para um ambiente positivo:
 
@@ -16,44 +16,43 @@ Exemplos de comportamento que contribuem para um ambiente positivo:
 - Focar no melhor para a comunidade e para o projeto.
 - Usar linguagem acolhedora e profissional.
 
-Exemplos de comportamento inaceitavel:
+Exemplos de comportamento inaceitável:
 
-- Uso de linguagem ou imagens sexualizadas e atencao sexual indesejada.
-- Comentarios ofensivos, insultos, ataques pessoais ou politicos.
-- Assedio publico ou privado.
-- Exposicao de informacoes privadas de terceiros sem permissao explicita.
+- Uso de linguagem ou imagens sexualizadas e atenção sexual indesejada.
+- Comentários ofensivos, insultos, ataques pessoais ou políticos.
+- Assédio público ou privado.
+- Exposição de informações privadas de terceiros sem permissão explícita.
 - Qualquer conduta que seja razoavelmente considerada inadequada em um ambiente profissional.
 
 ## Responsabilidades dos mantenedores
 
-Mantenedores sao responsaveis por esclarecer e aplicar nossos padroes de comportamento aceitavel e devem tomar acoes corretivas apropriadas e justas em resposta a qualquer comportamento que considerem inadequado, ameacador, ofensivo ou prejudicial.
+Mantenedores são responsáveis por esclarecer e aplicar nossos padrões de comportamento aceitável e devem tomar ações corretivas apropriadas e justas em resposta a qualquer comportamento que considerem inadequado, ameaçador, ofensivo ou prejudicial.
 
-Mantenedores tem o direito e a responsabilidade de remover, editar ou rejeitar comentarios, commits, codigo, edicoes de wiki, issues e outras contribuicoes que nao estejam alinhadas a este Codigo de Conduta, e comunicarao os motivos de moderacao quando apropriado.
+Mantenedores têm o direito e a responsabilidade de remover, editar ou rejeitar comentários, commits, código, edições de wiki, issues e outras contribuições que não estejam alinhadas a este Código de Conduta, e comunicarão os motivos de moderação quando apropriado.
 
 ## Escopo
 
-Este Codigo de Conduta se aplica a todos os espacos do projeto e tambem quando uma pessoa representa oficialmente o projeto em espacos publicos. Exemplos de representacao incluem uso de conta oficial, publicacao em canais oficiais e participacao como representante em eventos da comunidade.
+Este Código de Conduta se aplica a todos os espaços do projeto e também quando uma pessoa representa oficialmente o projeto em espaços públicos. Exemplos de representação incluem uso de conta oficial, publicação em canais oficiais e participação como representante em eventos da comunidade.
 
 ## Fiscalizacao
 
-Casos de abuso, assedio ou comportamento inaceitavel podem ser reportados aos mantenedores por mensagem privada no GitHub para `@kaikybrofc`.
+Casos de abuso, assédio ou comportamento inaceitável podem ser reportados aos mantenedores por mensagem privada no GitHub para `@kaikybrofc`.
 
-Todos os relatos serao revisados e investigados com seriedade e em tempo razoavel. Os mantenedores se comprometem a respeitar a privacidade e a seguranca de quem reportar incidentes.
+Todos os relatos serão revisados e investigados com seriedade e em tempo razoável. Os mantenedores se comprometem a respeitar a privacidade e a segurança de quem reportar incidentes.
 
-## Diretrizes de aplicacao
+## Diretrizes de aplicação
 
-Mantenedores podem aplicar as seguintes medidas, de acordo com a gravidade e recorrencia:
+Mantenedores podem aplicar as seguintes medidas, de acordo com a gravidade e recorrência:
 
-1. Correcao: orientacao privada ou publica sobre o comportamento inadequado.
-2. Advertencia: aviso formal com pedido de interrupcao da conduta.
-3. Suspensao temporaria: restricao de interacoes no projeto por periodo definido.
-4. Banimento: proibicao permanente de participacao no projeto.
+1. Correção: orientação privada ou pública sobre o comportamento inadequado.
+2. Advertência: aviso formal com pedido de interrupção da conduta.
+3. Suspensão temporária: restrição de interações no projeto por período definido.
+4. Banimento: proibição permanente de participação no projeto.
 
 ## Atribuicao
 
-Este Codigo de Conduta e adaptado do Contributor Covenant, versao 2.1:
+Este Código de Conduta é adaptado do Contributor Covenant, versão 2.1:
 https://www.contributor-covenant.org/version/2/1/code_of_conduct/
 
 Para perguntas frequentes, consulte:
 https://www.contributor-covenant.org/faq
-
