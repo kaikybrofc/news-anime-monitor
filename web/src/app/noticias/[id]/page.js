@@ -301,10 +301,24 @@ export async function generateMetadata(props) {
   const resolvedParams = await resolvedProps?.params;
   const rawArticleParam = String(resolvedParams?.id || "").trim();
   const resolved = await resolveArticleByNewsParam(rawArticleParam);
+  const fallbackImage = "/brand/og-image.png";
 
   if (resolved.status !== "ready" || !resolved.item) {
     return {
       title: "Notícia | Anime Radar",
+      description: "Notícia no Anime Radar.",
+      openGraph: {
+        type: "article",
+        title: "Notícia | Anime Radar",
+        description: "Notícia no Anime Radar.",
+        images: [{ url: fallbackImage, width: 1200, height: 630 }],
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: "Notícia | Anime Radar",
+        description: "Notícia no Anime Radar.",
+        images: [fallbackImage],
+      },
       robots: {
         index: false,
         follow: true,
@@ -321,6 +335,7 @@ export async function generateMetadata(props) {
   });
   const canonicalPath = getArticleDetailPath(article);
   const imageUrl = getArticleImageUrl(article);
+  const metadataImage = imageUrl || fallbackImage;
 
   return {
     title: `${title} | Anime Radar`,
@@ -331,13 +346,13 @@ export async function generateMetadata(props) {
       title,
       description: description || "Notícia no Anime Radar.",
       url: canonicalPath,
-      images: imageUrl ? [{ url: imageUrl }] : undefined,
+      images: [{ url: metadataImage }],
     },
     twitter: {
-      card: imageUrl ? "summary_large_image" : "summary",
+      card: "summary_large_image",
       title,
       description: description || "Notícia no Anime Radar.",
-      images: imageUrl ? [imageUrl] : undefined,
+      images: [metadataImage],
     },
   };
 }
