@@ -192,7 +192,7 @@ export function UnifiedSearch({
   }
 
   return (
-    <div ref={wrapperRef} className={`relative ${className}`.trim()}>
+    <div ref={wrapperRef} className={`relative z-[40] md:z-[160] ${className}`.trim()}>
       <div className="search-shell">
         <form action="/noticias" method="get" onSubmit={handleSubmit} className="search-input-shell">
           <input type="hidden" name="offset" value="0" />

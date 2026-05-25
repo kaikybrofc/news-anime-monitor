@@ -107,17 +107,7 @@ export default async function NoticiasPage(props) {
         {JSON.stringify(collectionSchema)}
       </script>
 
-      <section className="page-intro animate-fade-in">
-        <div className="section-heading">
-          <span className="page-kicker">Feed editorial</span>
-          <h1>Notícias monitoradas e priorizadas em tempo real</h1>
-          <p className="lead">
-            Acompanhe a coleção viva do radar com busca integrada, leitura guiada e paginação contínua por relevância editorial.
-          </p>
-        </div>
-      </section>
-
-      <section className="animate-fade-in-up delay-100">
+      <section className="relative z-[20] md:z-[220] animate-fade-in-up delay-100">
         <UnifiedSearch
           initialQuery={filters.q}
           className="w-full"
@@ -132,7 +122,7 @@ export default async function NoticiasPage(props) {
         </article>
       ) : null}
 
-      <section className="flex flex-col gap-8">
+      <section className="relative z-10 flex flex-col gap-8">
         {payload.items?.length ? (
           <>
             <div className="section-heading">
