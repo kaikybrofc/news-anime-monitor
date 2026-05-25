@@ -2,25 +2,6 @@
 
 import { useEffect } from "react";
 
-function buildSessionId() {
-  const now = Date.now().toString(36);
-  const rand = Math.random().toString(36).slice(2, 10);
-  return `avs_${now}_${rand}`;
-}
-
-function getSessionId() {
-  const key = "anime_radar_visit_session_id";
-  try {
-    const existing = window.localStorage.getItem(key);
-    if (existing) return existing;
-    const created = buildSessionId();
-    window.localStorage.setItem(key, created);
-    return created;
-  } catch {
-    return buildSessionId();
-  }
-}
-
 function parseUtmParams() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -69,7 +50,6 @@ export function ArticleVisitTracker({ articleId = "", articleSlug = "" }) {
     const safeArticleId = String(articleId || "").trim();
     if (!safeArticleId) return undefined;
 
-    const sessionId = getSessionId();
     const startedAt = Date.now();
     const maxScroll = { value: 0 };
     const utm = parseUtmParams();
@@ -79,7 +59,6 @@ export function ArticleVisitTracker({ articleId = "", articleSlug = "" }) {
       articleId: safeArticleId,
       articleSlug: String(articleSlug || "").trim(),
       path: window.location.pathname,
-      sessionId,
       referrer: document.referrer || "",
       deviceType: detectDeviceType(),
       ...utm,
