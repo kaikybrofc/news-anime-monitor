@@ -5,9 +5,24 @@
 ![Node](https://img.shields.io/badge/node-%3E%3D20.18.1-brightgreen.svg)
 
 > [!WARNING]
-> Este projeto não tem intenção de atacar, sobrecarregar ou prejudicar qualquer site.
-> As requisições são feitas de forma não agressiva, com limites, retries e boas práticas.
-> O uso é destinado a estudo, aprendizado e monitoramento técnico.
+> **Uso responsável e obrigatório.**
+> Este software é fornecido para monitoramento técnico, aprendizado e pesquisa.  
+> É **proibido** utilizar este projeto para abuso de infraestrutura, scraping agressivo, evasão de controles, negação de serviço, coleta indevida de dados pessoais ou qualquer atividade ilegal.
+>
+> **Responsabilidade do operador.**
+> Quem executa este projeto é integralmente responsável por:
+> - cumprir leis aplicáveis (incluindo privacidade e proteção de dados);
+> - respeitar `robots.txt`, termos de uso e políticas das fontes monitoradas;
+> - configurar limites, janelas e frequência de coleta de forma conservadora;
+> - obter consentimentos, bases legais e avisos necessários quando aplicável.
+>
+> **Risco operacional e de custo.**
+> Má configuração pode gerar bloqueios por IP, aumento de latência, consumo elevado de CPU/memória, custos de API/infra e indisponibilidade do serviço.
+> Sempre valide em ambiente de teste antes de produção, monitore logs e mantenha fallback, rate limit e cache ativos.
+>
+> **Sem garantias.**
+> Este projeto é disponibilizado **“no estado em que se encontra”**, sem garantia de disponibilidade contínua, precisão absoluta, adequação a finalidade específica ou conformidade regulatória automática.
+> Faça revisão técnica e jurídica antes de uso em produção.
 
 `News Anime Monitor` é um monitor de notícias de anime com pipeline modular de ingestão, filtros por fonte, enriquecimento semântico, dedupe em camadas, score de relevância, histórico de aparição e API REST.
 Além da coleta, o projeto atua como um radar editorial inteligente para classificar relevância, tendência e persistência de tópicos.
@@ -35,17 +50,17 @@ O projeto possui duas camadas:
 ## Fontes suportadas
 
 As fontes ativas no projeto são:
-- `animenew`
-- `animecorner`
-- `animenewsnetwork`
-- `crunchyrollnews`
-- `myanimelist`
-- `anitrendz`
-- `otakuusa`
-- `animeherald`
-- `animeuknews`
-- `otakunews`
-- `siliconera`
+- [`animenew` (AnimeNew)](https://animenew.com.br/)
+- [`animecorner` (Anime Corner)](https://animecorner.me/category/news/anime-news/)
+- [`animenewsnetwork` (Anime News Network)](https://www.animenewsnetwork.com/news)
+- [`crunchyrollnews` (Crunchyroll News)](https://www.crunchyroll.com/news/)
+- [`myanimelist` (MyAnimeList News)](https://myanimelist.net/news)
+- [`anitrendz` (Anime Trending)](https://anitrendz.net/news/)
+- [`otakuusa` (Otaku USA)](https://otakuusamagazine.com/)
+- [`animeherald` (Anime Herald)](https://www.animeherald.com/)
+- [`animeuknews` (Anime UK News)](https://animeuknews.net/)
+- [`otakunews` (Otaku News)](https://www.otakunews.com/)
+- [`siliconera` (Siliconera)](https://www.siliconera.com/)
 
 Cada fonte preserva regras próprias de:
 - `collectionPriority`
