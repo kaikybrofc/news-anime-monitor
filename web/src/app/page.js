@@ -5,6 +5,62 @@ import { fetchMonitor } from "@/lib/api";
 import { getArticleDetailPath, getArticleTitle } from "@/lib/formatters";
 import { toAbsoluteSiteUrl } from "@/lib/site-url";
 
+function pickTop(entries = []) {
+  if (!Array.isArray(entries) || !entries.length) return null;
+  return entries.reduce((best, current) => {
+    if (!best) return current;
+    return Number(current?.mentions || 0) > Number(best?.mentions || 0) ? current : best;
+  }, null);
+}
+
+function buildMap(entries = [], keyField = "slug") {
+  const map = new Map();
+  entries.forEach((entry) => {
+    const key = String(entry?.[keyField] || "").trim();
+    if (!key) return;
+    map.set(key, Number(entry?.mentions || 0));
+  });
+  return map;
+}
+
+function buildDailyBrief(trends24h = {}, trends72h = {}) {
+  const upCandidate = pickTop(trends24h?.topFranchises || []);
+  const upLabel = upCandidate?.name || "sem destaque";
+  const upMentions = Number(upCandidate?.mentions || 0);
+
+  const currentMap = buildMap(trends24h?.topFranchises || [], "slug");
+  const previousMap = buildMap(trends72h?.topFranchises || [], "slug");
+
+  let downLabel = "sem recuo claro";
+  let downDelta = 0;
+
+  previousMap.forEach((prevMentions, key) => {
+    const nowMentions = currentMap.get(key) || 0;
+    const delta = nowMentions - prevMentions;
+    if (delta < downDelta) {
+      downDelta = delta;
+      const item = (trends72h?.topFranchises || []).find((entry) => entry?.slug === key);
+      downLabel = item?.name || key;
+    }
+  });
+
+  const previousTopics = new Set(
+    (trends72h?.topTopics || [])
+      .map((item) => String(item?.topicKey || "").trim())
+      .filter(Boolean)
+  );
+  const emergent = (trends24h?.topTopics || []).find((item) => {
+    const key = String(item?.topicKey || "").trim();
+    return key && !previousTopics.has(key);
+  });
+
+  return [
+    `Subiu: ${upLabel} lidera com ${upMentions} menções nas últimas 24h.`,
+    `Caiu: ${downLabel}${downDelta < 0 ? ` perdeu ${Math.abs(downDelta)} menções no recorte curto.` : " sem queda relevante no recorte curto."}`,
+    `Emergiu: ${emergent?.label || emergent?.topicKey || "nenhum novo tópico forte"}${emergent ? " apareceu entre os temas quentes de 24h." : "."}`,
+  ];
+}
+
 export const metadata = {
   title: "Anime Radar | Inteligência em Notícias",
   description:
@@ -22,11 +78,26 @@ export default async function HomePage() {
     items: [],
   };
   let errorMessage = "";
+  let dailyBrief = [];
 
   try {
     latestPayload = await fetchMonitor("/articles", { limit: 8, offset: 0 });
   } catch (error) {
     errorMessage = error.message;
+  }
+
+  try {
+    const [trends24h, trends72h] = await Promise.all([
+      fetchMonitor("/trends", { top: 12, windowHours: 24, includeEditorial: 1 }),
+      fetchMonitor("/trends", { top: 12, windowHours: 72, includeEditorial: 1 }),
+    ]);
+    dailyBrief = buildDailyBrief(trends24h, trends72h);
+  } catch {
+    dailyBrief = [
+      "Subiu: monitorando sinais do último ciclo.",
+      "Caiu: ainda sem dados suficientes para o comparativo.",
+      "Emergiu: novos temas devem aparecer no próximo refresh.",
+    ];
   }
 
   const websiteSchema = {
@@ -77,6 +148,21 @@ export default async function HomePage() {
 
       <section className="relative z-[20] md:z-[220] animate-fade-in-up">
         <UnifiedSearch className="mx-auto w-full max-w-4xl" />
+      </section>
+
+      <section className="info-card animate-fade-in-up">
+        <div className="section-heading mb-3">
+          <span className="page-kicker">Resumo do Dia</span>
+          <h2>Leitura rápida em 3 sinais</h2>
+        </div>
+        <ul className="flex flex-col gap-2 text-sm text-[var(--muted-foreground)]">
+          {dailyBrief.map((line) => (
+            <li key={line} className="flex items-start gap-2">
+              <span className="mt-1 inline-block h-1.5 w-1.5 rounded-full bg-[var(--primary)]" />
+              <span>{line}</span>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="relative z-10 flex flex-col gap-8">
