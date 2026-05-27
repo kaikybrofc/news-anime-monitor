@@ -18,7 +18,7 @@ export function TrendHero({ windowHours, totals = {}, generatedAt = "" }) {
           </div>
         </div>
 
-        <div className="grid w-full max-w-2xl grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 animate-fade-in-up delay-300">
+        <div className="grid w-full max-w-2xl grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-4 animate-fade-in-up delay-300">
           <article className="data-card min-h-[11rem] justify-between !p-5">
             <div className="flex flex-col gap-3">
               <span className="data-card-label">Artigos analisados</span>
