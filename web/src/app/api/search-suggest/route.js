@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { fetchMonitor } from "@/lib/api";
 import {
   getArticleDetailPath,
+  getArticleImageUrl,
   getArticleTitle,
   summarizeText,
 } from "@/lib/formatters";
@@ -199,6 +200,7 @@ function toArticleSuggestion(article = {}) {
     type: "noticia",
     title,
     subtitle: subtitleParts.join(" · "),
+    imageUrl: getArticleImageUrl(article),
     href: getArticleDetailPath(article),
   };
 }

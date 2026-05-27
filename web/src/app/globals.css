@@ -617,9 +617,22 @@
     background: color-mix(in oklab, var(--background-elevated) 68%, transparent);
   }
 
+  .search-input-wrap {
+    @apply relative min-w-0 flex-1;
+  }
+
   .search-input {
-    @apply min-w-0 flex-1 bg-transparent px-4 py-3 text-sm outline-none md:text-base;
+    @apply min-w-0 w-full bg-transparent px-4 py-3 text-sm outline-none md:text-base;
     color: var(--title);
+  }
+
+  .search-input-inline {
+    @apply relative z-[2];
+  }
+
+  .search-input-ghost {
+    @apply pointer-events-none absolute inset-0 flex items-center overflow-hidden px-4 py-3 text-sm md:text-base;
+    color: color-mix(in oklab, var(--muted) 72%, transparent);
   }
 
   .search-input::placeholder {
@@ -629,12 +642,26 @@
   .search-dropdown {
     @apply absolute left-0 right-0 top-[calc(100%+0.65rem)] z-[120] rounded-[1.4rem] border p-2 shadow-2xl backdrop-blur-xl;
     border-color: color-mix(in oklab, var(--border-strong) 88%, transparent);
-    background: color-mix(in oklab, var(--card-strong) 88%, transparent);
+    background: color-mix(in oklab, var(--card-strong) 98%, var(--background) 2%);
     box-shadow: var(--shadow-medium);
   }
 
   .search-option {
     @apply flex w-full flex-col gap-1 rounded-[1rem] px-4 py-3 text-left transition;
+  }
+
+  .search-option-layout {
+    @apply flex items-start gap-3;
+  }
+
+  .search-option-thumb {
+    @apply relative h-12 w-16 shrink-0 overflow-hidden rounded-md border;
+    border-color: color-mix(in oklab, var(--border-strong) 76%, transparent);
+    background-color: color-mix(in oklab, var(--background-elevated) 76%, transparent);
+  }
+
+  .search-option-copy {
+    @apply min-w-0 flex-1;
   }
 
   .search-option:hover,
@@ -797,6 +824,70 @@
 
   .article-grid {
     @apply grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 items-stretch;
+  }
+
+  .daily-brief-grid {
+    @apply grid grid-cols-1 gap-4 md:grid-cols-3;
+  }
+
+  .daily-brief-card {
+    @apply overflow-hidden rounded-[1.25rem] border transition-all;
+    border-color: color-mix(in oklab, var(--border-strong) 80%, transparent);
+    background:
+      linear-gradient(180deg, color-mix(in oklab, var(--card-strong) 92%, transparent), color-mix(in oklab, var(--card) 82%, transparent));
+  }
+
+  .daily-brief-card:hover {
+    border-color: color-mix(in oklab, var(--primary) 30%, var(--border-strong));
+    box-shadow: var(--shadow-medium);
+    transform: translateY(-2px);
+  }
+
+  .daily-brief-media {
+    @apply relative aspect-[16/9] overflow-hidden;
+    background-color: color-mix(in oklab, var(--foreground) 10%, var(--background));
+  }
+
+  .daily-brief-media::after {
+    content: "";
+    @apply absolute inset-0;
+    background: linear-gradient(180deg, transparent 32%, rgba(0, 0, 0, 0.3));
+    pointer-events: none;
+  }
+
+  .daily-brief-media img {
+    @apply h-full w-full object-cover transition-transform duration-500;
+  }
+
+  .daily-brief-card:hover .daily-brief-media img {
+    @apply scale-[1.05];
+  }
+
+  .daily-brief-body {
+    @apply flex flex-col gap-2 p-4;
+  }
+
+  .daily-brief-body h3 {
+    @apply line-clamp-2 text-base font-semibold leading-tight;
+    color: var(--title);
+  }
+
+  .daily-brief-body p {
+    @apply line-clamp-2 text-xs leading-relaxed;
+    color: var(--muted-foreground);
+  }
+
+  .daily-brief-cta {
+    @apply mt-1 inline-flex items-center gap-2 text-xs font-semibold;
+    color: color-mix(in oklab, var(--primary) 86%, var(--foreground));
+  }
+
+  .daily-brief-cta svg {
+    @apply text-[0.7rem] transition-transform;
+  }
+
+  .daily-brief-card:hover .daily-brief-cta svg {
+    transform: translateX(3px);
   }
 
   .grid-cards {

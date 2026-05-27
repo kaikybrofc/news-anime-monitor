@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -48,22 +49,46 @@ function renderInlineMarkdown(text = "") {
   return parts.length ? parts : source;
 }
 
+function asPlainText(text = "") {
+  return String(text || "").replace(/\*\*|\*/g, "").trim();
+}
+
 export function UnifiedSearch({
   initialQuery = "",
   placeholder = "Buscar notícia, franquia ou fonte...",
   submitLabel = "Buscar",
+  resultsPath = "/busca",
   className = "",
+  disableSuggestionsOnMount = false,
+  suggestionsMode = "dropdown",
 }) {
   const router = useRouter();
   const wrapperRef = useRef(null);
+  const inputRef = useRef(null);
+  const skipInitialSuggestionsRef = useRef(Boolean(disableSuggestionsOnMount));
   const [query, setQuery] = useState(String(initialQuery || ""));
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [errorMessage, setErrorMessage] = useState("");
+  const isInlineSuggestions = suggestionsMode === "inline";
 
   const trimmedQuery = useMemo(() => query.trim(), [query]);
+  const suggestedQuery = useMemo(() => {
+    if (!isInlineSuggestions) return "";
+    if (trimmedQuery.length < MIN_QUERY_LENGTH) return "";
+    if (query !== trimmedQuery) return "";
+
+    const normalizedQuery = trimmedQuery.toLowerCase();
+    const firstMatch = items.find((item) => {
+      const title = asPlainText(item?.title || "");
+      if (!title) return false;
+      return title.toLowerCase().startsWith(normalizedQuery) && title.length > query.length;
+    });
+
+    return asPlainText(firstMatch?.title || "");
+  }, [isInlineSuggestions, items, query, trimmedQuery]);
 
   useEffect(() => {
     setQuery(String(initialQuery || ""));
@@ -84,10 +109,16 @@ export function UnifiedSearch({
   }, []);
 
   useEffect(() => {
+    if (skipInitialSuggestionsRef.current) {
+      skipInitialSuggestionsRef.current = false;
+      return undefined;
+    }
+
     if (trimmedQuery.length < MIN_QUERY_LENGTH) {
       setItems([]);
       setLoading(false);
       setErrorMessage("");
+      setOpen(false);
       setSelectedIndex(-1);
       return undefined;
     }
@@ -110,12 +141,12 @@ export function UnifiedSearch({
         const payload = await response.json();
         const nextItems = Array.isArray(payload?.items) ? payload.items : [];
         setItems(nextItems);
-        setOpen(true);
+        setOpen(!isInlineSuggestions);
         setSelectedIndex(nextItems.length ? 0 : -1);
       } catch (error) {
         if (controller.signal.aborted) return;
         setItems([]);
-        setOpen(true);
+        setOpen(!isInlineSuggestions);
         setSelectedIndex(-1);
         setErrorMessage(error.message || "Falha ao carregar sugestões.");
       } finally {
@@ -129,7 +160,7 @@ export function UnifiedSearch({
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [trimmedQuery]);
+  }, [isInlineSuggestions, trimmedQuery]);
 
   function navigateTo(href = "") {
     const target = String(href || "").trim();
@@ -140,23 +171,35 @@ export function UnifiedSearch({
   }
 
   function submitToNews() {
+    const basePath = String(resultsPath || "/busca").trim() || "/busca";
     if (!trimmedQuery) {
       navigateTo("/noticias");
       return;
     }
-    navigateTo(`/noticias?q=${encodeURIComponent(trimmedQuery)}&offset=0`);
+    navigateTo(`${basePath}?q=${encodeURIComponent(trimmedQuery)}&offset=0`);
   }
 
   function handleSubmit(event) {
     event.preventDefault();
-    if (open && selectedIndex >= 0 && items[selectedIndex]) {
-      navigateTo(items[selectedIndex].href);
-      return;
-    }
     submitToNews();
   }
 
   function handleKeyDown(event) {
+    if (isInlineSuggestions) {
+      if ((event.key === "Tab" || event.key === "ArrowRight") && suggestedQuery) {
+        const canAcceptWithArrow =
+          event.key === "Tab" ||
+          (inputRef.current &&
+            inputRef.current.selectionStart === query.length &&
+            inputRef.current.selectionEnd === query.length);
+        if (canAcceptWithArrow) {
+          event.preventDefault();
+          setQuery(suggestedQuery);
+        }
+      }
+      return;
+    }
+
     if (!open || !items.length) {
       if (event.key === "ArrowDown" && items.length) {
         event.preventDefault();
@@ -196,31 +239,42 @@ export function UnifiedSearch({
       <div className="search-shell">
         <form action="/noticias" method="get" onSubmit={handleSubmit} className="search-input-shell">
           <input type="hidden" name="offset" value="0" />
-          <input
-            type="text"
-            name="q"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setOpen(true);
-            }}
-            onFocus={() => {
-              if (trimmedQuery.length >= MIN_QUERY_LENGTH) {
-                setOpen(true);
-              }
-            }}
-            onKeyDown={handleKeyDown}
-            autoComplete="off"
-            placeholder={placeholder}
-            className="search-input"
-          />
+          <div className="search-input-wrap">
+            {isInlineSuggestions && suggestedQuery ? (
+              <span className="search-input-ghost" aria-hidden="true">
+                {suggestedQuery}
+              </span>
+            ) : null}
+            <input
+              ref={inputRef}
+              type="text"
+              name="q"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                if (!isInlineSuggestions) {
+                  setOpen(true);
+                }
+              }}
+              onFocus={() => {
+                if (!isInlineSuggestions && trimmedQuery.length >= MIN_QUERY_LENGTH) {
+                  setOpen(true);
+                }
+              }}
+              onKeyDown={handleKeyDown}
+              autoComplete="off"
+              placeholder={placeholder}
+              aria-autocomplete={isInlineSuggestions ? "both" : "list"}
+              className={`search-input ${isInlineSuggestions ? "search-input-inline" : ""}`.trim()}
+            />
+          </div>
           <button type="submit" className="btn btn-primary !px-6 !py-3 text-sm">
             {submitLabel}
           </button>
         </form>
       </div>
 
-      {open ? (
+      {open && !isInlineSuggestions ? (
         <div className="search-dropdown">
           {loading ? <p className="px-4 py-4 text-sm text-[var(--muted-foreground)]">Buscando sugestões...</p> : null}
 
@@ -244,6 +298,7 @@ export function UnifiedSearch({
             <ul className="flex max-h-96 flex-col gap-1 overflow-y-auto">
               {items.map((item, index) => {
                 const isActive = index === selectedIndex;
+                const hasThumb = item?.type === "noticia" && String(item?.imageUrl || "").trim();
                 return (
                   <li key={item.id || `${item.type}-${index}`}>
                     <button
@@ -255,17 +310,34 @@ export function UnifiedSearch({
                       onMouseEnter={() => setSelectedIndex(index)}
                       className={`search-option ${isActive ? "is-active" : ""}`}
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="search-type-badge">{TYPE_LABEL[item.type] || "Resultado"}</span>
-                        <span className="line-clamp-1 text-sm font-semibold text-[var(--title)]">
-                          {renderInlineMarkdown(item.title)}
-                        </span>
+                      <div className="search-option-layout">
+                        {hasThumb ? (
+                          <span className="search-option-thumb" aria-hidden="true">
+                            <Image
+                              src={item.imageUrl}
+                              alt={asPlainText(item.title) || "Imagem da notícia"}
+                              fill
+                              sizes="64px"
+                              className="object-cover"
+                              loading="lazy"
+                            />
+                          </span>
+                        ) : null}
+
+                        <div className="search-option-copy">
+                          <div className="flex items-center gap-2">
+                            <span className="search-type-badge">{TYPE_LABEL[item.type] || "Resultado"}</span>
+                            <span className="line-clamp-1 text-sm font-semibold text-[var(--title)]">
+                              {renderInlineMarkdown(item.title)}
+                            </span>
+                          </div>
+                          {item.subtitle ? (
+                            <span className="line-clamp-1 text-xs text-[var(--muted-foreground)]">
+                              {renderInlineMarkdown(item.subtitle)}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
-                      {item.subtitle ? (
-                        <span className="line-clamp-1 text-xs text-[var(--muted-foreground)]">
-                          {renderInlineMarkdown(item.subtitle)}
-                        </span>
-                      ) : null}
                     </button>
                   </li>
                 );

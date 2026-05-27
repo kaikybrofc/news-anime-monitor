@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faArrowRight } from "@fortawesome/free-solid-svg-icons";
+import { SafeImage } from "@/components/safe-image";
 import { ArticleCard } from "@/components/article-card";
 import { UnifiedSearch } from "@/components/unified-search";
 import { fetchMonitor } from "@/lib/api";
-import { getArticleDetailPath, getArticleTitle } from "@/lib/formatters";
+import { getArticleDetailPath, getArticleImageUrl, getArticleTitle } from "@/lib/formatters";
 import { toAbsoluteSiteUrl } from "@/lib/site-url";
 
 function pickTop(entries = []) {
@@ -107,7 +110,7 @@ export default async function HomePage() {
     url: toAbsoluteSiteUrl("/"),
     potentialAction: {
       "@type": "SearchAction",
-      target: `${toAbsoluteSiteUrl("/noticias")}?q={search_term_string}`,
+      target: `${toAbsoluteSiteUrl("/busca")}?q={search_term_string}`,
       "query-input": "required name=search_term_string",
     },
   };
@@ -140,6 +143,14 @@ export default async function HomePage() {
     logo: toAbsoluteSiteUrl("/brand/logo-64.png"),
   };
 
+  const dailyHighlights = (latestPayload.items || []).slice(0, 3).map((article, index) => ({
+    id: article?.id || `daily-highlight-${index}`,
+    title: getArticleTitle(article),
+    href: getArticleDetailPath(article),
+    image: getArticleImageUrl(article),
+    line: dailyBrief[index] || "Sinal editorial do ciclo atual.",
+  }));
+
   return (
     <div className="page-shell">
       <script type="application/ld+json" suppressHydrationWarning>
@@ -155,14 +166,41 @@ export default async function HomePage() {
           <span className="page-kicker">Resumo do Dia</span>
           <h2>Leitura rápida em 3 sinais</h2>
         </div>
-        <ul className="flex flex-col gap-2 text-sm text-[var(--muted-foreground)]">
-          {dailyBrief.map((line) => (
-            <li key={line} className="flex items-start gap-2">
-              <span className="mt-1 inline-block h-1.5 w-1.5 rounded-full bg-[var(--primary)]" />
-              <span>{line}</span>
-            </li>
-          ))}
-        </ul>
+        {dailyHighlights.length ? (
+          <div className="daily-brief-grid">
+            {dailyHighlights.map((item) => (
+              <Link key={item.id} href={item.href} className="daily-brief-card">
+                <div className="daily-brief-media">
+                  <SafeImage
+                    src={item.image}
+                    alt={item.title || "Imagem da notícia"}
+                    fill
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                    className="object-cover"
+                    fallbackClassName="daily-brief-media"
+                  />
+                </div>
+                <div className="daily-brief-body">
+                  <h3>{item.title}</h3>
+                  <p>{item.line}</p>
+                  <span className="daily-brief-cta">
+                    Ler notícia
+                    <FontAwesomeIcon icon={faArrowRight} />
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-2 text-sm text-[var(--muted-foreground)]">
+            {dailyBrief.map((line) => (
+              <li key={line} className="flex items-start gap-2">
+                <span className="mt-1 inline-block h-1.5 w-1.5 rounded-full bg-[var(--primary)]" />
+                <span>{line}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="relative z-10 flex flex-col gap-8">
