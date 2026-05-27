@@ -3,6 +3,12 @@ const DEFAULT_MONITOR_API_BASE_URLS = [
   "http://127.0.0.1:3000",
 ];
 const REQUEST_TIMEOUT_MS = 10000;
+const RATE_LIMIT_RETRY_ATTEMPTS = 2;
+const RATE_LIMIT_RETRY_BASE_DELAY_MS = 350;
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function stripTrailingSlash(value) {
   return String(value || "").replace(/\/+$/, "");
@@ -71,6 +77,52 @@ export async function fetchMonitor(pathname, query = {}) {
     }
 
     if (!response.ok) {
+      if (response.status === 429) {
+        let handled = false;
+
+        if (allowFallback && index < baseUrls.length - 1) {
+          attemptErrors.push(`Erro 429 em ${baseUrl}${normalizedPath}. Tentando fallback...`);
+          continue;
+        }
+
+        for (let retry = 0; retry < RATE_LIMIT_RETRY_ATTEMPTS; retry += 1) {
+          const delayMs = RATE_LIMIT_RETRY_BASE_DELAY_MS * (retry + 1);
+          await wait(delayMs);
+
+          let retryResponse;
+          try {
+            retryResponse = await fetch(url.toString(), {
+              cache: "no-store",
+              next: { revalidate: 0 },
+              signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+            });
+          } catch (error) {
+            attemptErrors.push(`Falha de rede após 429 em ${baseUrl}${normalizedPath}: ${error.message}`);
+            break;
+          }
+
+          if (retryResponse.ok) {
+            return retryResponse.json();
+          }
+
+          if (retryResponse.status !== 429) {
+            response = retryResponse;
+            handled = true;
+            break;
+          }
+
+          if (retry + 1 === RATE_LIMIT_RETRY_ATTEMPTS) {
+            attemptErrors.push(`Erro 429 em ${baseUrl}${normalizedPath} após ${RATE_LIMIT_RETRY_ATTEMPTS} tentativas.`);
+          }
+        }
+
+        if (!handled) {
+          const error = new Error(attemptErrors.join(" | ") || `Erro 429 em ${baseUrl}${normalizedPath}.`);
+          error.status = 429;
+          throw error;
+        }
+      }
+
       let details = "";
       try {
         const json = await response.json();
