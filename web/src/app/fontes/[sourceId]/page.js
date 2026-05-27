@@ -4,6 +4,18 @@ import { Pagination } from "@/components/pagination";
 import { clampInt, fetchMonitor, readQueryInt, readQueryString } from "@/lib/api";
 import { formatNumber } from "@/lib/formatters";
 
+function getSourceIconUrl(source = {}) {
+  const rawUrl = source.monitorUrl || source.feedUrl || source.url || "";
+  if (!rawUrl) return "";
+
+  try {
+    const { hostname } = new URL(rawUrl);
+    return hostname ? `https://icons.duckduckgo.com/ip3/${hostname}.ico` : "";
+  } catch {
+    return "";
+  }
+}
+
 const VALID_SOURCE_IDS = new Set([
   "animenew",
   "animecorner",
@@ -106,13 +118,26 @@ export default async function FonteDetailPage(props) {
 
   const lifecycle = payload?.stats?.lifecycle || {};
   const contentTypes = payload?.stats?.contentTypes || {};
+  const sourceIconUrl = getSourceIconUrl(payload?.source || {});
 
   return (
     <div className="page-shell">
       <section className="page-intro">
         <div className="section-heading">
           <span className="page-kicker">Fonte monitorada</span>
-          <h1>{payload.source?.name || sourceId}</h1>
+          <div className="flex items-center gap-3">
+            {sourceIconUrl ? (
+              <img
+                src={sourceIconUrl}
+                alt=""
+                width="30"
+                height="30"
+                loading="lazy"
+                className="h-[30px] w-[30px] rounded border border-[var(--border)] bg-[var(--background-elevated)]"
+              />
+            ) : null}
+            <h1>{payload.source?.name || sourceId}</h1>
+          </div>
           <p className="lead">Detalhamento da cobertura, do ciclo de vida e dos tipos de conteúdo desta fonte dentro do radar.</p>
         </div>
       </section>
