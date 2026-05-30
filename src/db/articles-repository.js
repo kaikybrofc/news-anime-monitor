@@ -1,7 +1,9 @@
 const {
   hasDbConfig,
   getPool,
+  isRecoverableDbError,
   pingDatabase,
+  recreatePool,
 } = require("./mysql.js");
 
 const TABLE_NAME = "articles";
@@ -234,13 +236,27 @@ async function ensureDatabaseAndTable() {
 
 async function loadAllArticles() {
   await pingDatabase();
-  const db = getPool();
+  let db = getPool();
+  let rows;
 
-  const [rows] = await db.query(
-    `SELECT id, DATE_FORMAT(timestamp, '%Y-%m-%dT%H:%i:%s.%fZ') AS timestamp, refined_json
-     FROM ${quoteIdentifier(TABLE_NAME)}
-     ORDER BY timestamp DESC`
-  );
+  try {
+    [rows] = await db.query(
+      `SELECT id, DATE_FORMAT(timestamp, '%Y-%m-%dT%H:%i:%s.%fZ') AS timestamp, refined_json
+       FROM ${quoteIdentifier(TABLE_NAME)}
+       ORDER BY timestamp DESC`
+    );
+  } catch (error) {
+    if (!isRecoverableDbError(error)) {
+      throw error;
+    }
+    await recreatePool();
+    db = getPool();
+    [rows] = await db.query(
+      `SELECT id, DATE_FORMAT(timestamp, '%Y-%m-%dT%H:%i:%s.%fZ') AS timestamp, refined_json
+       FROM ${quoteIdentifier(TABLE_NAME)}
+       ORDER BY timestamp DESC`
+    );
+  }
 
   return rows.map(parseArticleRow);
 }

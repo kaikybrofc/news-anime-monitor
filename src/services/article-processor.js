@@ -11,9 +11,22 @@ const {
   extractTitleFromHtml,
 } = require("../utils/article-utils.js");
 const { buildProcessedArticle } = require("../pipeline/enrichment.js");
+const SOURCE_403_PAUSE_THRESHOLD = Math.max(
+  1,
+  Number.parseInt(process.env.SOURCE_403_PAUSE_THRESHOLD || "3", 10) || 3
+);
 
 function normalizeText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function extractHttpStatus(error) {
+  const status = Number(error?.response?.status);
+  if (Number.isFinite(status) && status > 0) return status;
+  const message = String(error?.message || "");
+  const matched = message.match(/\bstatus code (\d{3})\b/i);
+  if (!matched) return 0;
+  return Number(matched[1]);
 }
 
 function escapeXml(value) {
@@ -385,6 +398,9 @@ async function processWithConcurrency(items, worker, concurrency) {
 
   const results = new Array(items.length);
   const limit = Math.max(1, Math.min(concurrency, items.length));
+  const blockedSources = new Set();
+  const source403Errors = new Map();
+  const sourceSkipNotice = new Set();
   let nextIndex = 0;
 
   async function runWorker() {
@@ -396,11 +412,36 @@ async function processWithConcurrency(items, worker, concurrency) {
         return;
       }
 
+      const item = items[index] || {};
+      const sourceKey = String(item.sourceId || item.sourceName || "unknown").trim();
+      const sourceLabel = String(item.sourceName || sourceKey || "Fonte").trim();
+      if (blockedSources.has(sourceKey)) {
+        if (!sourceSkipNotice.has(sourceKey)) {
+          sourceSkipNotice.add(sourceKey);
+          logger.warn(
+            `[${sourceLabel}] Novos itens ignorados no ciclo atual após bloqueio recorrente de HTTP 403.`
+          );
+        }
+        results[index] = null;
+        continue;
+      }
+
       try {
-        results[index] = await worker(items[index]);
+        results[index] = await worker(item);
       } catch (error) {
+        if (extractHttpStatus(error) === 403) {
+          const total403 = (source403Errors.get(sourceKey) || 0) + 1;
+          source403Errors.set(sourceKey, total403);
+          if (total403 >= SOURCE_403_PAUSE_THRESHOLD && !blockedSources.has(sourceKey)) {
+            blockedSources.add(sourceKey);
+            logger.warn(
+              `[${sourceLabel}] Limite de ${SOURCE_403_PAUSE_THRESHOLD} erro(s) 403 atingido no ciclo. Pausando a fonte até o próximo ciclo.`
+            );
+          }
+        }
+
         logger.error(
-          `Erro ao processar o artigo "${items[index]?.name || items[index]?.url}":`,
+          `Erro ao processar o artigo "${item?.name || item?.url}":`,
           error?.message || error
         );
         results[index] = null;

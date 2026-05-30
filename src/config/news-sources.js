@@ -378,6 +378,14 @@ const SOURCE_DEFINITIONS = {
     allowedPathPrefixes: ["/articles/", "/news/"],
     excludedPathPrefixes: ["/reviews/", "/guides/", "/videos/"],
     homeLinkSelectors: ["a[href^='/articles/']", "a[href^='/news/']"],
+    requestHeaders: buildRequestHeaders(
+      {
+        Referer: "https://www.gamespot.com/news/",
+        Origin: "https://www.gamespot.com",
+        "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.7",
+      },
+      ["GAMESPOT_COOKIE"]
+    ),
     titleSuffixes: ["GameSpot"],
   },
   aftermath: {
