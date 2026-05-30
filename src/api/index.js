@@ -335,6 +335,7 @@ const responseCache = new Map();
 const CACHEABLE_GET_PATHS = new Set([
   "/articles",
   "/trends",
+  "/calendar",
   "/franchises",
   "/sources",
   "/seo/entities",
@@ -1771,6 +1772,389 @@ function enrichTrendsWithEditorial(basePayload = {}, scopedArticles = []) {
   };
 }
 
+const CALENDAR_MONTH_INDEX_BY_TOKEN = {
+  jan: 0,
+  janeiro: 0,
+  january: 0,
+  fev: 1,
+  fevereiro: 1,
+  feb: 1,
+  february: 1,
+  mar: 2,
+  marco: 2,
+  march: 2,
+  abr: 3,
+  abril: 3,
+  apr: 3,
+  april: 3,
+  mai: 4,
+  maio: 4,
+  may: 4,
+  jun: 5,
+  junho: 5,
+  june: 5,
+  jul: 6,
+  julho: 6,
+  july: 6,
+  ago: 7,
+  agosto: 7,
+  aug: 7,
+  august: 7,
+  set: 8,
+  setembro: 8,
+  sep: 8,
+  sept: 8,
+  september: 8,
+  out: 9,
+  outubro: 9,
+  oct: 9,
+  october: 9,
+  nov: 10,
+  novembro: 10,
+  november: 10,
+  dec: 11,
+  dez: 11,
+  dezembro: 11,
+  december: 11,
+};
+
+const CALENDAR_CONFIDENCE_SCORE = {
+  low: 1,
+  medium: 2,
+  high: 3,
+};
+
+const CALENDAR_EVENT_TYPE_LABELS = {
+  premiere: "Estreia",
+  episode: "Novo episodio",
+  movie: "Filme",
+  game: "Jogo",
+  event: "Evento",
+  announcement: "Anuncio",
+};
+
+function formatUtcDayKey(timestampMs) {
+  const date = new Date(timestampMs);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function startOfUtcDay(timestampMs) {
+  const date = new Date(timestampMs);
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
+
+function createIsoDateFromParts(year, monthIndex, day) {
+  if (!Number.isInteger(year) || !Number.isInteger(monthIndex) || !Number.isInteger(day)) {
+    return "";
+  }
+  if (monthIndex < 0 || monthIndex > 11 || day < 1 || day > 31) {
+    return "";
+  }
+
+  const timestamp = Date.UTC(year, monthIndex, day);
+  const date = new Date(timestamp);
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== monthIndex ||
+    date.getUTCDate() !== day
+  ) {
+    return "";
+  }
+  return date.toISOString();
+}
+
+function addCalendarDateCandidate(bucket, dateIso, confidence, source) {
+  if (!dateIso) return;
+  const timestamp = Date.parse(dateIso);
+  if (Number.isNaN(timestamp)) return;
+
+  const key = formatUtcDayKey(timestamp);
+  const existing = bucket.get(key);
+  const score = CALENDAR_CONFIDENCE_SCORE[confidence] || 1;
+  if (!existing || score > (CALENDAR_CONFIDENCE_SCORE[existing.confidence] || 1)) {
+    bucket.set(key, {
+      dateIso: new Date(timestamp).toISOString(),
+      confidence,
+      source,
+    });
+  }
+}
+
+function extractCalendarDateCandidates(article = {}) {
+  const refined = article?.refined || {};
+  const title = String(refined.name || article?.name || "");
+  const summary = String(refined.summary || "");
+  const rawText = `${title}\n${summary}`.trim();
+  const normalizedText = normalizeToAscii(rawText).toLowerCase();
+  const candidateMap = new Map();
+  const fallbackYear =
+    new Date(
+      Date.parse(
+        refined.publishedAt || refined.firstSeenAt || refined.lastSeenAt || article?.timestamp || Date.now()
+      )
+    ).getUTCFullYear() || new Date().getUTCFullYear();
+
+  const isoPattern = /\b((?:19|20)\d{2})[\/.-](0?[1-9]|1[0-2])[\/.-](0?[1-9]|[12]\d|3[01])\b/g;
+  for (const match of normalizedText.matchAll(isoPattern)) {
+    const year = Number(match[1]);
+    const monthIndex = Number(match[2]) - 1;
+    const day = Number(match[3]);
+    addCalendarDateCandidate(
+      candidateMap,
+      createIsoDateFromParts(year, monthIndex, day),
+      "high",
+      "title_or_summary"
+    );
+  }
+
+  const dmyPattern = /\b(0?[1-9]|[12]\d|3[01])[\/.-](0?[1-9]|1[0-2])(?:[\/.-]((?:19|20)\d{2}))?\b/g;
+  for (const match of normalizedText.matchAll(dmyPattern)) {
+    const day = Number(match[1]);
+    const monthIndex = Number(match[2]) - 1;
+    const year = match[3] ? Number(match[3]) : fallbackYear;
+    addCalendarDateCandidate(
+      candidateMap,
+      createIsoDateFromParts(year, monthIndex, day),
+      match[3] ? "high" : "medium",
+      "title_or_summary"
+    );
+  }
+
+  const monthTokens = Object.keys(CALENDAR_MONTH_INDEX_BY_TOKEN).join("|");
+  const monthDayPattern = new RegExp(
+    `\\b(${monthTokens})\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s*((?:19|20)\\d{2}))?\\b`,
+    "g"
+  );
+  for (const match of normalizedText.matchAll(monthDayPattern)) {
+    const monthIndex = CALENDAR_MONTH_INDEX_BY_TOKEN[match[1]];
+    const day = Number(match[2]);
+    const year = match[3] ? Number(match[3]) : fallbackYear;
+    addCalendarDateCandidate(
+      candidateMap,
+      createIsoDateFromParts(year, monthIndex, day),
+      match[3] ? "high" : "medium",
+      "title_or_summary"
+    );
+  }
+
+  const dayMonthPattern = new RegExp(
+    `\\b(\\d{1,2})\\s+(?:de\\s+)?(${monthTokens})(?:\\s+(?:de\\s+)?)?((?:19|20)\\d{2})?\\b`,
+    "g"
+  );
+  for (const match of normalizedText.matchAll(dayMonthPattern)) {
+    const day = Number(match[1]);
+    const monthIndex = CALENDAR_MONTH_INDEX_BY_TOKEN[match[2]];
+    const year = match[3] ? Number(match[3]) : fallbackYear;
+    addCalendarDateCandidate(
+      candidateMap,
+      createIsoDateFromParts(year, monthIndex, day),
+      match[3] ? "high" : "medium",
+      "title_or_summary"
+    );
+  }
+
+  const candidates = Array.from(candidateMap.values()).sort((left, right) => {
+    const scoreDiff =
+      (CALENDAR_CONFIDENCE_SCORE[right.confidence] || 1) -
+      (CALENDAR_CONFIDENCE_SCORE[left.confidence] || 1);
+    if (scoreDiff !== 0) return scoreDiff;
+    return Date.parse(left.dateIso) - Date.parse(right.dateIso);
+  });
+
+  if (candidates.length) return candidates;
+
+  const fallbackIso = parseQueryDate(
+    refined.publishedAt || refined.firstSeenAt || refined.lastSeenAt || article?.timestamp
+  );
+  if (!fallbackIso) return [];
+  return [
+    {
+      dateIso: fallbackIso,
+      confidence: "low",
+      source: "published_at",
+    },
+  ];
+}
+
+function classifyCalendarEventType(article = {}) {
+  const refined = article?.refined || {};
+  const context = normalizeToAscii(`${refined.name || ""} ${refined.summary || ""}`).toLowerCase();
+  const tests = [
+    {
+      type: "premiere",
+      pattern:
+        /\b(estreia|estreiam|estreando|premiere|debut|debuts|airs|streaming starts|starts streaming|lancamento)\b/i,
+    },
+    {
+      type: "episode",
+      pattern: /\b(episodio|episode|capitulo|chapter|ova|ona)\b/i,
+    },
+    {
+      type: "movie",
+      pattern: /\b(filme|movie|theatrical|cinema|longa)\b/i,
+    },
+    {
+      type: "game",
+      pattern: /\b(game|jogo|steam|switch|playstation|xbox|ps5|pc release)\b/i,
+    },
+    {
+      type: "event",
+      pattern:
+        /\b(evento|festival|convention|expo|showcase|panel|livestream|live stream|concert|aniversario)\b/i,
+    },
+  ];
+
+  for (const entry of tests) {
+    if (entry.pattern.test(context)) return entry.type;
+  }
+
+  return "announcement";
+}
+
+function buildCalendarEvent(article = {}, dateCandidate = {}) {
+  const contract = toArticleContract(article);
+  const refined = contract?.refined || {};
+  const franchise = deriveFranchiseFromRefined(refined);
+  const eventType = classifyCalendarEventType(contract);
+  const eventDateIso = parseQueryDate(dateCandidate?.dateIso);
+  const sourceId = String(refined.sourceId || "unknown");
+  const sourceName =
+    String(refined.sourceName || "") || SOURCE_DEFINITIONS[sourceId]?.name || sourceId;
+
+  return {
+    articleId: String(contract.id || ""),
+    newsSlug: String(refined.newsSlug || buildArticleNewsSlug(contract)),
+    eventDate: eventDateIso,
+    day: formatUtcDayKey(Date.parse(eventDateIso)),
+    confidence: String(dateCandidate?.confidence || "low"),
+    dateSource: String(dateCandidate?.source || "published_at"),
+    type: eventType,
+    typeLabel: CALENDAR_EVENT_TYPE_LABELS[eventType] || "Anuncio",
+    title: String(refined.name || ""),
+    summary: String(refined.summary || ""),
+    score: Number(refined.score || 0),
+    sourceId,
+    sourceName,
+    franchise: {
+      slug: String(franchise?.slug || ""),
+      name: String(franchise?.name || slugToName(franchise?.slug || "")),
+    },
+    article: {
+      id: String(contract.id || ""),
+      url: String(refined.canonicalUrl || refined.url || ""),
+      publishedAt: String(refined.publishedAt || contract.timestamp || ""),
+      lastSeenAt: String(refined.lastSeenAt || contract.timestamp || ""),
+    },
+  };
+}
+
+function groupCalendarEventsByDay(events = [], limitPerDay = 20) {
+  const dayMap = new Map();
+  for (const event of events) {
+    const dayKey = String(event?.day || "");
+    if (!dayKey) continue;
+    if (!dayMap.has(dayKey)) {
+      dayMap.set(dayKey, []);
+    }
+    dayMap.get(dayKey).push(event);
+  }
+
+  return Array.from(dayMap.entries())
+    .sort((left, right) => left[0].localeCompare(right[0]))
+    .map(([day, items]) => ({
+      day,
+      total: items.length,
+      items: items
+        .slice()
+        .sort((left, right) => {
+          const scoreDiff =
+            (CALENDAR_CONFIDENCE_SCORE[right.confidence] || 1) -
+            (CALENDAR_CONFIDENCE_SCORE[left.confidence] || 1);
+          if (scoreDiff !== 0) return scoreDiff;
+          if (right.score !== left.score) return right.score - left.score;
+          return String(left.title || "").localeCompare(String(right.title || ""));
+        })
+        .slice(0, Math.max(1, limitPerDay)),
+    }));
+}
+
+function buildCalendarPayload(articles = [], options = {}) {
+  const now = Date.now();
+  const daysBack = toPositiveInt(options.daysBack, 7);
+  const daysAhead = toPositiveInt(options.daysAhead, 45);
+  const fromIso = parseQueryDate(options.from);
+  const toIso = parseQueryDate(options.to);
+  const limitPerDay = normalizeLimit(options.limitPerDay, 20);
+  const requestedType = normalizeQueryText(options.type);
+  const requestedSourceId = normalizeQueryText(options.sourceId);
+  const requestedFranchise = normalizeQueryText(options.franchise);
+  const minConfidence = normalizeQueryText(options.confidence);
+  const minConfidenceScore = CALENDAR_CONFIDENCE_SCORE[minConfidence] || 0;
+
+  const rangeStartMs = fromIso
+    ? startOfUtcDay(Date.parse(fromIso))
+    : startOfUtcDay(now - daysBack * 24 * 60 * 60 * 1000);
+  const rangeEndMs = toIso
+    ? startOfUtcDay(Date.parse(toIso)) + 24 * 60 * 60 * 1000 - 1
+    : startOfUtcDay(now + daysAhead * 24 * 60 * 60 * 1000) + 24 * 60 * 60 * 1000 - 1;
+
+  const events = [];
+  for (const article of articles) {
+    const candidates = extractCalendarDateCandidates(article);
+    if (!candidates.length) continue;
+
+    const primaryEvent = buildCalendarEvent(article, candidates[0]);
+    const eventDateMs = Date.parse(primaryEvent.eventDate || "");
+    if (Number.isNaN(eventDateMs)) continue;
+    if (eventDateMs < rangeStartMs || eventDateMs > rangeEndMs) continue;
+    if (requestedType && primaryEvent.type !== requestedType) continue;
+    if (requestedSourceId && primaryEvent.sourceId !== requestedSourceId) continue;
+    if (requestedFranchise && primaryEvent.franchise.slug !== requestedFranchise) continue;
+    if (
+      minConfidenceScore &&
+      (CALENDAR_CONFIDENCE_SCORE[primaryEvent.confidence] || 0) < minConfidenceScore
+    ) {
+      continue;
+    }
+    events.push(primaryEvent);
+  }
+
+  const uniqueByArticle = new Map();
+  for (const event of events) {
+    const key = `${event.articleId}:${event.day}`;
+    if (uniqueByArticle.has(key)) continue;
+    uniqueByArticle.set(key, event);
+  }
+
+  const deduped = Array.from(uniqueByArticle.values()).sort(
+    (left, right) => Date.parse(left.eventDate) - Date.parse(right.eventDate)
+  );
+  const groupedDays = groupCalendarEventsByDay(deduped, limitPerDay);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    filters: {
+      from: new Date(rangeStartMs).toISOString(),
+      to: new Date(rangeEndMs).toISOString(),
+      daysBack,
+      daysAhead,
+      type: requestedType || "",
+      sourceId: requestedSourceId || "",
+      franchise: requestedFranchise || "",
+      confidence: minConfidence || "",
+      limitPerDay,
+    },
+    totals: {
+      days: groupedDays.length,
+      events: deduped.length,
+    },
+    days: groupedDays,
+  };
+}
+
 function createEntityAggregationRow(type, entity) {
   return {
     type,
@@ -2246,6 +2630,51 @@ app.get("/trends", async (req, res) => {
     logger.error("[API:/trends] Falha ao montar tendências:", error);
     res.status(500).json({
       error: "Falha ao montar tendências.",
+    });
+  }
+});
+
+app.get("/calendar", async (req, res) => {
+  try {
+    const windowHours = toPositiveInt(req.query.windowHours, 24 * 45);
+    const daysBack = toPositiveInt(req.query.daysBack, 7);
+    const daysAhead = toPositiveInt(req.query.daysAhead, 45);
+
+    const filters = {
+      sourceId: normalizeQueryText(req.query.source || req.query.sourceId),
+      bucket: normalizeQueryText(req.query.bucket),
+      contentType: normalizeQueryText(req.query.contentType),
+      lastSeenEvent: normalizeQueryText(req.query.lastSeenEvent),
+      from: "",
+      to: "",
+    };
+
+    const allArticles = await loadAllArticlesForContract();
+    const scopedByWindow =
+      windowHours > 0 ? filterArticlesByWindowHours(allArticles, windowHours) : allArticles;
+    const scoped = filterArticlesInMemory(scopedByWindow, filters);
+
+    const payload = buildCalendarPayload(scoped, {
+      from: req.query.from,
+      to: req.query.to,
+      daysBack,
+      daysAhead,
+      type: req.query.type,
+      sourceId: req.query.source || req.query.sourceId,
+      franchise: req.query.franchise,
+      confidence: req.query.confidence,
+      limitPerDay: req.query.limitPerDay,
+    });
+
+    return res.json({
+      ...payload,
+      windowHours: windowHours || null,
+      articlesConsidered: scoped.length,
+    });
+  } catch (error) {
+    logger.error("[API:/calendar] Falha ao montar calendario:", error);
+    return res.status(500).json({
+      error: "Falha ao montar calendario.",
     });
   }
 });

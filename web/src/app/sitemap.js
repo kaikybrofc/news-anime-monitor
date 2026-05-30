@@ -72,6 +72,7 @@ export default async function sitemap() {
     { path: "/", lastModified: fallbackIso },
     { path: "/noticias", lastModified: fallbackIso },
     { path: "/tendencias", lastModified: fallbackIso },
+    { path: "/calendario", lastModified: fallbackIso },
     { path: "/franquias", lastModified: fallbackIso },
     { path: "/fontes", lastModified: fallbackIso },
     { path: "/anime", lastModified: fallbackIso },

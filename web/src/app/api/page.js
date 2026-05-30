@@ -22,14 +22,20 @@ const queryParams = [
   { key: "contentType", desc: "Filtra por tipo de conteúdo (news, brief, unknown)." },
   { key: "lastSeenEvent", desc: "Filtra por evento de ciclo: new, revisited, updated, fetch_restricted." },
   { key: "from / to", desc: "Faixa temporal em formato de data ISO." },
-  { key: "windowHours", desc: "Janela em horas para /trends, /sources e /franchises." },
+  { key: "windowHours", desc: "Janela em horas para /trends, /calendar, /sources e /franchises." },
   { key: "top", desc: "Top N de agregados para rankings e tendências." },
+  { key: "daysBack / daysAhead", desc: "Recorte relativo de dias para o /calendar." },
+  { key: "type", desc: "Filtra tipo de evento no /calendar (premiere, episode, movie, game, event, announcement)." },
+  { key: "franchise", desc: "Filtra slug de franquia no /calendar." },
+  { key: "confidence", desc: "Filtra confiança mínima de data no /calendar (high, medium, low)." },
+  { key: "limitPerDay", desc: "Limita quantos eventos por dia retornam no /calendar." },
   { key: "includeEditorial", desc: "Enriquece /trends com artigos representativos, labels amigáveis e cards de apoio." },
 ];
 
 const portalPages = [
   { label: "Notícias", href: "/noticias", desc: "Feed editorial paginado." },
   { label: "Tendências", href: "/tendencias", desc: "Radar de destaque por janela." },
+  { label: "Calendário", href: "/calendario", desc: "Agenda de eventos detectados." },
   { label: "Franquias", href: "/franquias", desc: "Hub por franquia detectada." },
   { label: "Fontes", href: "/fontes", desc: "Cobertura por source monitorada." },
 ];
@@ -84,6 +90,15 @@ const endpointDefinitions = [
     desc: "Tendências por janela temporal com modo editorial opcional para cards ricos e notícias representativas.",
     curl: `curl -X GET "${API_BASE_PROD}/trends?windowHours=72&top=5&includeEditorial=1"`,
     fetcher: async () => fetchMonitor("/trends", { windowHours: 72, top: 5, includeEditorial: 1 }),
+  },
+  {
+    key: "calendar",
+    method: "GET",
+    path: "/calendar",
+    desc: "Calendario de eventos otaku detectados por parsing de data no titulo e resumo das noticias.",
+    curl: `curl -X GET "${API_BASE_PROD}/calendar?daysBack=7&daysAhead=45&limitPerDay=10"`,
+    fetcher: async () =>
+      fetchMonitor("/calendar", { daysBack: 7, daysAhead: 45, limitPerDay: 10 }),
   },
   {
     key: "sources",
