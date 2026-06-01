@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { PageKicker } from "@/components/page-kicker";
+import { SafeImage } from "@/components/safe-image";
+import { CalendarCarouselCenter } from "@/components/calendar-carousel-center";
+import { CalendarCarouselControls } from "@/components/calendar-carousel-controls";
 import { clampInt, fetchMonitor, readQueryInt, readQueryString } from "@/lib/api";
 import { formatNumber, summarizeTextBySentence } from "@/lib/formatters";
 
@@ -48,6 +51,41 @@ function confidenceLabel(value = "") {
   if (value === "medium") return "Media";
   if (value === "low") return "Baixa";
   return "Nao definida";
+}
+
+function getUtcDayKey(date = new Date()) {
+  return date.toISOString().slice(0, 10);
+}
+
+function compareDayKeys(dayA = "", dayB = "") {
+  const parsedA = new Date(`${dayA}T00:00:00.000Z`);
+  const parsedB = new Date(`${dayB}T00:00:00.000Z`);
+  if (Number.isNaN(parsedA.getTime()) || Number.isNaN(parsedB.getTime())) return 0;
+  return parsedA.getTime() - parsedB.getTime();
+}
+
+function diffDaysFrom(dayKey = "", referenceKey = "") {
+  const parsedDay = new Date(`${dayKey}T00:00:00.000Z`);
+  const parsedReference = new Date(`${referenceKey}T00:00:00.000Z`);
+  if (Number.isNaN(parsedDay.getTime()) || Number.isNaN(parsedReference.getTime())) return null;
+  return Math.round((parsedDay.getTime() - parsedReference.getTime()) / 86400000);
+}
+
+function relativeDayLabel(dayKey = "", todayKey = "") {
+  const diff = diffDaysFrom(dayKey, todayKey);
+  if (diff === null) return "Data indefinida";
+  if (diff === 0) return "Hoje";
+  if (diff === 1) return "Amanha";
+  if (diff === -1) return "Ontem";
+  if (diff > 1) return `Em ${formatNumber(diff)} dias`;
+  return `${formatNumber(Math.abs(diff))} dias atras`;
+}
+
+function getCalendarEventImage(event = {}) {
+  const raw = String(event?.image || event?.article?.image || "").trim();
+  if (!raw) return "";
+  if (raw.startsWith("data:image/svg+xml")) return "";
+  return raw;
 }
 
 function buildQueryHref(basePath, params = {}, overrides = {}) {
@@ -107,6 +145,32 @@ export default async function CalendarioPage(props) {
     errorMessage = error.message;
   }
 
+  const todayKey = getUtcDayKey();
+  const sortedDays = [...(payload?.days || [])].sort((a, b) => compareDayKeys(a?.day || "", b?.day || ""));
+
+  const pastDays = [];
+  const todayDays = [];
+  const futureDays = [];
+
+  sortedDays.forEach((dayBlock) => {
+    const compareWithToday = compareDayKeys(dayBlock?.day || "", todayKey);
+    if (compareWithToday < 0) {
+      pastDays.push(dayBlock);
+      return;
+    }
+    if (compareWithToday > 0) {
+      futureDays.push(dayBlock);
+      return;
+    }
+    todayDays.push(dayBlock);
+  });
+
+  const timelineDays = [
+    ...pastDays.map((dayBlock) => ({ ...dayBlock, bucket: "past" })),
+    ...todayDays.map((dayBlock) => ({ ...dayBlock, bucket: "today" })),
+    ...futureDays.map((dayBlock) => ({ ...dayBlock, bucket: "future" })),
+  ];
+
   return (
     <div className="page-shell">
       <section className="page-intro animate-fade-in">
@@ -117,6 +181,100 @@ export default async function CalendarioPage(props) {
             Um painel para acompanhar datas relevantes de estreias, episodios, filmes, jogos e eventos usando sinais extraidos automaticamente das noticias monitoradas.
           </p>
         </div>
+      </section>
+
+      {errorMessage ? (
+        <article className="info-card warning-card animate-fade-in">
+          <h2 className="text-[var(--title)]">Falha ao carregar calendario</h2>
+          <p>{errorMessage}</p>
+        </article>
+      ) : null}
+
+      <section className="calendar-timeline-shell animate-fade-in-up delay-100">
+        <article className="calendar-now-banner">
+          <div>
+            <span className="tag">Referencia de hoje</span>
+            <h2>{formatCalendarDay(todayKey)}</h2>
+            <p>Use essa marca para separar rapidamente o que ja passou do que ainda vem pela frente.</p>
+          </div>
+          <div className="calendar-now-actions">
+            <span className="trend-badge">Hoje</span>
+            <CalendarCarouselControls />
+          </div>
+        </article>
+
+        {timelineDays.length ? (
+          <div className="calendar-carousel" data-calendar-carousel>
+            <CalendarCarouselCenter />
+            <div className="calendar-carousel-spacer" aria-hidden="true" />
+            {timelineDays.map((dayBlock, index) => (
+              <article
+                key={dayBlock.day || `day-${index}`}
+                className={`list-panel calendar-carousel-item ${dayBlock.bucket === "today" ? "is-today" : ""}`}
+                data-day-bucket={dayBlock.bucket || "future"}
+              >
+                <div className="calendar-carousel-chip-row">
+                  <span className={`calendar-carousel-dot ${dayBlock.bucket || "future"}`} />
+                  <span className="trend-badge">{dayBlock.bucket === "past" ? "Passado" : dayBlock.bucket === "today" ? "Hoje" : "Futuro"}</span>
+                  <span className="tag">{formatNumber(dayBlock.total || 0)} evento(s)</span>
+                </div>
+
+                <div className="calendar-day-panel">
+                  <div className="calendar-day-header">
+                    <div>
+                      <h2 className="text-base capitalize">{formatCalendarDay(dayBlock.day)}</h2>
+                      <p className="text-xs text-[var(--muted)]">{relativeDayLabel(dayBlock.day, todayKey)}</p>
+                    </div>
+                  </div>
+
+                  <div className="list-stack">
+                    {(dayBlock.items || []).map((event) => (
+                      <Link
+                        key={`${event.articleId}-${event.day}`}
+                        href={event.newsSlug ? `/noticias/${event.newsSlug}` : "/noticias"}
+                        className="line-link calendar-event-link"
+                      >
+                        <div className="calendar-event-layout">
+                          <div className="calendar-event-thumb">
+                            <SafeImage
+                              src={getCalendarEventImage(event)}
+                              alt={event.title || "Imagem da noticia"}
+                              fill
+                              sizes="(max-width: 640px) 84px, 96px"
+                              className="object-cover"
+                              fallbackClassName="calendar-event-thumb"
+                            />
+                          </div>
+
+                          <div className="calendar-event-copy">
+                            <div className="calendar-event-title-row">
+                              <strong className="line-clamp-2">{event.title || "Evento sem titulo"}</strong>
+                              <span className="trend-badge whitespace-nowrap">{event.typeLabel}</span>
+                            </div>
+                            <span>
+                              {event.sourceName} · confianca {confidenceLabel(event.confidence)} · score{" "}
+                              {formatNumber(event.score || 0)}
+                            </span>
+                            {event.franchise?.slug ? (
+                              <span>Franquia: {event.franchise.name || event.franchise.slug}</span>
+                            ) : null}
+                            {event.summary ? <span>{summarizeTextBySentence(event.summary, 180)}</span> : null}
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </article>
+            ))}
+            <div className="calendar-carousel-spacer" aria-hidden="true" />
+          </div>
+        ) : (
+          <article className="empty-state">
+            <h2 className="mb-2 !text-2xl">Sem eventos no recorte atual</h2>
+            <p>Tente ampliar os dias futuros ou reduzir o filtro de confianca para aumentar a cobertura.</p>
+          </article>
+        )}
       </section>
 
       <section className="metric-strip animate-fade-in-up delay-50">
@@ -139,6 +297,24 @@ export default async function CalendarioPage(props) {
           <span className="data-card-label">Confianca minima</span>
           <p className="kpi-number">{confidenceLabel(confidence)}</p>
           <p className="data-card-note">Com base na data detectada.</p>
+        </article>
+      </section>
+
+      <section className="calendar-lane-grid animate-fade-in-up delay-75">
+        <article className="data-card">
+          <span className="data-card-label">Eventos passados</span>
+          <p className="kpi-number">{formatNumber(pastDays.reduce((total, day) => total + (day?.total || 0), 0))}</p>
+          <p className="data-card-note">Linha do tempo antes de {formatCalendarDay(todayKey)}.</p>
+        </article>
+        <article className="data-card">
+          <span className="data-card-label">Hoje</span>
+          <p className="kpi-number">{formatNumber(todayDays.reduce((total, day) => total + (day?.total || 0), 0))}</p>
+          <p className="data-card-note">Eventos marcados para o dia atual.</p>
+        </article>
+        <article className="data-card">
+          <span className="data-card-label">Eventos futuros</span>
+          <p className="kpi-number">{formatNumber(futureDays.reduce((total, day) => total + (day?.total || 0), 0))}</p>
+          <p className="data-card-note">Agenda prevista para os proximos dias.</p>
         </article>
       </section>
 
@@ -197,55 +373,6 @@ export default async function CalendarioPage(props) {
             Atualizado em: <strong>{payload?.generatedAt ? new Date(payload.generatedAt).toLocaleString("pt-BR") : "sem dado"}</strong>
           </span>
         </div>
-      </section>
-
-      {errorMessage ? (
-        <article className="info-card warning-card animate-fade-in">
-          <h2 className="text-[var(--title)]">Falha ao carregar calendario</h2>
-          <p>{errorMessage}</p>
-        </article>
-      ) : null}
-
-      <section className="panel-grid animate-fade-in-up delay-100">
-        {payload?.days?.length ? (
-          payload.days.map((dayBlock) => (
-            <article key={dayBlock.day} className="list-panel">
-              <div className="mb-2 px-2 py-2">
-                <h2 className="text-base capitalize">{formatCalendarDay(dayBlock.day)}</h2>
-                <p className="text-xs text-[var(--muted)]">
-                  {formatNumber(dayBlock.total || 0)} evento(s) no dia
-                </p>
-              </div>
-              <div className="list-stack">
-                {(dayBlock.items || []).map((event) => (
-                  <Link
-                    key={`${event.articleId}-${event.day}`}
-                    href={event.newsSlug ? `/noticias/${event.newsSlug}` : "/noticias"}
-                    className="line-link"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <strong className="line-clamp-2">{event.title || "Evento sem titulo"}</strong>
-                      <span className="trend-badge whitespace-nowrap">{event.typeLabel}</span>
-                    </div>
-                    <span>
-                      {event.sourceName} · confianca {confidenceLabel(event.confidence)} · score{" "}
-                      {formatNumber(event.score || 0)}
-                    </span>
-                    {event.franchise?.slug ? (
-                      <span>Franquia: {event.franchise.name || event.franchise.slug}</span>
-                    ) : null}
-                    {event.summary ? <span>{summarizeTextBySentence(event.summary, 180)}</span> : null}
-                  </Link>
-                ))}
-              </div>
-            </article>
-          ))
-        ) : (
-          <article className="empty-state">
-            <h2 className="mb-2 !text-2xl">Sem eventos no recorte atual</h2>
-            <p>Tente ampliar os dias futuros ou reduzir o filtro de confianca para aumentar a cobertura.</p>
-          </article>
-        )}
       </section>
     </div>
   );

@@ -2023,6 +2023,7 @@ function buildCalendarEvent(article = {}, dateCandidate = {}) {
   const sourceId = String(refined.sourceId || "unknown");
   const sourceName =
     String(refined.sourceName || "") || SOURCE_DEFINITIONS[sourceId]?.name || sourceId;
+  const imageUrl = String(refined.image || contract.image || "").trim();
 
   return {
     articleId: String(contract.id || ""),
@@ -2038,6 +2039,7 @@ function buildCalendarEvent(article = {}, dateCandidate = {}) {
     score: Number(refined.score || 0),
     sourceId,
     sourceName,
+    image: imageUrl,
     franchise: {
       slug: String(franchise?.slug || ""),
       name: String(franchise?.name || slugToName(franchise?.slug || "")),
@@ -2045,6 +2047,7 @@ function buildCalendarEvent(article = {}, dateCandidate = {}) {
     article: {
       id: String(contract.id || ""),
       url: String(refined.canonicalUrl || refined.url || ""),
+      image: imageUrl,
       publishedAt: String(refined.publishedAt || contract.timestamp || ""),
       lastSeenAt: String(refined.lastSeenAt || contract.timestamp || ""),
     },
