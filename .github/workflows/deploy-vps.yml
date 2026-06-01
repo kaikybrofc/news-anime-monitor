@@ -71,12 +71,48 @@ jobs:
     environment: production
 
     steps:
-      - name: Configure SSH key
+      - name: Configure SSH key and known_hosts
+        env:
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
         run: |
+          set -euo pipefail
+
+          for required in VPS_SSH_PRIVATE_KEY VPS_HOST VPS_PORT VPS_USER; do
+            if [ -z "${!required:-}" ]; then
+              echo "::error::Missing required secret: $required"
+              exit 1
+            fi
+          done
+
+          if ! [[ "$VPS_PORT" =~ ^[0-9]+$ ]]; then
+            echo "::error::Invalid VPS_PORT value: '$VPS_PORT'"
+            exit 1
+          fi
+
           install -m 700 -d ~/.ssh
-          printf '%s\n' '${{ secrets.VPS_SSH_PRIVATE_KEY }}' > ~/.ssh/id_ed25519
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -T 30 -H -p '${{ secrets.VPS_PORT }}' '${{ secrets.VPS_HOST }}' >> ~/.ssh/known_hosts
+          touch ~/.ssh/known_hosts
+
+          KEYSCAN_OK=0
+          for attempt in 1 2 3; do
+            if ssh-keyscan -T 10 -H -p "$VPS_PORT" "$VPS_HOST" >> ~/.ssh/known_hosts 2>/tmp/ssh-keyscan.err; then
+              KEYSCAN_OK=1
+              break
+            fi
+
+            echo "::warning::ssh-keyscan failed (attempt ${attempt}/3) for ${VPS_HOST}:${VPS_PORT}. Retrying in 5s..."
+            sleep 5
+          done
+
+          if [ "$KEYSCAN_OK" -ne 1 ]; then
+            echo "::error::Could not fetch SSH host key from ${VPS_HOST}:${VPS_PORT}. Check host, port, firewall, and SSH service availability."
+            cat /tmp/ssh-keyscan.err || true
+            exit 1
+          fi
 
       - name: Deploy over SSH
         env:
@@ -90,5 +126,15 @@ jobs:
           DEPLOY_PUBLIC_API_URL: ${{ vars.DEPLOY_PUBLIC_API_URL }}
           PM2_API_NAME: ${{ vars.PM2_API_NAME }}
           PM2_WEB_NAME: ${{ vars.PM2_WEB_NAME }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
         run: |
-          ssh -o BatchMode=yes -p '${{ secrets.VPS_PORT }}' '${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}' "export DEPLOY_REF='$DEPLOY_REF' DEPLOY_COMPONENT='$DEPLOY_COMPONENT' DEPLOY_SKIP_SEO_CHECK='$DEPLOY_SKIP_SEO_CHECK' DEPLOY_DOMAIN_URL='$DEPLOY_DOMAIN_URL' DEPLOY_LOCAL_API_URL='$DEPLOY_LOCAL_API_URL' DEPLOY_LOCAL_WEB_URL='$DEPLOY_LOCAL_WEB_URL' DEPLOY_PUBLIC_API_URL='$DEPLOY_PUBLIC_API_URL' PM2_API_NAME='$PM2_API_NAME' PM2_WEB_NAME='$PM2_WEB_NAME'; bash -lc 'set -euo pipefail; echo [remote] user=\$(whoami); echo [remote] pwd=\$(pwd); cd "$DEPLOY_PATH"; echo [remote] project=\$(pwd); bash "$DEPLOY_PATH/scripts/deploy-vps.sh" "$DEPLOY_REF"'"
+          set -euo pipefail
+
+          if [ -z "${DEPLOY_PATH:-}" ]; then
+            echo "::error::Missing required repository variable: DEPLOY_PATH"
+            exit 1
+          fi
+
+          ssh -o BatchMode=yes -o ConnectTimeout=30 -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "export DEPLOY_REF='$DEPLOY_REF' DEPLOY_COMPONENT='$DEPLOY_COMPONENT' DEPLOY_SKIP_SEO_CHECK='$DEPLOY_SKIP_SEO_CHECK' DEPLOY_DOMAIN_URL='$DEPLOY_DOMAIN_URL' DEPLOY_LOCAL_API_URL='$DEPLOY_LOCAL_API_URL' DEPLOY_LOCAL_WEB_URL='$DEPLOY_LOCAL_WEB_URL' DEPLOY_PUBLIC_API_URL='$DEPLOY_PUBLIC_API_URL' PM2_API_NAME='$PM2_API_NAME' PM2_WEB_NAME='$PM2_WEB_NAME'; bash -lc 'set -euo pipefail; echo [remote] user=\$(whoami); echo [remote] pwd=\$(pwd); cd "$DEPLOY_PATH"; echo [remote] project=\$(pwd); bash "$DEPLOY_PATH/scripts/deploy-vps.sh" "$DEPLOY_REF"'"
