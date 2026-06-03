@@ -478,6 +478,149 @@
     opacity: 0.8;
   }
 
+  .home-hero {
+    @apply p-5 md:p-8 lg:p-10;
+  }
+
+  .daily-brief-section {
+    background:
+      linear-gradient(180deg, color-mix(in oklab, var(--card-strong) 96%, transparent), color-mix(in oklab, var(--card) 84%, transparent)),
+      radial-gradient(circle at top left, color-mix(in oklab, var(--primary) 16%, transparent), transparent 38%),
+      radial-gradient(circle at right center, color-mix(in oklab, var(--accent) 72%, transparent), transparent 42%);
+  }
+
+  .daily-brief-header {
+    @apply flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between;
+  }
+
+  .daily-brief-heading {
+    max-width: 46rem;
+  }
+
+  .daily-brief-heading h1 {
+    max-width: 11ch;
+  }
+
+  .daily-brief-actions {
+    @apply flex w-full flex-col gap-3 lg:items-end;
+  }
+
+  .daily-brief-footer {
+    @apply mt-6 flex justify-center md:justify-start;
+  }
+
+  .daily-brief-primary-cta {
+    @apply inline-flex items-center gap-2;
+    box-shadow:
+      rgba(50,50,93,0.22) 0px 24px 42px -24px,
+      rgba(0,0,0,0.12) 0px 16px 30px -18px;
+  }
+
+  .daily-brief-primary-cta svg {
+    @apply text-xs transition-transform;
+  }
+
+  .daily-brief-primary-cta:hover svg {
+    transform: translateX(3px);
+  }
+
+  .home-hero-layout {
+    @apply grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(18rem,0.85fr)] lg:items-end;
+  }
+
+  .home-hero-copy {
+    @apply flex flex-col gap-4;
+  }
+
+  .home-hero-copy h1 {
+    max-width: 12ch;
+  }
+
+  .home-hero-badge {
+    @apply px-3 py-1.5 text-[11px];
+  }
+
+  .home-hero-side {
+    @apply flex flex-col gap-4;
+  }
+
+  .home-hero-spotlight {
+    @apply flex flex-col gap-3 rounded-[1.6rem] border p-4 md:p-5;
+    border-color: color-mix(in oklab, var(--border-strong) 82%, transparent);
+    background:
+      linear-gradient(180deg, color-mix(in oklab, var(--card-strong) 92%, transparent), color-mix(in oklab, var(--card) 84%, transparent)),
+      radial-gradient(circle at top right, color-mix(in oklab, var(--primary) 12%, transparent), transparent 42%);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .home-hero-spotlight h2 {
+    @apply text-[1.2rem] leading-tight md:text-[1.55rem];
+  }
+
+  .home-hero-spotlight p {
+    @apply text-sm md:text-base;
+  }
+
+  .home-hero-spotlight-actions {
+    @apply flex flex-wrap items-center gap-2 pt-1;
+  }
+
+  .home-hero-stat-grid {
+    @apply gap-3;
+  }
+
+  .home-hero-stat-card {
+    content-visibility: visible;
+    contain-intrinsic-size: auto;
+  }
+
+  .home-hero-stat-card .kpi-number {
+    line-height: 0.95;
+  }
+
+  @media (max-width: 640px) {
+    .home-hero {
+      @apply rounded-[1.6rem] p-4;
+    }
+
+    .daily-brief-header {
+      @apply gap-4;
+    }
+
+    .daily-brief-heading h1 {
+      max-width: 100%;
+      font-size: clamp(2.25rem, 12vw, 3.2rem);
+      line-height: 0.98;
+    }
+
+    .daily-brief-actions {
+      max-width: 100%;
+      align-items: stretch;
+    }
+
+    .daily-brief-primary-cta {
+      @apply w-full justify-center;
+    }
+
+    .home-hero-layout {
+      @apply gap-4;
+    }
+
+    .home-hero-copy h1 {
+      max-width: 100%;
+      font-size: clamp(2.15rem, 12vw, 3rem);
+      line-height: 0.98;
+    }
+
+    .home-hero-spotlight {
+      @apply rounded-[1.35rem] p-4;
+    }
+
+    .home-hero-stat-grid {
+      @apply grid-cols-1;
+    }
+  }
+
   .info-card,
   .premium-card,
   .data-card,
@@ -783,6 +926,32 @@
     background: color-mix(in oklab, var(--background-elevated) 68%, transparent);
   }
 
+  @media (max-width: 640px) {
+    .search-shell {
+      @apply rounded-[1.55rem] p-1.5;
+    }
+
+    .search-input-shell {
+      @apply flex-col items-stretch gap-2 rounded-[1.2rem] px-1.5 py-1.5;
+    }
+
+    .search-input {
+      @apply px-3 py-3.5 text-[16px];
+    }
+
+    .search-input-ghost {
+      @apply px-3 py-3.5 text-[16px];
+    }
+
+    .search-input-shell .btn {
+      @apply w-full justify-center;
+    }
+
+    .search-dropdown {
+      @apply top-[calc(100%+0.5rem)] rounded-[1.2rem] p-1.5;
+    }
+  }
+
   .search-input-wrap {
     @apply relative min-w-0 flex-1;
   }
@@ -992,26 +1161,98 @@
     @apply grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 items-stretch;
   }
 
+  .latest-readings-shell {
+    @apply rounded-[2rem] border p-5 md:p-6;
+    border-color: color-mix(in oklab, var(--border-strong) 84%, transparent);
+    background:
+      linear-gradient(180deg, color-mix(in oklab, var(--card-strong) 88%, transparent), color-mix(in oklab, var(--card) 78%, transparent));
+    box-shadow: var(--shadow-soft);
+  }
+
+  .latest-readings-header {
+    @apply flex flex-col gap-4 md:flex-row md:items-end md:justify-between;
+  }
+
+  .latest-readings-heading {
+    max-width: 50rem;
+  }
+
   .daily-brief-grid {
-    @apply grid grid-cols-1 gap-4 md:grid-cols-3;
+    @apply mt-6 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(19rem,0.75fr)];
+  }
+
+  .daily-brief-side-stack {
+    @apply flex flex-col gap-4;
+  }
+
+  @media (max-width: 640px) {
+    .daily-brief-grid {
+      display: flex;
+      flex-direction: column;
+      overflow: visible;
+      padding-bottom: 0;
+      scroll-snap-type: none;
+    }
+
+    .daily-brief-grid > * {
+      scroll-snap-align: unset;
+    }
+
+    .article-grid {
+      @apply gap-4;
+    }
   }
 
   .daily-brief-card {
-    @apply overflow-hidden rounded-[1.25rem] border transition-all;
+    @apply overflow-hidden rounded-[1.45rem] border transition-all;
     border-color: color-mix(in oklab, var(--border-strong) 80%, transparent);
     background:
-      linear-gradient(180deg, color-mix(in oklab, var(--card-strong) 92%, transparent), color-mix(in oklab, var(--card) 82%, transparent));
+      linear-gradient(180deg, color-mix(in oklab, var(--card-strong) 94%, transparent), color-mix(in oklab, var(--card) 82%, transparent));
+    box-shadow:
+      rgba(50,50,93,0.14) 0px 24px 40px -30px,
+      rgba(0,0,0,0.1) 0px 16px 28px -20px;
+  }
+
+  .daily-brief-card-featured {
+    display: grid;
+    grid-template-columns: minmax(0, 1.02fr) minmax(18rem, 0.98fr);
+    min-height: 100%;
+  }
+
+  .daily-brief-card-secondary {
+    min-height: 100%;
   }
 
   .daily-brief-card:hover {
     border-color: color-mix(in oklab, var(--primary) 30%, var(--border-strong));
     box-shadow: var(--shadow-medium);
-    transform: translateY(-2px);
+    transform: translateY(-4px);
+  }
+
+  .daily-brief-card:first-child {
+    background:
+      linear-gradient(180deg, color-mix(in oklab, var(--primary) 11%, var(--card-strong)), color-mix(in oklab, var(--card) 88%, transparent)),
+      linear-gradient(180deg, color-mix(in oklab, var(--card-strong) 96%, transparent), color-mix(in oklab, var(--card) 82%, transparent));
+  }
+
+  @media (max-width: 1024px) {
+    .daily-brief-card-featured {
+      grid-template-columns: 1fr;
+    }
   }
 
   .daily-brief-media {
     @apply relative aspect-[16/9] overflow-hidden;
     background-color: color-mix(in oklab, var(--foreground) 10%, var(--background));
+  }
+
+  .daily-brief-media-featured {
+    min-height: 100%;
+    aspect-ratio: auto;
+  }
+
+  .daily-brief-media-secondary {
+    aspect-ratio: 16 / 8.6;
   }
 
   .daily-brief-media::after {
@@ -1030,21 +1271,44 @@
   }
 
   .daily-brief-body {
-    @apply flex flex-col gap-2 p-4;
+    @apply flex flex-col gap-3 p-4 md:p-5;
+  }
+
+  .daily-brief-body-featured {
+    @apply justify-center p-6 md:p-7;
+  }
+
+  .daily-brief-body-secondary {
+    @apply p-4;
+  }
+
+  .daily-brief-tag {
+    @apply w-fit px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em];
+    background-color: color-mix(in oklab, var(--primary) 10%, transparent);
   }
 
   .daily-brief-body h3 {
-    @apply line-clamp-2 text-base font-semibold leading-tight;
+    @apply line-clamp-2 text-[1.05rem] font-semibold leading-tight md:text-[1.18rem];
     color: var(--title);
   }
 
+  .daily-brief-body-featured h3 {
+    @apply text-[1.5rem] md:text-[2rem];
+    line-height: 1;
+    letter-spacing: -0.04em;
+  }
+
   .daily-brief-body p {
-    @apply line-clamp-2 text-xs leading-relaxed;
+    @apply line-clamp-3 text-sm leading-relaxed;
     color: var(--muted-foreground);
   }
 
+  .daily-brief-body-featured p {
+    @apply text-base md:text-[1.02rem];
+  }
+
   .daily-brief-cta {
-    @apply mt-1 inline-flex items-center gap-2 text-xs font-semibold;
+    @apply mt-2 inline-flex items-center gap-2 text-sm font-semibold;
     color: color-mix(in oklab, var(--primary) 86%, var(--foreground));
   }
 
@@ -1107,6 +1371,37 @@
 
   .article-body {
     @apply flex flex-1 flex-col gap-5 p-5;
+  }
+
+  @media (max-width: 640px) {
+    .article-card {
+      border-radius: 1.35rem;
+    }
+
+    .article-cover {
+      aspect-ratio: 16 / 11;
+    }
+
+    .article-body {
+      @apply gap-4 p-4;
+    }
+
+    .article-meta-row {
+      @apply gap-3 pb-2.5;
+    }
+
+    .article-footer-meta {
+      @apply items-start;
+      flex-wrap: wrap;
+    }
+
+    .article-footer-actions {
+      @apply flex-col items-stretch;
+    }
+
+    .article-footer-actions .btn {
+      @apply w-full;
+    }
   }
 
   .article-meta-row {

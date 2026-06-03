@@ -3,9 +3,8 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowRight } from "@fortawesome/free-solid-svg-icons";
 import { SafeImage } from "@/components/safe-image";
 import { ArticleCard } from "@/components/article-card";
-import { UnifiedSearch } from "@/components/unified-search";
 import { fetchMonitor } from "@/lib/api";
-import { getArticleDetailPath, getArticleImageUrl, getArticleTitle } from "@/lib/formatters";
+import { formatNumber, getArticleDetailPath, getArticleImageUrl, getArticleTitle } from "@/lib/formatters";
 import { toAbsoluteSiteUrl } from "@/lib/site-url";
 
 function pickTop(entries = []) {
@@ -150,6 +149,12 @@ export default async function HomePage() {
     image: getArticleImageUrl(article),
     line: dailyBrief[index] || "Sinal editorial do ciclo atual.",
   }));
+  const spotlight = dailyHighlights[0] || null;
+  const quickSignals = [
+    `${formatNumber(latestPayload.total || latestPayload.items?.length || 0)} notícias no radar`,
+    `${formatNumber(dailyHighlights.length || dailyBrief.length || 0)} sinais para leitura rápida`,
+    "Experiência ajustada para celular",
+  ];
 
   return (
     <div className="page-shell">
@@ -157,39 +162,78 @@ export default async function HomePage() {
         {JSON.stringify([websiteSchema, collectionSchema, organizationSchema])}
       </script>
 
-      <section className="relative z-[20] md:z-[220] animate-fade-in-up">
-        <UnifiedSearch className="mx-auto w-full max-w-4xl" />
-      </section>
+      <section className="hero-card daily-brief-section animate-fade-in-up">
+        <div className="daily-brief-header">
+          <div className="section-heading daily-brief-heading">
+            <span className="page-kicker">Resumo do Dia</span>
+            <h1>O que vale sua atenção agora no radar de anime.</h1>
+            <p className="lead">
+              Uma abertura pensada para prender a atenção do visitante com leitura rápida, destaques visuais e acesso imediato às notícias mais quentes do ciclo.
+            </p>
+          </div>
 
-      <section className="info-card animate-fade-in-up">
-        <div className="section-heading mb-3">
-          <span className="page-kicker">Resumo do Dia</span>
-          <h2>Leitura rápida em 3 sinais</h2>
+          <div className="daily-brief-actions">
+            <div className="badge-row">
+              {quickSignals.map((signal) => (
+                <span key={signal} className="trend-badge home-hero-badge">
+                  {signal}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
+
         {dailyHighlights.length ? (
           <div className="daily-brief-grid">
-            {dailyHighlights.map((item) => (
-              <Link key={item.id} href={item.href} className="daily-brief-card">
-                <div className="daily-brief-media">
+            {dailyHighlights[0] ? (
+              <Link key={dailyHighlights[0].id} href={dailyHighlights[0].href} className="daily-brief-card daily-brief-card-featured">
+                <div className="daily-brief-media daily-brief-media-featured">
                   <SafeImage
-                    src={item.image}
-                    alt={item.title || "Imagem da notícia"}
+                    src={dailyHighlights[0].image}
+                    alt={dailyHighlights[0].title || "Imagem da notícia"}
                     fill
-                    sizes="(max-width: 768px) 100vw, 33vw"
+                    sizes="(max-width: 768px) 100vw, 50vw"
                     className="object-cover"
-                    fallbackClassName="daily-brief-media"
+                    fallbackClassName="daily-brief-media daily-brief-media-featured"
                   />
                 </div>
-                <div className="daily-brief-body">
-                  <h3>{item.title}</h3>
-                  <p>{item.line}</p>
+                <div className="daily-brief-body daily-brief-body-featured">
+                  <span className="tag daily-brief-tag">Destaque principal</span>
+                  <h3>{dailyHighlights[0].title}</h3>
+                  <p>{dailyHighlights[0].line}</p>
                   <span className="daily-brief-cta">
                     Ler notícia
                     <FontAwesomeIcon icon={faArrowRight} />
                   </span>
                 </div>
               </Link>
-            ))}
+            ) : null}
+
+            <div className="daily-brief-side-stack">
+              {dailyHighlights.slice(1).map((item) => (
+                <Link key={item.id} href={item.href} className="daily-brief-card daily-brief-card-secondary">
+                  <div className="daily-brief-media daily-brief-media-secondary">
+                    <SafeImage
+                      src={item.image}
+                      alt={item.title || "Imagem da notícia"}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 25vw"
+                      className="object-cover"
+                      fallbackClassName="daily-brief-media daily-brief-media-secondary"
+                    />
+                  </div>
+                  <div className="daily-brief-body daily-brief-body-secondary">
+                    <span className="tag daily-brief-tag">Leitura rápida</span>
+                    <h3>{item.title}</h3>
+                    <p>{item.line}</p>
+                    <span className="daily-brief-cta">
+                      Abrir
+                      <FontAwesomeIcon icon={faArrowRight} />
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
           </div>
         ) : (
           <ul className="flex flex-col gap-2 text-sm text-[var(--muted-foreground)]">
@@ -201,18 +245,22 @@ export default async function HomePage() {
             ))}
           </ul>
         )}
+
+        <div className="daily-brief-footer">
+          <Link href="/noticias" className="btn btn-primary daily-brief-primary-cta">
+            Ver mais notícias
+            <FontAwesomeIcon icon={faArrowRight} />
+          </Link>
+        </div>
       </section>
 
-      <section className="relative z-10 flex flex-col gap-8">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="section-heading">
+      <section className="relative z-10 flex flex-col gap-8 latest-readings-shell">
+        <div className="latest-readings-header">
+          <div className="section-heading latest-readings-heading">
             <span className="page-kicker">Últimas leituras</span>
             <h2>As histórias mais recentes que entraram no radar</h2>
             <p className="section-copy">Uma seleção do fluxo mais novo já organizada para leitura rápida e contexto imediato.</p>
           </div>
-          <Link href="/noticias" className="btn btn-secondary w-fit !px-6 !py-2 text-sm">
-            Ver coleção completa
-          </Link>
         </div>
 
         {errorMessage ? (
@@ -235,6 +283,45 @@ export default async function HomePage() {
             <p>Nenhuma notícia encontrada no momento.</p>
           </article>
         )}
+      </section>
+
+      <section className="home-hero info-card animate-fade-in-up">
+        <div className="home-hero-layout">
+          <div className="home-hero-copy">
+            <span className="eyebrow">Radar editorial mobile-first</span>
+            <h2>Continue explorando o radar com uma experiência pensada para celular.</h2>
+            <p className="lead">
+              Descubra o que ganhou tração, encontre franquias com rapidez e abra as histórias mais relevantes sem sofrer com um layout apertado no celular.
+            </p>
+          </div>
+
+          <div className="home-hero-side">
+            <article className="home-hero-spotlight">
+              <span className="page-kicker">Destaque do ciclo</span>
+              <h2>{spotlight?.title || "O radar já está acompanhando as próximas movimentações."}</h2>
+              <p>{spotlight?.line || dailyBrief[0] || "Abra o monitor para ver o resumo editorial mais recente."}</p>
+              <div className="home-hero-spotlight-actions">
+                <span className="tag">Leitura guiada</span>
+                <Link href={spotlight?.href || "/noticias"} className="btn btn-secondary w-fit !px-5 !py-2 text-xs">
+                  {spotlight ? "Abrir destaque" : "Explorar notícias"}
+                </Link>
+              </div>
+            </article>
+
+            <div className="mini-stat-grid home-hero-stat-grid">
+              <article className="data-card home-hero-stat-card !p-4">
+                <span className="data-card-label">No radar</span>
+                <p className="kpi-number !text-[2.2rem]">{formatNumber(latestPayload.total || latestPayload.items?.length || 0)}</p>
+                <p className="data-card-note">Itens prontos para descoberta.</p>
+              </article>
+              <article className="data-card home-hero-stat-card !p-4">
+                <span className="data-card-label">Resumo do dia</span>
+                <p className="kpi-number !text-[2.2rem]">{formatNumber(dailyHighlights.length || dailyBrief.length || 0)}</p>
+                <p className="data-card-note">Sinais editoriais logo na abertura.</p>
+              </article>
+            </div>
+          </div>
+        </div>
       </section>
 
     </div>
