@@ -42,7 +42,7 @@ O projeto possui duas camadas:
 - Persistência com MySQL (preferencial) e fallback JSON local.
 - Observabilidade por ciclo e por fonte em `/debug/sources`.
 - Frontend com páginas de notícias, tendências, fontes e franquias.
-- Resumo extrativo local por TF-IDF com a biblioteca pública `natural`, sem chamadas a provedores de IA.
+- Resumo extrativo por TF-IDF e tradução local inglês-português com M2M100 via Transformers.js, sem API externa.
 - Score composto com sinais de qualidade, importância, tendência e velocidade (`velocityScore`).
 - Healthcheck de SEO automatizado para páginas críticas.
 - Lint padronizado para API e frontend.
@@ -197,6 +197,7 @@ Principais opcionais:
 - `NODE_ENV`
 - `SUMMARY_MAX_INPUT_CHARS` (padrão `12000`)
 - `SUMMARY_MAX_OUTPUT_CHARS` (padrão `650`)
+- `TRANSLATION_MODEL` (padrão `Xenova/m2m100_418M`)
 - `NEWS_SOURCE_IDS`
 - `MAX_ITEMS_PER_SOURCE`
 - `MAX_SITEMAPS_PER_SOURCE`
@@ -301,6 +302,7 @@ O repositório mantém:
 - Nginx configurado para `animeradar.shop`
 - `.env` configurado localmente na VPS
 - dependências instaladas com `npm install`
+- acesso à internet no primeiro uso para baixar o modelo de tradução e espaço em disco para o cache
 
 ### Secrets no GitHub
 
@@ -364,6 +366,7 @@ news-anime-monitor/
 
 - API não sobe: valide `.env` e porta configurada.
 - Resumo vazio: confirme se o HTML da fonte contém texto editorial e ajuste `articleContentSelectors` para a fonte.
+- Tradução indisponível: o artigo permanece no idioma original; confirme o acesso ao Hugging Face e o cache local do modelo.
 - Frontend sem dados: configure `NEWS_MONITOR_API_URL` para a API correta.
 - MySQL não conecta: confira `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`.
 - ANN com restrição: configure `ANIMENEWSNETWORK_COOKIE` (ou `ANN_COOKIE`) e mantenha fallback guest.

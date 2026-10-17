@@ -360,7 +360,9 @@ async function processArticleCandidate(
 
   const html = String(articlePageResponse.data || "");
   const resolvedName = resolveArticleName(candidate, html);
-  const name = await translateTitleToPtBr(resolvedName);
+  const name = await translateTitleToPtBr(resolvedName, {
+    sourceId: candidate.sourceId || candidate.sourceConfig?.id,
+  });
 
   if (
     candidate?.sourceId === "crunchyrollnews" &&

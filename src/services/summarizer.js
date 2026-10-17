@@ -13,6 +13,10 @@ const SUMMARY_MAX_OUTPUT_CHARS = toPositiveInt(
   process.env.SUMMARY_MAX_OUTPUT_CHARS,
   650
 );
+const TRANSLATION_MODEL =
+  String(
+    process.env.TRANSLATION_MODEL || "Xenova/m2m100_418M"
+  ).trim() || "Xenova/m2m100_418M";
 const SUMMARY_MAX_SENTENCES = 3;
 const SUMMARY_GENERIC_ERROR_MESSAGE = "Ocorreu um erro durante o resumo.";
 const sentenceTokenizer = new natural.SentenceTokenizer();
@@ -21,6 +25,59 @@ const summaryStopWords = new Set(
   "a ao aos as com como da das de dela dele depois do dos e ela elas ele eles em entre era essa esse esta este eu foi foram ha isso isto mais mas me minha muito na nas no nos nossa o os ou para pela pelo pelas pelos por qual que quem se sem ser seu sua sao somente tambem tem um uma umas uns voce voces anime animacao news manga japanese season studio show serie new update episode latest based official says"
     .split(/\s+/)
 );
+let translationPipelinePromise = null;
+let translationQueue = Promise.resolve();
+
+async function getTranslationPipeline() {
+  if (!translationPipelinePromise) {
+    translationPipelinePromise = import("@huggingface/transformers")
+      .then(({ pipeline }) =>
+        pipeline("translation", TRANSLATION_MODEL, { dtype: "q8" })
+      )
+      .catch((error) => {
+        translationPipelinePromise = null;
+        throw error;
+      });
+  }
+
+  return translationPipelinePromise;
+}
+
+function isPortugueseSource(sourceId = "") {
+  return String(sourceId || "").trim().toLowerCase() === "animenew";
+}
+
+function translateTextToPtBr(value = "", options = {}) {
+  const text = String(value || "").trim();
+  if (!text || isPortugueseSource(options.sourceId)) {
+    return Promise.resolve(text);
+  }
+
+  const task = async () => {
+    try {
+      const translator = await getTranslationPipeline();
+      const output = await translator(text, {
+        src_lang: "en",
+        tgt_lang: "pt",
+        max_new_tokens: 220,
+      });
+      const translated = String(output?.[0]?.translation_text || "").trim();
+      return translated || text;
+    } catch (error) {
+      logger.warn(
+        `[Tradução] Falha no modelo local ${TRANSLATION_MODEL}. Mantendo original: ${error?.message || error}`
+      );
+      return text;
+    }
+  };
+
+  const result = translationQueue.then(task, task);
+  translationQueue = result.then(
+    () => undefined,
+    () => undefined
+  );
+  return result;
+}
 
 function normalizeArticleText(text) {
   return String(text || "")
@@ -188,8 +245,13 @@ async function summarizeHtml(htmlContent, options = {}) {
 
     const limitedText = articleText.slice(0, SUMMARY_MAX_INPUT_CHARS);
     const title = extractTitleFromHtml(htmlContent);
-    const summary = buildExtractiveSummary(limitedText, title);
-    logger.info(`[Resumo] Resumo extrativo local gerado (${summary.length} caracteres).`);
+    const sourceId = options?.sourceConfig?.id || options?.sourceId || "";
+    const extractedSummary = buildExtractiveSummary(limitedText, title);
+    const translatedSummary = await translateTextToPtBr(extractedSummary, {
+      sourceId,
+    });
+    const summary = truncateText(translatedSummary, SUMMARY_MAX_OUTPUT_CHARS);
+    logger.info(`[Resumo] Resumo extrativo traduzido localmente (${summary.length} caracteres).`);
     return summary;
   } catch (error) {
     logger.error("[Resumo] Erro ao gerar resumo:", error.message || error);
@@ -197,8 +259,8 @@ async function summarizeHtml(htmlContent, options = {}) {
   }
 }
 
-function translateTitleToPtBr(title = "") {
-  return Promise.resolve(String(title || "").trim());
+function translateTitleToPtBr(title = "", options = {}) {
+  return translateTextToPtBr(title, options);
 }
 
 async function summarizeUrl(url, options = {}) {
