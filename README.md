@@ -42,7 +42,7 @@ O projeto possui duas camadas:
 - Persistência com MySQL (preferencial) e fallback JSON local.
 - Observabilidade por ciclo e por fonte em `/debug/sources`.
 - Frontend com páginas de notícias, tendências, fontes e franquias.
-- Sumário editorial orientado a contexto e neutralidade (Gemini CLI com fallback para Claude CLI).
+- Resumo extrativo local por TF-IDF com a biblioteca pública `natural`, sem chamadas a provedores de IA.
 - Score composto com sinais de qualidade, importância, tendência e velocidade (`velocityScore`).
 - Healthcheck de SEO automatizado para páginas críticas.
 - Lint padronizado para API e frontend.
@@ -192,26 +192,11 @@ cp .env.example .env
 
 ### API
 
-Obrigatório:
-- Gemini CLI instalado/autenticado no servidor
-- Claude CLI instalado no servidor para uso como fallback
-- `CLAUDE_API` ou `ANTHROPIC_API_KEY` definido para autenticar o Claude CLI
-
 Principais opcionais:
 - `PORT` (padrão `3001`)
 - `NODE_ENV`
-- `GEMINI_CLI_PATH` (padrão `gemini`)
-- `GEMINI_MODEL` (usa o padrão do CLI quando vazio)
-- `GEMINI_TIMEOUT_MS` (padrão `90000`)
-- `GEMINI_MAX_ATTEMPTS` (padrão `3`)
-- `GEMINI_MODEL_AUTO_SWITCH` (padrão `true`)
-- `GEMINI_MODEL_CANDIDATES` (lista separada por vírgula para troca automática)
-- `GEMINI_RETRY_BASE_MS` (padrão `1200`)
-- `GEMINI_APPROVAL_MODE` (padrão `plan`)
-- `GEMINI_DISABLE_EXTENSIONS` (padrão `true`)
-- `CLAUDE_CLI_PATH` (padrão `claude`)
-- `CLAUDE_MODEL` (usa o padrão do CLI quando vazio)
-- `CLAUDE_API` (fallback para `ANTHROPIC_API_KEY`)
+- `SUMMARY_MAX_INPUT_CHARS` (padrão `12000`)
+- `SUMMARY_MAX_OUTPUT_CHARS` (padrão `650`)
 - `NEWS_SOURCE_IDS`
 - `MAX_ITEMS_PER_SOURCE`
 - `MAX_SITEMAPS_PER_SOURCE`
@@ -315,8 +300,7 @@ O repositório mantém:
 - PM2 instalado para o usuário de deploy
 - Nginx configurado para `animeradar.shop`
 - `.env` configurado localmente na VPS
-- Gemini CLI instalado/autenticado
-- Claude CLI instalado com `CLAUDE_API` ou `ANTHROPIC_API_KEY` disponível no ambiente
+- dependências instaladas com `npm install`
 
 ### Secrets no GitHub
 
@@ -379,8 +363,7 @@ news-anime-monitor/
 ## Troubleshooting rápido
 
 - API não sobe: valide `.env` e porta configurada.
-- Erro no Gemini CLI: confirme comando `gemini` disponível e autenticado.
-- Fallback do Claude não entra: confirme `claude` disponível no servidor e `CLAUDE_API` ou `ANTHROPIC_API_KEY` definidos.
+- Resumo vazio: confirme se o HTML da fonte contém texto editorial e ajuste `articleContentSelectors` para a fonte.
 - Frontend sem dados: configure `NEWS_MONITOR_API_URL` para a API correta.
 - MySQL não conecta: confira `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`.
 - ANN com restrição: configure `ANIMENEWSNETWORK_COOKIE` (ou `ANN_COOKIE`) e mantenha fallback guest.
